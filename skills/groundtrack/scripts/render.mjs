@@ -888,8 +888,10 @@ function main(argv) {
   process.exit(0);
 }
 
-// Run only when this file is what node was pointed at. Matched on the resolved
-// path rather than on the file name: the other skill in this repository also
-// ships a `render.mjs`, so a name test would run this main() inside that one.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv);
+// This file is a command, not a module: nothing imports it. It used to run
+// main() only when the path node was given matched its own, and through a
+// symlinked skill directory the two never matched, so every command exited 0
+// having done nothing. A check that says nothing reads as a file with no
+// refusals. Run unconditionally, so no path can reach the silent case.
+main(process.argv);
 

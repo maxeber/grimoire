@@ -15,7 +15,7 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, linkSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, linkSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -1277,5 +1277,43 @@ test('a file that is not JSON is refused before anything else', () => {
   const r = run(groundtrack, [p, '--check']);
   assert.equal(r.code, 2);
   assert.match(r.stderr, /cannot read /);
+});
+
+/* -- run through a linked skill directory ---------------------------------- */
+
+// A harness commonly installs a skill as a symbolic link into another skills
+// directory and reports the link as the skill's base directory. The renderer
+// once ran only when the path node was given matched its own realpath, so
+// through a link it did nothing and exited 0 — and a silent --check reads as a
+// file with no refusals.
+test('the renderer run through a linked skill directory answers as it does through the real one', t => {
+  const link = join(work, 'linked-groundtrack');
+  try {
+    // 'junction' is honoured on Windows, where it needs no admin rights, and
+    // ignored elsewhere, where this is an ordinary directory symlink.
+    symlinkSync(join(groundtrack, '..', '..'), link, 'junction');
+  } catch (e) {
+    t.skip(`this filesystem would not make a directory link: ${e.code}`);
+    return;
+  }
+  const linked = join(link, 'scripts', 'render.mjs');
+  const refusedFile = derive(prog => {
+    for (const node of Object.values(prog.nodes)) delete node.touches;
+  });
+
+  // Each real-path run is pinned to a known outcome as well, so two silent
+  // runs cannot agree their way to a pass.
+  for (const { file, code, stderr } of [
+    { file: refusedFile, code: 1, stderr: /touches/ },
+    { file: exampleFlightpath, code: 0, stderr: /^ok: / },
+  ]) {
+    const real = check(file);
+    assert.equal(real.code, code, `exit code through the real path, for ${file}`);
+    assert.match(real.stderr, stderr, `stderr through the real path, for ${file}`);
+    const viaLink = run(linked, [file, '--check']);
+    assert.equal(viaLink.code, real.code, `exit code through the link, for ${file}`);
+    assert.equal(viaLink.stdout, real.stdout, `stdout through the link, for ${file}`);
+    assert.equal(viaLink.stderr, real.stderr, `stderr through the link, for ${file}`);
+  }
 });
 
