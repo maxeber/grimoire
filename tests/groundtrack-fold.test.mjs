@@ -951,17 +951,12 @@ test('a tag the file gives no kind for is absent from the table, so the row prin
 
 test('a handler is not a source of a kind', () => {
   // An onError entry names the tag it catches and no cause. It says where a
-  // failure stops, never what kind of failure it was. greet declares a handler
-  // for NoSuchUser and throws nothing; take lookupName's throw away and the
-  // tag has no kind left, however many handlers name it.
+  // failure stops, never what kind of failure it was. Catch a tag that nothing
+  // throws and no trace raises, and the handler is the only place it appears.
   const prog = JSON.parse(JSON.stringify(greet));
-  prog.nodes.lookupName.steps = prog.nodes.lookupName.steps.filter(s => s.op !== 'throw');
-  // The kind is file-wide, so the traces are cleared where the file keeps them.
-  // Emptying the view's own `presets` would leave every graph's traces in place
-  // and the table would still find the raised effect.
-  for (const g of prog.graphs) g.presets = [];
-  prog.presets = [];
-  assert.deepEqual({ ...G.failureKinds(prog) }, {});
+  const call = prog.nodes.greet.steps.find(s => s.onError);
+  call.onError.push({ tag: 'OnlyCaught', goto: 'plain' });
+  assert.equal(G.failureKinds(prog).OnlyCaught, undefined);
 });
 
 test('a throw move is not a source of a kind — the step it ran is', () => {
