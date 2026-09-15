@@ -32,43 +32,43 @@ const OPTIONAL = ['files', 'layers', 'sheet'];
 const GRAPH = ['id', 'title', 'blurb', 'entry', 'presets'];
 const NODE = ['name', 'role', 'loc', 'params', 'channels', 'steps', 'touches', 'enteredBy'];
 const FILE = ['path', 'change', 'why', 'adds', 'dels'];
-const PRESET = ['name', 'blurb', 'input', 'walk'];
+const PRESET = ['name', 'blurb', 'input', 'trace'];
 const CHANGE = ['new', 'edit', 'delete', 'forbidden'];
-/* The three kinds a failure can be. Read from the module rather than written
+/* The two kinds a failure can be. Read from the module rather than written
  * again here: the module orders a tag's kinds by this list, and a second copy
- * that drifted would refuse a channel the page then printed. */
-const CHANNEL = Groundtrack.KINDS;
+ * that drifted would refuse a cause the page then printed. */
+const CAUSE = Groundtrack.KINDS;
 
 const STEP = {
-  note: { req: ['note'], opt: [] },
-  let: { req: ['name', 'expr'], opt: [] },
+  comment: { req: ['comment'], opt: [] },
+  var: { req: ['name', 'expr'], opt: [] },
   if: { req: ['cond', 'then', 'else'], opt: [] },
   goto: { req: ['to'], opt: [] },
   call: { req: ['target'], opt: ['args', 'bind', 'onError'] },
   effect: { req: ['kind', 'desc'], opt: ['args', 'bind', 'onError'] },
-  throw: { req: ['tag', 'message', 'channel'], opt: [] },
+  throw: { req: ['tag', 'message', 'cause'], opt: [] },
   return: { req: ['expr'], opt: [] },
 };
 
 /* The move kind is the op that ran. These eight names are the eight ops, and
  * four more move a frame rather than run a step. */
 const MOVE = {
-  note: { req: ['at', 'next'], opt: [] },
-  let: { req: ['at', 'next'], opt: [] },
+  comment: { req: ['at', 'next'], opt: [] },
+  var: { req: ['at', 'next'], opt: [] },
   if: { req: ['at', 'next'], opt: [] },
   goto: { req: ['at', 'next'], opt: [] },
   call: { req: ['at', 'to', 'next'], opt: [] },
   effect: { req: ['at', 'kind', 'desc'], opt: ['next', 'raised', 'result', 'attempt'] },
-  throw: { req: ['at', 'tag', 'message', 'channel'], opt: [] },
+  throw: { req: ['at', 'tag', 'message', 'cause'], opt: [] },
   return: { req: ['at'], opt: ['value'] },
-  handled: { req: ['at', 'goto', 'next'], opt: [] },
-  unwind: { req: [], opt: [] },
+  catch: { req: ['at', 'goto', 'next'], opt: [] },
+  propagate: { req: [], opt: [] },
   done: { req: [], opt: ['result'] },
-  uncaught: { req: ['tag', 'message', 'channel'], opt: [] },
+  uncaught: { req: ['tag', 'message', 'cause'], opt: [] },
 };
 
-/** The moves that name an op. `handled` is not one: it runs no step of its own. */
-const OP_MOVES = new Set(['note', 'let', 'if', 'goto', 'call', 'effect', 'throw', 'return']);
+/** The moves that name an op. `catch` is not one: it runs no step of its own. */
+const OP_MOVES = new Set(['comment', 'var', 'if', 'goto', 'call', 'effect', 'throw', 'return']);
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -180,9 +180,9 @@ function shape(prog, r) {
         if (isObj(layer.nodes))
           for (const [nid, ov] of Object.entries(layer.nodes)) {
             if (!isNode(prog, nid)) r.shape(`layers.${ln}.nodes.${nid}`, 'is not a node');
-            keys(r, `layers.${ln}.nodes.${nid}`, ov, ['R']);
-            if (isObj(ov) && Array.isArray(ov.R) && !ov.R.length)
-              r.shape(`layers.${ln}.nodes.${nid}.R`, 'state the renamed tokens, or leave the node out of this layer');
+            keys(r, `layers.${ln}.nodes.${nid}`, ov, ['requirements']);
+            if (isObj(ov) && Array.isArray(ov.requirements) && !ov.requirements.length)
+              r.shape(`layers.${ln}.nodes.${nid}.requirements`, 'state the renamed tokens, or leave the node out of this layer');
           }
       }
   }
@@ -193,11 +193,11 @@ function shape(prog, r) {
     if (!isObj(n)) continue;
     if (typeof n.role === 'string' && !n.role.trim()) r.shape(`nodes.${id}.role`, 'is blank — role is an open word, and the page prints it');
     if (n.channels !== undefined) {
-      keys(r, `nodes.${id}.channels`, n.channels, ['A', 'E', 'R']);
+      keys(r, `nodes.${id}.channels`, n.channels, ['success', 'error', 'requirements']);
       if (isObj(n.channels)) {
-        if (n.channels.E !== undefined && !Array.isArray(n.channels.E)) r.shape(`nodes.${id}.channels.E`, 'expected an array of failure tags');
-        if (n.channels.R !== undefined && !Array.isArray(n.channels.R)) r.shape(`nodes.${id}.channels.R`, 'expected an array of tokens');
-        if (n.channels.A !== undefined && typeof n.channels.A !== 'string') r.shape(`nodes.${id}.channels.A`, 'expected a string');
+        if (n.channels.error !== undefined && !Array.isArray(n.channels.error)) r.shape(`nodes.${id}.channels.error`, 'expected an array of failure tags');
+        if (n.channels.requirements !== undefined && !Array.isArray(n.channels.requirements)) r.shape(`nodes.${id}.channels.requirements`, 'expected an array of tokens');
+        if (n.channels.success !== undefined && typeof n.channels.success !== 'string') r.shape(`nodes.${id}.channels.success`, 'expected a string');
       }
     }
     if (!Array.isArray(n.steps)) {
@@ -215,7 +215,14 @@ function shape(prog, r) {
         if (s[k] !== undefined && L[s[k]] === undefined) r.shape(w, `${k} "${s[k]}" is not a label in ${id}`);
       }
       if (s.op === 'call' && !isNode(prog, s.target)) r.shape(w, `target "${s.target}" is not a node`);
-      if (s.op === 'throw' && !CHANNEL.includes(s.channel)) r.shape(w, `channel "${s.channel}" is not one of ${CHANNEL.join(', ')}`);
+      if (s.op === 'throw' && !CAUSE.includes(s.cause)) r.shape(w, `cause "${s.cause}" is not one of ${CAUSE.join(', ')}`);
+      /* A fail is part of the node's contract, so its error list names it. A
+       * die is a defect, so the list never does. */
+      if (s.op === 'throw' && CAUSE.includes(s.cause) && isObj(n.channels)) {
+        const listed = (n.channels.error || []).includes(s.tag);
+        if (s.cause === 'fail' && !listed) r.shape(w, `throws "${s.tag}" as a fail, and ${id}'s error list does not name it`);
+        if (s.cause === 'die' && listed) r.shape(w, `throws "${s.tag}" as a die, and ${id}'s error list names it — a die is never in the list`);
+      }
       if (s.onError !== undefined && !Array.isArray(s.onError)) r.shape(w, 'onError expected an array of { tag, goto }');
       for (const h of Array.isArray(s.onError) ? s.onError : []) {
         keys(r, `${w}.onError`, h, ['tag', 'goto'], ['bind']);
@@ -265,14 +272,14 @@ function shape(prog, r) {
     });
     g.presets.forEach((p, i) => {
       keys(r, `graphs[${gi}].presets[${i}]`, p, PRESET);
-      if (!isObj(p) || !isObj(p.walk)) return;
-      keys(r, `graphs[${gi}].presets[${i}].walk`, p.walk, ['provenance', 'steps']);
-      if (!['authored', 'captured'].includes(p.walk.provenance))
-        r.shape(`graphs[${gi}].presets[${i}].walk.provenance`, `"${p.walk.provenance}" is not authored or captured`);
-      if (!Array.isArray(p.walk.steps)) return r.shape(`graphs[${gi}].presets[${i}].walk.steps`, 'expected an array');
-      if (!p.walk.steps.length) r.shape(`graphs[${gi}].presets[${i}].walk.steps`, 'a walk with no moves shows nothing');
-      p.walk.steps.forEach((m, j) => {
-        const w = `graphs[${gi}].presets[${i}].walk.steps[${j}]`;
+      if (!isObj(p) || !isObj(p.trace)) return;
+      keys(r, `graphs[${gi}].presets[${i}].trace`, p.trace, ['provenance', 'steps']);
+      if (!['authored', 'captured'].includes(p.trace.provenance))
+        r.shape(`graphs[${gi}].presets[${i}].trace.provenance`, `"${p.trace.provenance}" is not authored or captured`);
+      if (!Array.isArray(p.trace.steps)) return r.shape(`graphs[${gi}].presets[${i}].trace.steps`, 'expected an array');
+      if (!p.trace.steps.length) r.shape(`graphs[${gi}].presets[${i}].trace.steps`, 'a trace with no moves shows nothing');
+      p.trace.steps.forEach((m, j) => {
+        const w = `graphs[${gi}].presets[${i}].trace.steps[${j}]`;
         if (!isObj(m) || !MOVE[m.k]) return r.shape(w, `k "${m && m.k}" is not a move kind`);
         keys(r, `${w} (${m.k})`, m, ['k', ...MOVE[m.k].req], MOVE[m.k].opt);
       });
@@ -288,7 +295,7 @@ function shape(prog, r) {
  */
 function path(prog, gi, pi, r) {
   const graph = prog.graphs[gi];
-  const { walk, name: runName } = graph.presets[pi];
+  const { trace: walk, name: runName } = graph.presets[pi];
   /* Every node is written before any is read, so this one cannot reach the
    * prototype today. Bare anyway: the property is one loop order away from
    * being untrue, and nothing would say so. */
@@ -302,8 +309,8 @@ function path(prog, gi, pi, r) {
    * than at a step that is not there. */
   const base = `graphs[${gi}].presets[${pi}]`;
   const where = `graph "${graph.id}", run "${runName}"`;
-  const pathAt = i => (i >= walk.steps.length ? `${base}.walk` : `${base}.walk.steps[${i}]`);
-  const wordsAt = i => (i >= walk.steps.length ? `${where}, at the end of the walk` : `${where}, move ${i}`);
+  const pathAt = i => (i >= walk.steps.length ? `${base}.trace` : `${base}.trace.steps[${i}]`);
+  const wordsAt = i => (i >= walk.steps.length ? `${where}, at the end of the trace` : `${where}, move ${i}`);
   const bad = (i, m) => r.walk(pathAt(i), wordsAt(i), m);
 
   /* A walk begins at its graph's entry with the cursor at zero. No move says so. */
@@ -326,6 +333,15 @@ function path(prog, gi, pi, r) {
    * is exactly where the error is still moving. Cleared by the catch, and by
    * reaching the top. */
   let raised = null;
+  /* An error leaves a frame when it propagates out, or when it reaches the top
+   * with the frame still open. The node it leaves states it in its error list
+   * when it is a fail, and never when it is a die. */
+  const leaves = (i, nodeId) => {
+    if (!raised || !CAUSE.includes(raised.cause)) return;
+    const listed = ((((prog.nodes[nodeId] || {}).channels) || {}).error || []).includes(raised.tag);
+    if (raised.cause === 'fail' && !listed) bad(i, `"${raised.tag}" is a fail and leaves ${nodeId}, but ${nodeId}'s error list does not name it`);
+    if (raised.cause === 'die' && listed) bad(i, `"${raised.tag}" is a die and leaves ${nodeId}, but ${nodeId}'s error list names it — a die is never in the list`);
+  };
   const noteEmpty = (i, kind) => {
     if (!frames.length) {
       emptiedAt = i;
@@ -338,16 +354,17 @@ function path(prog, gi, pi, r) {
   };
 
   walk.steps.forEach((m, i) => {
-    if (m.k === 'unwind') {
+    if (m.k === 'propagate') {
       if (!frames.length) return blameEmpty(i, m);
-      if (!raised) bad(i, 'unwind with no error travelling — a frame is popped by a return unless something raised');
+      if (!raised) bad(i, 'propagate with no error travelling — a frame is popped by a return unless something threw');
+      leaves(i, frames[frames.length - 1].nodeId);
       frames.pop();
-      noteEmpty(i, 'unwind');
+      noteEmpty(i, 'propagate');
       return;
     }
     if (m.k === 'done') {
       if (frames.length) bad(i, `done arrived with ${frames.length} frame(s) still open`);
-      if (raised) bad(i, `done arrived while "${raised.tag}" was still travelling (raised at move ${raised.from}) — an error ends in a catch or at the top, and not by the walk stopping`);
+      if (raised) bad(i, `done arrived while "${raised.tag}" was still travelling (raised at move ${raised.from}) — an error ends in a catch or at the top, and not by the trace stopping`);
       frames.length = 0;
       return;
     }
@@ -361,6 +378,8 @@ function path(prog, gi, pi, r) {
     if (m.k === 'uncaught') {
       if (!raised) bad(i, `"${m.tag}" reached the top uncaught, and no move before it raised anything`);
       else if (raised.tag !== m.tag) bad(i, `"${m.tag}" reached the top, but the error travelling is "${raised.tag}"`);
+      else if (raised.cause !== m.cause) bad(i, `"${m.tag}" reached the top as a ${m.cause}, but the error travelling is a ${raised.cause}`);
+      for (const fr of frames) leaves(i, fr.nodeId);
       raised = null;
       for (const fr of frames) {
         if (fr.callAt === undefined) continue;
@@ -380,9 +399,9 @@ function path(prog, gi, pi, r) {
      * return here would discard the error without a catch and without it
      * reaching the top, and a step-running move would mean the frame the error
      * is leaving carried on regardless. Both are walks that contradict their
-     * own graph. The three moves that carry an error — unwind, handled and
+     * own graph. The three moves that carry an error — propagate, catch and
      * uncaught — never reach this line or are excepted below. */
-    if (raised && m.k !== 'handled') {
+    if (raised && m.k !== 'catch') {
       bad(i, `${m.k} ran while "${raised.tag}" was still travelling (raised at move ${raised.from}) — an error is caught, or it reaches the top`);
     }
     const node = prog.nodes[f.nodeId];
@@ -390,10 +409,10 @@ function path(prog, gi, pi, r) {
     if (typeof m.at !== 'number' || !node.steps[m.at]) return bad(i, `${m.k} at ${m.at} is not a step of ${f.nodeId}`);
     const st = node.steps[m.at];
 
-    /* `at` is always the step that ran, so it is always the cursor. A handled
-     * catch is the one move that arrives after an unwind, so its `at` names
+    /* `at` is always the step that ran, so it is always the cursor. A catch
+     * is the one move that arrives after a propagate, so its `at` names
      * the step in this frame whose onError caught, not the cursor. */
-    if (m.k !== 'handled' && m.at !== f.pc) bad(i, `${m.k} ran step ${m.at}, but the cursor sits at ${f.pc}`);
+    if (m.k !== 'catch' && m.at !== f.pc) bad(i, `${m.k} ran step ${m.at}, but the cursor sits at ${f.pc}`);
 
     /* `next` is always where the cursor goes, and it is never worked out. */
     if (m.next !== undefined && !node.steps[m.next]) bad(i, `next ${m.next} is not a step of ${f.nodeId}`);
@@ -402,8 +421,8 @@ function path(prog, gi, pi, r) {
     if (OP_MOVES.has(m.k) && st.op !== m.k) bad(i, `a "${m.k}" move ran step ${m.at}, which is a "${st.op}"`);
 
     switch (m.k) {
-      case 'note':
-      case 'let':
+      case 'comment':
+      case 'var':
       case 'if':
       case 'goto': {
         let ok = false;
@@ -432,24 +451,25 @@ function path(prog, gi, pi, r) {
            * it is handed a reporter that routes to the walk form instead —
            * otherwise this one fault, alone among the walk's, would print a
            * path and go quiet about which run it is in. */
-          keys({ shape: (p, why) => r.walk(p, wordsAt(i), why) }, `${pathAt(i)}.raised`, m.raised, ['tag', 'message', 'channel']);
-          if (isObj(m.raised) && !CHANNEL.includes(m.raised.channel))
-            bad(i, `raised channel "${m.raised.channel}" is not one of ${CHANNEL.join(', ')}`);
-          if (isObj(m.raised)) raised = { tag: m.raised.tag, from: i };
+          keys({ shape: (p, why) => r.walk(p, wordsAt(i), why) }, `${pathAt(i)}.raised`, m.raised, ['tag', 'message', 'cause']);
+          if (isObj(m.raised) && !CAUSE.includes(m.raised.cause))
+            bad(i, `raised cause "${m.raised.cause}" is not one of ${CAUSE.join(', ')}`);
+          if (isObj(m.raised)) raised = { tag: m.raised.tag, from: i, cause: m.raised.cause };
         }
         break;
       case 'throw':
         if (st.op === 'throw' && m.tag !== st.tag) bad(i, `throw tag "${m.tag}" does not match step tag "${st.tag}"`);
-        raised = { tag: m.tag, from: i };
+        if (st.op === 'throw' && m.cause !== st.cause) bad(i, `throw cause "${m.cause}" does not match step cause "${st.cause}"`);
+        raised = { tag: m.tag, from: i, cause: st.op === 'throw' ? st.cause : m.cause };
         break;
-      case 'handled': {
+      case 'catch': {
         const declared = (st.onError || []).filter(h => h.goto === m.goto);
-        if (!declared.length) bad(i, `handled at ${m.at} (${st.op}): its onError does not name "${m.goto}"`);
-        if (!raised) bad(i, `handled at ${m.at} catches nothing — no move before it raised`);
+        if (!declared.length) bad(i, `catch at ${m.at} (${st.op}): its onError does not name "${m.goto}"`);
+        if (!raised) bad(i, `catch at ${m.at} catches nothing — no move before it raised`);
         else if (declared.length && !declared.some(h => h.tag === raised.tag))
-          bad(i, `handled at ${m.at} goes to "${m.goto}", which ${f.nodeId} declares for ${declared.map(h => `"${h.tag}"`).join(', ')}, and the error travelling is "${raised.tag}" (raised at move ${raised.from})`);
-        if (L[m.goto] === undefined) bad(i, `handled goto "${m.goto}" is not a label in ${f.nodeId}`);
-        else if (m.next !== L[m.goto]) bad(i, `handled lands at ${m.next}, but "${m.goto}" is step ${L[m.goto]}`);
+          bad(i, `catch at ${m.at} goes to "${m.goto}", which ${f.nodeId} declares for ${declared.map(h => `"${h.tag}"`).join(', ')}, and the error travelling is "${raised.tag}" (raised at move ${raised.from})`);
+        if (L[m.goto] === undefined) bad(i, `catch goto "${m.goto}" is not a label in ${f.nodeId}`);
+        else if (m.next !== L[m.goto]) bad(i, `catch lands at ${m.next}, but "${m.goto}" is step ${L[m.goto]}`);
         raised = null;
         f.pc = m.next;
         /* The frame resumed, so the call it was suspended at no longer guards
@@ -461,7 +481,7 @@ function path(prog, gi, pi, r) {
         frames.pop();
         noteEmpty(i, 'return');
         /* The caller resumed, so its call's onError is no longer in any
-         * error's way. An unwind does not clear this: there the error is still
+         * error's way. A propagate does not clear this: there the error is still
          * travelling through the frame. */
         if (frames.length) frames[frames.length - 1].callAt = undefined;
         break;
@@ -470,12 +490,12 @@ function path(prog, gi, pi, r) {
     }
   });
 
-  if (frames.length) bad(walk.steps.length, `the walk ended with ${frames.length} frame(s) still open`);
-  /* The last door in the same rule. A walk whose final move unwinds the last
+  if (frames.length) bad(walk.steps.length, `the trace ended with ${frames.length} frame(s) still open`);
+  /* The last door in the same rule. A walk whose final move propagates the last
    * frame leaves no frame open, so the line above is content — and the error
    * is still travelling with nowhere left to go. An error is caught, or it
    * reaches the top. */
-  if (raised) bad(walk.steps.length, `the walk ended while "${raised.tag}" was still travelling (raised at move ${raised.from}) — write the catch, or the uncaught that ends it`);
+  if (raised) bad(walk.steps.length, `the trace ended while "${raised.tag}" was still travelling (raised at move ${raised.from}) — write the catch, or the uncaught that ends it`);
 }
 
 export function check(prog, fileLabel) {
@@ -520,7 +540,7 @@ export function findings(prog) {
     if (!reached.has(id)) out.push(`no graph's entry reaches ${id}, so no sheet draws it`);
   }
 
-  /* An E channel declaring a tag nothing beneath it can produce.
+  /* An error list declaring a tag nothing beneath it can produce.
    *
    * A node produces a tag three ways: it throws it, a step of it declares a
    * handler for it, or one of its effects raised it in a walk this file
@@ -535,7 +555,7 @@ export function findings(prog) {
   prog.graphs.forEach((g, gi) => {
     const view = Groundtrack.graphView(prog, gi);
     for (const p of g.presets) {
-      const states = Groundtrack.fold(view, p.walk);
+      const states = Groundtrack.fold(view, p.trace);
       for (const l of states[states.length - 1].ledger) {
         if (l.raised) (raisedInWalks[l.nodeId] = raisedInWalks[l.nodeId] || new Set()).add(l.raised.tag);
       }
@@ -555,9 +575,21 @@ export function findings(prog) {
   };
   for (const [id, n] of Object.entries(prog.nodes)) {
     const can = tagsOf(id);
-    for (const tag of (n.channels || {}).E || []) {
-      if (!can.has(tag)) out.push(`${id} declares E tag "${tag}", and nothing beneath it produces that tag`);
+    for (const tag of (n.channels || {}).error || []) {
+      if (!can.has(tag)) out.push(`${id} declares error tag "${tag}", and nothing beneath it produces that tag`);
     }
+  }
+
+  /* A handler for a tag the file throws as a die. Legal — a defect can be
+   * caught — and worth seeing, because a catch of a defect should be on
+   * purpose. */
+  const causes = Groundtrack.failureKinds(prog);
+  for (const [id, n] of Object.entries(prog.nodes)) {
+    (n.steps || []).forEach((s, at) => {
+      for (const h of s.onError || []) {
+        if ((causes[h.tag] || []).includes('die')) out.push(`${id}[${at}] catches "${h.tag}", which the file throws as a die`);
+      }
+    });
   }
 
   /* Files in the change that no node accounts for, by name. A
@@ -575,7 +607,7 @@ export function findings(prog) {
 
 /* -- the text output ------------------------------------------------------
  *
- * One shared walk drives the page and the text, so the two produce the same
+ * One shared trace drives the page and the text, so the two produce the same
  * row list. One row is a call site, not a node, so a node called twice appears
  * twice. Without the run's end marks every run in a file prints the same text,
  * which would make the reader's choice of run change nothing.
@@ -584,19 +616,19 @@ export function text(prog, graphIndex, runIndex) {
   const view = Groundtrack.graphView(prog, graphIndex);
   const i = runIndex === undefined ? Groundtrack.suggestRun(view) : runIndex;
   const run = view.presets[i];
-  const rows = Groundtrack.treeRows(view, run.walk);
+  const rows = Groundtrack.treeRows(view, run.trace);
   const L = [];
 
   /* Read across the whole file, because the sentence says "in this file". A
    * change whose first graph was written by hand and whose second was captured
    * is mixed, and saying so on either sheet is the honest reading. */
-  const kinds = [...new Set(prog.graphs.flatMap(g => g.presets.map(p => p.walk.provenance)))];
+  const kinds = [...new Set(prog.graphs.flatMap(g => g.presets.map(p => p.trace.provenance)))];
   L.push(
     kinds.length === 1 && kinds[0] === 'captured'
-      ? 'The walks in this file were captured from a real run.'
+      ? 'The traces in this file were captured from a real run.'
       : kinds.length === 1
-        ? 'The walks in this file were written by hand. They are claims about the program, not recordings of it.'
-        : 'The walks in this file are mixed: some were captured from a real run, some were written by hand.',
+        ? 'The traces in this file were written by hand. They are claims about the program, not recordings of it.'
+        : 'The traces in this file are mixed: some were captured from a real run, some were written by hand.',
   );
   L.push('');
   L.push(`${prog.title}`);
@@ -608,25 +640,25 @@ export function text(prog, graphIndex, runIndex) {
     const arrow = row.depth ? '-> ' : '';
     L.push(`${pad}${arrow}${row.name}  [${row.role}]  ${row.state}${row.repeat ? '  (seen above — stopped)' : ''}`);
     /* Where this call site stood on the error, in the rail's words: the tag
-     * beside the raise or the throw, and nothing beside the rest. Only an
-     * error still live at the end of the walk shows here, because that is
-     * where the text reads the walk. */
-    if (row.error) {
-      const how = row.error.how.map(h => (Groundtrack.ERROR_POSITION[h] === 'raised' ? `${h} ${row.error.tag}` : h));
+     * beside the throw, and nothing beside the rest. Only an
+     * error still live at the end of the trace shows here, because that is
+     * where the text reads the trace. */
+    if (row.errorPath) {
+      const how = row.errorPath.how.map(h => (Groundtrack.ERROR_POSITION[h] === 'thrown' ? `${h} ${row.errorPath.tag}` : h));
       L.push(`${pad}   error path: ${how.join(', ')}`);
     }
     /* The tag, then the kind the file gives it. A tag the file gives no kind
      * for prints bare, and one given two prints both. */
-    const E = row.E.length ? row.E.map(t => [t, ...(row.kinds[t] || [])].join(' ')).join(' · ') : 'never';
-    const R = row.R.length ? row.R.join(', ') : 'none';
-    L.push(`${pad}   A ${row.A || '—'}   E ${E}   R ${R}`);
+    const E = row.error.length ? row.error.map(t => [t, ...(row.kinds[t] || [])].join(' ')).join(' · ') : 'never';
+    const R = row.requirements.length ? row.requirements.join(', ') : 'none';
+    L.push(`${pad}   success ${row.success || '—'}   error ${E}   requirements ${R}`);
     if (row.site && (row.site.label || row.site.aside)) {
       if (row.site.label) L.push(`${pad}   at "${row.site.label}"`);
       if (row.site.aside) L.push(`${pad}   ${row.site.aside}`);
     }
     for (const [ln, layer] of Object.entries(prog.layers || {})) {
       const ov = layer.nodes && layer.nodes[row.id];
-      if (ov && ov.R && ov.R.length) L.push(`${pad}   R under ${ln}: ${ov.R.join(', ')}`);
+      if (ov && ov.requirements && ov.requirements.length) L.push(`${pad}   requirements under ${ln}: ${ov.requirements.join(', ')}`);
     }
     for (const fx of row.effects) L.push(`${pad}   · ${fx.kind}  ${fx.desc} — ${fx.mark}`);
   }
@@ -713,8 +745,8 @@ export function page(prog) {
    * string replacement is interpreted: $&, $` and $' stand for the match and
    * the text on either side of it, so author text carrying one of those
    * splices a slab of the template into the middle of the page — including the
-   * template's own real closing script tag, which the escape above cannot help
-   * with because that tag never passed through the file. A function
+   * template's own real closing script tag, which the replace above cannot help
+   * with because that tag never went through the file. A function
    * replacement is inserted literally and has no patterns at all. */
   /* The sheet picker is rendered here rather than built by the page's script,
    * because a control the script creates is in no page as a string and so no

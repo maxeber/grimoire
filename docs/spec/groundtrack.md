@@ -23,9 +23,9 @@ they cannot ask about.
 
 Four things go missing in particular.
 
-**Where a thing breaks, and how badly.** A failure that retries, a failure that
-escapes to a caller, and a failure that destroys the process are three different
-facts, and a file list carries none of them. The last one is invisible to
+**Where a thing breaks, and how badly.** An expected failure a caller catches
+and a defect that destroys the process are two different facts, and a file
+list carries neither of them. The last one is invisible to
 tooling as well as to the reader: a renderer killed for running out of memory
 reaches no error handler, so nothing logs it and the debugging session drops at
 the moment the data was worth having.
@@ -52,20 +52,20 @@ through.
 The reader points it at something that already exists — a diff, a plan, a named
 function, a bare path into a codebase. The agent reads the material and
 hand-writes one file, `<topic>.flightpath.json`, which states one graph and one
-or more recorded walks through it. A zero-dependency renderer turns that file
+or more recorded traces through it. A zero-dependency renderer turns that file
 into a single self-contained HTML page.
 
 Every node on the graph carries three channels, in the framing the skill
 borrows from Effect:
 
-- **A** — what flows out of the node.
-- **E** — where it breaks: the failure tags it can raise, each one a retry, an
-  escape or a die.
-- **R** — what it needs to work.
+- **success** — what flows out of the node.
+- **error** — where it breaks: the tags it can throw as a fail. A die is a
+  defect, and never appears in this list.
+- **requirements** — what it needs to work.
 
-The page draws the graph and steps a cursor over a recorded walk. Nothing is
+The page draws the graph and steps a cursor over a recorded trace. Nothing is
 computed at read time: every branch an `if` took, every value an effect
-returned, and every catch, is a literal in the file. That is what makes the walk
+returned, and every catch, is a literal in the file. That is what makes the trace
 a list of checkable claims rather than a program a reader has to believe.
 
 A **layer** redraws the same graph under a different set of dependencies — the
@@ -78,7 +78,7 @@ answer in the reply and the answer on the page are the same graph seen two ways.
 
 The honesty property is the point of the whole thing, and it has a stated limit.
 The material is durable, so a sceptical reader can go and check the drawing
-against it. The validator proves the walk is a legal path through the graph the
+against it. The validator proves the trace is a legal path through the graph the
 file declares. It cannot prove which branch was taken or what an effect
 returned; those stay the author's claims. The skill says so rather than hiding
 it.
@@ -93,10 +93,10 @@ it.
    what, so that I can see the shape of the change before I read a single file.
 2. As a reviewer, I want each node to state what it returns, so that I can tell
    what flows through the change without inferring it from call sites.
-3. As a reviewer, I want each node to state the failure tags it can raise, so
+3. As a reviewer, I want each node to state the failure tags it can throw, so
    that I can see where the change can break.
-4. As a reviewer, I want a failure marked as a retry, an escape or a die, so
-   that I can tell a transient blip from a crash that destroys the process.
+4. As a reviewer, I want a failure marked as a fail or a die, so that I can
+   tell an expected error from a defect that destroys the process.
 5. As a reviewer, I want each node to state what it needs to work, so that a
    dependency I did not expect is visible rather than buried in an import.
 6. As a reviewer of a 17-file pull request, I want the change cut into more than
@@ -124,28 +124,28 @@ it.
 14. As a maintainer, I want a plan and a change to use the same file shape, so
     that I learn one format rather than two.
 
-**Stepping the walk**
+**Stepping the trace**
 
-15. As a reader, I want to step forward through a recorded walk, so that I can
+15. As a reader, I want to step forward through a recorded trace, so that I can
     follow one route through the mechanism rather than read a static picture.
 16. As a reader, I want to step backward, so that I can re-watch a call I moved
     past too quickly.
 17. As a reader stepping back over a call, I want the drawing to redraw the call
     in reverse — callee to caller — so that unwinding reads as unwinding.
-18. As a reader, I want the walk animated, so that the direction of a call is
+18. As a reader, I want the run animated, so that the direction of a call is
     something I see rather than something I work out.
-19. As a reader, I want to hold the walk on the next effect, so that I can stop
+19. As a reader, I want to hold the run on the next effect, so that I can stop
     where the system touches the outside world.
-20. As a reader, I want to hold the walk on the next error, so that I can stop
+20. As a reader, I want to hold the run on the next error, so that I can stop
     where it breaks without stepping there by hand.
 21. As a reader, I want the call stack as it stands at the cursor, so that I
     know how I got to the node I am looking at.
 22. As a reader, I want the effects ledger to grow as I step, so that I can see
     what the run touched, in order.
-23. As a reader, I want the error path shown when something raises, so that I
+23. As a reader, I want the error path shown when something throws, so that I
     can see how far an error travelled before something caught it.
-24. As a reader, I want the run's inputs shown read-only, so that I know the
-    condition this walk was recorded under, without a field that looks editable
+24. As a reader, I want the run's arguments shown read-only, so that I know the
+    condition this trace was recorded under, without a field that looks editable
     and is not.
 25. As a reader, I want to pick which of several recorded runs to step, so that
     I can watch the failing one rather than the happy path.
@@ -155,14 +155,14 @@ it.
 **Reading one node**
 
 27. As a reader, I want to open one node and see its body, so that I can read
-    the steps the walk is moving over.
+    the steps the trace is moving over.
 28. As a reader, I want the open node's current step marked, so that the source
     view and the cursor agree.
 29. As a reader, I want the open node's files grouped into this node, other
     nodes on this sheet, and in the diff on no node, so that one list answers
     all three questions.
 30. As a reader, I want the open node's declared contract shown, so that I can
-    compare what it says it does against what the walk did.
+    compare what it says it does against what the run did.
 
 **Reading without the drawing**
 
@@ -179,7 +179,7 @@ it.
     choosing a different run changes what I read.
 36. As a reader asking for text, I want the skill to suggest one run and list
     the rest by name and blurb, so that I can overrule the suggestion cheaply.
-37. As a reader asking for text, I want one line saying where the walks came
+37. As a reader asking for text, I want one line saying where the traces came
     from, so that I know whether I am reading a claim or a recording.
 38. As a reader, I want a repeated node marked and stopped rather than expanded
     forever, so that a cycle terminates.
@@ -215,8 +215,8 @@ it.
     reason, so that I can act on it without guessing.
 50. As an agent, I want a refusal to name the move that caused the fault rather
     than the first move to notice it, so that I do not rewrite the wrong half of
-    the walk.
-51. As an agent, I want a walk that claims a tag reached the top uncaught to be
+    the trace.
+51. As an agent, I want a trace that claims a tag reached the top uncaught to be
     refused when a frame in its way declares a handler for it, so that a file
     cannot contradict itself and pass.
 52. As an agent, I want the checker to run in one command with no install, so
@@ -374,7 +374,8 @@ specs enter it.
 - **`role` is an open word.** The page prints it and nothing branches on it. The
   words in use are pure, io, handler, agent and prototype; an author adds one
   when none fits. This replaces the closed node category the prototype had.
-- **The channels are `A` a string, `E` a list of tags, `R` a list of tokens.**
+- **The channels are `success` a string, `error` a list of tags,
+  `requirements` a list of tokens.**
 - **The test field names only the specs that *call* this node**, and nothing
   else. A node covered through its caller lists nothing. Coverage of a lower
   node follows from the call edges, so no field states it. This is a rename and
@@ -387,38 +388,38 @@ Eight ops, and every step may carry a jump label and a remark:
 
 | op | required | notes |
 | --- | --- | --- |
-| note | the note text | |
-| let | a name and an expression | |
+| comment | the comment text | |
+| var | a name and an expression | |
 | if | a condition, a then and an else | both branches name labels in this node |
 | goto | a target | names a label in this node |
 | call | a target node | may bind, pass args and declare handlers |
 | effect | a kind and a description | may bind, pass args and declare handlers |
-| throw | a tag, a message and a channel | the channel is retry, escape or die |
+| throw | a tag, a message and a cause | the cause is fail or die |
 | return | an expression | |
 
 **A jump label is a jump target and only a jump target.** An effect's readable
-name is its description; a walk move's readable name is its description.
+name is its description; a trace move's readable name is its description.
 
-**The remark on a step and the note op are two different things**, and the
+**The remark on a step and the comment op are two different things**, and the
 prototype called both `note`. Rule 1 renames the annotation.
 
 **No step carries a result.** The prototype gave an effect a result, a failure
 condition, a failing attempt and a failure value, so its interpreter knew what
 to return. Nothing runs now, so all four are gone: what an effect returned is a
-fact in the walk, not a rule in the program.
+fact in the trace, not a rule in the program.
 
 Handlers are declared per step as a list of `{ tag, goto }` pairs, each `goto`
 naming a label in the same node.
 
-### The file: a run and its walk
+### The file: a run and its trace
 
-A run carries a name, a one-sentence blurb, its inputs, and its walk. A walk
+A run carries a name, a one-sentence blurb, its inputs, and its trace. A trace
 carries its provenance — **authored** or **captured** — and a flat list of
 moves.
 
 **Three rules cover the whole tape.**
 
-1. **The move kind is the op that ran.** A `let` step produces a `let` move,
+1. **The move kind is the op that ran.** A `var` step produces a `var` move,
    an `if` step an `if` move. There is no mapping to learn. Four kinds name no
    op, because they move a frame rather than run a step.
 2. **`at` always names the step that ran.** Every move that runs a step carries
@@ -430,28 +431,28 @@ moves.
 The qualifiers on rules 2 and 3 are load-bearing. Read without them, both rules
 demand a field of moves that cannot have it.
 
-**Eight moves run a step**, one per op. **Four move a frame:** a handled catch,
-an unwind, the entry frame returning, and an error reaching the top uncaught.
+**Eight moves run a step**, one per op. **Four move a frame:** a catch, a
+propagate, the entry frame returning, and an error reaching the top uncaught.
 
 **Which moves carry which fields:**
 
 | kind | `at` | `next` | also |
 | --- | --- | --- | --- |
-| note, let | yes | yes — the following index | |
+| comment, var | yes | yes — the following index | |
 | if | yes | yes — the then label or the else label | |
 | goto | yes | yes — the target label | |
 | call | yes | yes — where **this** frame resumes | the node it pushed |
-| effect | yes | **either** `next` **or** a raise, never both | the kind, the description, and a result on the `next` form |
-| throw | yes | no — the frame is leaving | the tag, the message, the channel |
+| effect | yes | **either** `next` **or** `raised`, never both | the kind, the description, and a result on the `next` form |
+| throw | yes | no — the frame is leaving | the tag, the message, the cause |
 | return | yes | no — the frame is leaving | the returned value, optional |
-| handled | yes — the step that declares the handler | yes — the step it landed on | the handler label |
-| unwind | no | no | |
+| catch | yes — the step that declares the handler | yes — the step the cursor moves to | the handler label |
+| propagate | no | no | |
 | done | no | no | the result, optional |
-| uncaught | no | no | the tag, the message, the channel |
+| uncaught | no | no | the tag, the message, the cause |
 
 **Frames.**
 
-- **A walk begins in the entry node with the cursor at zero.** No move says so.
+- **A trace begins in the entry node with the cursor at zero.** No move says so.
 - **A call pushes the frame it names, and that frame enters at step zero**, the
   same rule the entry frame follows. Nothing else pushes a frame.
 - **The call's own `next` is the caller's continuation** — where the caller
@@ -459,12 +460,12 @@ an unwind, the entry frame returning, and an error reaching the top uncaught.
   callee is pushed, which is why a caller's cursor is already past its own guard
   while the callee runs. That detail is not trivia: it is exactly what one of
   the shipped validator checks had to get right.
-- **A frame is popped by a return or an unwind**, and by nothing else.
+- **A frame is popped by a return or a propagate**, and by nothing else.
 - **The two terminal moves are stack-free.** They arrive after the last frame
   has gone, so a validator that demands an open frame on every move rejects
-  every valid walk.
+  every valid trace.
 
-**A failing effect is one move, not two.** The effect move carries a raise
+**A failing effect is one move, not two.** The effect move carries `raised`
 instead of a `next`, and the ledger row is derived from that one move. **There
 is no separate raise move, and `raise` is not a move kind.** The prototype had
 one, and it died when the shape locked: an effect with both a status field and a
@@ -473,7 +474,7 @@ to disagree with itself. The status field died in the same pass, because three
 capable runs read it the other way from the checker.
 
 **Model a failure the way the code does.** If the real effect throws, the effect
-move carries the raise. If it returns a failure value that an `if` inspects, the
+move carries `raised`. If it returns a failure value that an `if` inspects, the
 effect move carries `next` to that `if`, and the `if` routes to the throw step.
 Both are ordinary and the tape tells them apart.
 
@@ -481,32 +482,32 @@ A tape covering a call and a failure, in full:
 
 ```json
 [
-  { "k": "let",    "at": 0, "next": 1 },
+  { "k": "var",    "at": 0, "next": 1 },
   { "k": "call",   "at": 1, "to": "bindSheet", "next": 2 },
   { "k": "effect", "at": 0, "kind": "net.get", "desc": "fetch the sheet",
                    "raised": { "tag": "SheetMissing", "message": "404",
-                               "channel": "escape" } },
-  { "k": "unwind" },
-  { "k": "handled", "at": 1, "goto": "warn", "next": 4 },
+                               "cause": "fail" } },
+  { "k": "propagate" },
+  { "k": "catch", "at": 1, "goto": "warn", "next": 4 },
   { "k": "return", "at": 5, "value": { "bound": false } },
   { "k": "done",   "result": { "refused": null } }
 ]
 ```
 
-Read it as: the entry frame runs a `let` and then calls, parking its own cursor
-at 2. The callee enters at zero, its effect raises, and the callee's frame
-unwinds. The entry frame's call step declared a handler, so the error is caught
+Read it as: the entry frame runs a `var` and then calls, parking its own cursor
+at 2. The callee enters at zero, its effect throws, and the callee's frame
+propagates. The entry frame's call step declared a handler, so the error is caught
 there and the cursor lands on the step labelled `warn`. The entry frame returns,
-and the walk is done with no frame open.
+and the trace is done with no frame open.
 
-**Walks live in the file.** They cost about a quarter of a program file — a
+**Traces live in the file.** They cost about a quarter of a program file — a
 kilobyte or two per run, roughly sixty bytes a move — which is cheap enough that
 storing them elsewhere is not a question.
 
 **No recorder ships.** The measurement is the reason: a structural path check
 with no evaluator at all ran 560 moves with zero errors and caught nine of
 eleven deliberate corruptions, a wrong branch included, and a capable agent
-hand-wrote a legal walk nine times out of nine, three of them on a held-out
+hand-wrote a legal trace nine times out of nine, three of them on a held-out
 task the shape had never seen. A recorder would also make one of the two
 measured residual failures *worse* rather than better, because it replays the
 graph it is given and would render a wrong graph internally consistent.
@@ -521,7 +522,7 @@ is legal.
   "production": { "nodes": {} },
   "tests": {
     "entry": "buildShelf",
-    "nodes": { "bindSheet": { "R": ["THREE.TextureLoader -> fakeLoader()"] } }
+    "nodes": { "bindSheet": { "requirements": ["THREE.TextureLoader -> fakeLoader()"] } }
   }
 }
 ```
@@ -550,7 +551,7 @@ and six divergences already exist between them. A second artifact that can
 silently disagree with the first is not worth having. A prose shape document
 ships instead, and the test suite is what binds the two.
 
-The validator proves the walk is a **legal path** and evaluates nothing:
+The validator proves the trace is a **legal path** and evaluates nothing:
 
 - Every `at` indexes a real step of the frame's node, and equals the cursor.
 - Every `next` indexes a real step of the same node.
@@ -558,15 +559,20 @@ The validator proves the walk is a **legal path** and evaluates nothing:
 - `next` lands somewhere the step can reach.
 - A call's target matches the step's target; an effect's kind matches the step's
   kind.
-- A handled catch names a step that declares that handler, and lands on it.
+- A catch names a step that declares that handler, and lands on it.
 - Frames push and pop in order, and the terminal move arrives with none open.
+- A fail is in the error list of every node it leaves, and a die is in none.
+- A throw move and an uncaught move repeat the cause the error carries.
+
+A handler for a tag the file throws as a die is legal, and `--check` reports it
+as a finding.
 
 **Two more checks ship, both measured rather than argued:**
 
 - **Refuse a tag claimed uncaught while a frame in its way declares a handler
   for it.** A frame is in the way when it is *suspended at a call* — track the
   call step when a call pushes a frame, clear it on the matching return, and
-  keep it through an unwind, which is exactly the case where the error is still
+  keep it through a propagate, which is exactly the case where the error is still
   travelling. Two earlier formulations were wrong: *any step of the node* is too
   wide, and *the step the frame's cursor sits at* is simply wrong, because a
   call advances the caller's cursor past the guard before pushing the child.
@@ -575,11 +581,11 @@ The validator proves the walk is a **legal path** and evaluates nothing:
   finding two errors in each where the fidelity rubric found one.
 - **Name the move that emptied the frame stack**, not the first move to notice.
   One measured run went 34 → 36 → 36 → 36 → 36 errors and finished blaming the
-  checker, when the whole fault was a spurious unwind one move earlier than the
+  checker, when the whole fault was a spurious propagate one move earlier than the
   refusal pointed.
 
 **The limit is stated, not hidden.** Structure is checkable and values are not.
-An authored walk may claim any effect result and nothing contradicts it. The
+An authored trace may claim any effect result and nothing contradicts it. The
 skill says this where a reader will see it.
 
 ### The page
@@ -589,11 +595,11 @@ holds changes, and each control sits with what it acts on.
 
 | Region | Holds | Tempo |
 | --- | --- | --- |
-| Head | the run picker and the step controls | drives the walk |
-| Tools, the rail's header | zoom, layer, view, and the holds | changes how the sheet is **read**, and where a walk stops; never moves the cursor |
-| Rail, right | under the tools: call stack, inputs, error path, effects ledger | reads the walk; moves on every step |
+| Head | the run picker and the step controls | drives the run |
+| Tools, the rail's header | zoom, layer, view, and the holds | changes how the sheet is **read**, and where a run stops; never moves the cursor |
+| Rail, right | under the tools: call stack, arguments, error path, effects ledger | reads the trace; moves on every step |
 | Cutaway, below | one node — source, files, contract | changes when a different node is opened |
-| Footer band | title-block cells, sheet facts, the trace | states the sheet; only the trace moves |
+| Footer band | title-block cells, sheet facts, the trace band | states the sheet; only the trace band moves |
 
 Settled placements:
 
@@ -605,7 +611,7 @@ Settled placements:
   row is built from the file, so its width is data. A row too long for the
   rail wraps under its first control.
 - **The holds are the tools' last row** — hold: effect, error — at the top of
-  the rail, over the blocks they watch. The head drives the walk forward; the
+  the rail, over the blocks they watch. The head drives the run forward; the
   holds say where it stops.
 - **No tool sits on the plan pane.** The drawing and the tree own all of it,
   so neither has a corner that a node or a row can go under. The tree has no
@@ -614,12 +620,12 @@ Settled placements:
   its header is sticky, so at a short window its blocks scroll under four
   rows of tools.
 - **The view toggle switches the plan between the drawing and a tree.** The tree
-  is the text format rendered from the same file and the same walk, on paper.
+  is the text format rendered from the same file and the same trace, on paper.
   Stepping works in tree mode; only the animation goes. Zoom has nothing to act
   on there and greys out.
 - **The tree marks the error path, row by row.** At a cursor where an error is
-  live, every row whose call site took part says which part: raised or thrown,
-  passed through, or caught. The tree is one row per call site, so it is the
+  live, every row whose call site took part says which part: thrown,
+  propagated, or caught. The tree is one row per call site, so it is the
   one view that shows the path as a path. Rows are matched by the site each
   error-path entry carries, never by node, so a node called from several
   places is marked only where the error went. The error reaching the top names
@@ -628,34 +634,35 @@ Settled placements:
   down the row's left edge, a glyph before the name, and the word itself in a
   chip after it. The stripe goes on the left and not the right — a reader
   enters a row at its left edge, and that is where the rarest signal on the
-  sheet belongs — just inside the walk-state border, which is drafting order:
+  sheet belongs — just inside the row-state border, which is drafting order:
   the object outline outermost, its annotation within. `--text` prints the
-  same positions, for an error still live at the end of the walk.
+  same positions, for an error still live at the end of the trace.
 - **The stripe and the glyph say where the frame ended up, one word.** A frame
-  that raises and then catches its own error is on the path twice; the rail
+  that throws and then catches its own error is on the path twice; the rail
   lists both in order, and the row says `caught`, which is where it came to
   rest. That word is read off the row's filtered path and never off the fold's
-  raw entries — the fold records a throwing frame as thrown and then as passed
-  through as it unwinds, so the raw last entry would strip the mark off the
+  raw entries — the fold records a throwing frame as thrown and then as
+  propagated as the error leaves it, so the raw last entry would strip the mark off the
   one row a reader looks for first.
-- **The tree tells the frame the walk is in from the frames waiting under it.**
-  Both are on the stack, and on a deep stack that is most of the rows. The
-  running frame keeps the full-ink left rule; the ones waiting under it take
+- **The tree tells the frame the trace is in from the frames waiting under it.**
+  The row states are `running` and `waiting`, and on a deep stack `waiting` is
+  most of the rows. The running frame keeps the full-ink left rule; the ones
+  waiting under it take
   the design system's state rule, which is ink 55 — a stroke that carries a
   signal is held to 3:1. Neither takes a hue: a position on the stack is not a
-  condition. This is a second field on the row and not a fourth walk state,
-  because the state is what `--text` prints and what the checks read.
+  condition. The row's four states are `not called`, `running`, `waiting` and
+  `returned`, and `--text` prints the same four.
 - **The sheet asks the design system for a role, never for a mark colour.** An
   error in flight and a failed effect are one condition and ask for the path;
-  where the path stops and an effect that landed are resolved and ask for the
+  where the path stops and an effect that returned are resolved and ask for the
   caught role. Each theme answers in what it carries: amber and green in the
   deck theme, redline and plain ink in the site theme, where reaching for
   caution directly would have got ink and said nothing. The effect outcome
   wears the same chip as the path's word, at the same weight — it is a closed
   set, derived per call site, and it was already spending those two colours on
-  an 11px word where they could not be seen. Not reached is an absence and
+  an 11px word where they could not be seen. Not called is an absence and
   takes no chip, so every chip drawn means something.
-- **The inputs block is read-only and is called Inputs**, showing the run's whole
+- **The arguments block is read-only and is called arguments**, showing the run's whole
   input block including any injected fault. A field that looks editable and is
   not is worse than a value that never looked editable, and the player needs no
   per-frame scope at all.
@@ -666,7 +673,7 @@ Settled placements:
   nominal one — one of green's few honest uses.
 - **The cutaway opens at 12rem.** Measured as the knee: the smallest cut that
   still shows a small node's whole tape. Ten clips a five-step node, and the
-  tape is where the walk is read. The splitter still moves.
+  tape is where the trace is read. The splitter still moves.
 - **A help note hangs under the thing it describes.** It is centred under the
   thing, with its leader on the thing's middle, and it goes above when there
   is no room below. It is kept inside the window, and its leader stays on the
@@ -690,10 +697,10 @@ Measured facts that govern the layout:
 **The player may derive, never decide.** It pushes a frame, pops a frame,
 appends a ledger row and moves a cursor. It evaluates nothing, and **the page
 contains no dynamic code evaluation at all.** Everything else — the step
-counter, what has been visited, which edges the walk took — is derived by the
+counter, what has been visited, which edges the run took — is derived by the
 fold.
 
-**The page holds the walk to the graph** before drawing it: a move naming a step
+**The page holds the trace to the graph** before drawing it: a move naming a step
 the node has not got, or a pop with no frame open, is refused rather than drawn.
 
 ### Author text on the page
@@ -745,7 +752,7 @@ four are author text, and none of them is exempt because it looks like a key.
 **The text prints the graph with end marks, on request, for one run the reader
 picks.**
 
-- **One shared walk drives the page and the text**, so the two produce the same
+- **One shared fold drives the page and the text**, so the two produce the same
   row list. This is what the claim *the same graph seen two ways* means, and it
   is the half that can be held to code. The other half narrows: the page moves a
   cursor and the text has none, so they are the same graph rather than the same
@@ -763,9 +770,9 @@ picks.**
   channel rows as keywords.
 - **One line of provenance for the file**, above everything.
 - **A repeated node is marked and stopped**, or the output does not terminate.
-- **The skill suggests the longest walk.** It is the only rule that names
+- **The skill suggests the longest trace.** It is the only rule that names
   exactly one run in all three worked programs with no tie. *The run that fails*
-  names none where nothing raises; *the widest run* ties six ways.
+  names none where nothing throws; *the widest run* ties six ways.
 - **Every run not printed is listed by name with the blurb its author already
   wrote.** Sixteen of sixteen runs carry one, so this derives nothing and is
   what lets a reader overrule the suggestion.
@@ -780,7 +787,7 @@ the reader's choice of run change nothing.
 skills/groundtrack/
   SKILL.md
   scripts/      the renderer, and the shared module it inlines
-  references/   the shape document, and the walk-authoring rules
+  references/   the shape document, and the trace-authoring rules
   assets/       the page template, and three vendored font faces
   examples/     the worked programs
 ```
@@ -843,12 +850,12 @@ file there.
 
 **One worked example renders into the published site.** *Disposable by default*
 governs what a reader's run leaves behind, not whether the repository shows what
-the skill produces — and a page that steps over a walk is not something a
+the skill produces — and a page that steps over a trace is not something a
 screenshot can carry.
 
 **Fonts are vendored and inlined.** Three monospace faces ship in the skill's
 assets and are inlined as data URIs, about 45 KB before encoding, against a
-program file whose walks already cost a quarter of that. **The page makes no
+program file whose traces already cost a quarter of that. **The page makes no
 network request at all.** The incumbent links a font CDN instead; a CDN link is
 a dependency on somebody else's uptime, some hosts will not load one, and a
 drawing whose monospace silently degrades is a worse drawing. The prototype
@@ -944,7 +951,7 @@ function its page and its tests share, and the module's own comment says why: it
 lives apart from the markup that calls it so that a test can reach it, and the
 renderer inlines it so the page and the test run the same function.
 
-This is what makes the walk fold testable. The repository takes no dependency,
+This is what makes the trace fold testable. The repository takes no dependency,
 so there is no headless browser and there never will be; the fold has to be
 reachable from Node with no DOM. The prototype's own smoke test drove a real
 browser through a package manager, which this repository cannot do.
@@ -972,11 +979,11 @@ surface invented for the page.
 - **Every refusal fires on a file that breaks exactly that rule**, and the
   message locates the fault as precisely as the fault allows. **A file, and a
   reason, always.** The run and the move are carried **when the fault is in a
-  walk**, which is what makes a refusal actionable there — the measured example
+  trace**, which is what makes a refusal actionable there — the measured example
   reads `<file> / <run> [<move>] "<tag>" is uncaught, but <node>[<step>] declares
   onError for it`. A fault in the file's shape has no run and no move to name: a
   top-level unknown key and an empty optional list are both refused before a
-  walk is read, and both locate to a path into the document instead. A contract
+  trace is read, and both locate to a path into the document instead. A contract
   that demanded all four fields would be a contract two of the required refusals
   could not satisfy.
 - **An unknown key is refused**, including one that differs from a real key by a
@@ -1021,9 +1028,9 @@ surface invented for the page.
 
 **Through seam 2 — the shared module**
 
-- **The walk fold** over a known tape: what the call stack holds at each move,
+- **The trace fold** over a known tape: what the call stack holds at each move,
   what the ledger has collected, which nodes are unreached, and which edges the
-  walk took.
+  run took.
 - **Stepping backward** returns the state stepping forward produced, move for
   move, including the reversed redraw of a call.
 - **Cut-edge derivation** under a layer: a renamed token that appears in a call's
@@ -1081,15 +1088,15 @@ run is a suite nobody runs.
   goes with it. Nothing here is blocked on it, and the sheet still needs no
   fifth colour.
 - **A second viewer.** The stepper prototype proved the engine and retires. One
-  page ships. A recorded walk needs no reducer, so the prototype's engine stays
+  page ships. A recorded trace needs no reducer, so the prototype's engine stays
   retired even though stepping came back. The tree is not a second viewer: one
-  page, one file, one walk, two renderings behind a toggle.
+  page, one file, one trace, two renderings behind a toggle.
 - **The live conversation as an input.** Nothing durable exists to check the
   graph against, so the honesty property the skill rests on disappears. A graph
   of what was just said is a claim with no source.
 - **A recorder.** No offline runner ships. The measurement is in the
   implementation decisions above, and the residual it would buy back is one run
-  in nine on a walk error, against making a graph error worse.
+  in nine on a trace error, against making a graph error worse.
 - **Any change to `eagle-eye`.** Not its layout, not its schema file, not its six
   divergences, not its unknown-key hole. Two unrelated skills making different
   calls is independence, not divergence.
@@ -1116,8 +1123,8 @@ implementation session decides where they go. Both are already computed by
 working code from the file alone, with no run:
 
 - **One file edited by several nodes.** The one finding of the three that is not
-  a graph-versus-walk contradiction, so the argument for refusing it is weaker.
-- **An `E` channel declaring a tag nothing beneath it can produce.** The map
+  a graph-versus-trace contradiction, so the argument for refusing it is weaker.
+- **An `error` list declaring a tag nothing beneath it can produce.** The map
   reads this as folded into a refusal; the two checks that actually shipped are
   different rules, and the prototype surfaces this one as a notice. That
   mismatch is real and is why it is open.
@@ -1157,7 +1164,7 @@ needs. **This is the owner's call.**
 **A synthetic example is available but never the primary.** It can be sized
 perfectly and tuned to show off a channel, and it gives up the one property the
 skill rests on: durable material a sceptical reader can go and check. An invented
-program has an unfalsifiable layer map and a walk that replays against nothing.
+program has an unfalsifiable layer map and a trace that replays against nothing.
 
 **The incumbent breaks the naming rule this spec inherits, in seven places**, and
 that is tracked as its own issue rather than as part of this work.
@@ -1189,9 +1196,9 @@ back is the id matching the symbol it names, which is what a sceptical reader
 checks the drawing against.
 
 **The two unplaced structural findings are findings, not refusals.** *One file
-edited by several nodes* and *an `E` channel declaring a tag nothing beneath it
+edited by several nodes* and *an `error` list declaring a tag nothing beneath it
 can produce* are printed on standard output under `--check`, and the exit code
-stays zero. Neither is a graph-versus-walk contradiction, so refusing a file
+stays zero. Neither is a graph-versus-trace contradiction, so refusing a file
 for either would refuse a file that says exactly what its author meant. Several
 nodes editing one file is the ordinary shape of a change where one file carries
 two concerns, and the shipped example fires it five times.
@@ -1200,11 +1207,11 @@ The second finding needed one change to be worth printing at all. The
 prototype could read an effect's failure set off the step, because its
 intermediate representation gave an effect a `failWith`. The locked shape
 removes that field on purpose, so nothing in the steps says which tags an
-effect can raise. Read from the steps alone the rule fires on every effect that
-can fail, which is most of them. **So the rule reads the walks as well**: a node
+effect can throw. Read from the steps alone the rule fires on every effect that
+can fail, which is most of them. **So the rule reads the traces as well**: a node
 produces a tag if it throws it, if a step of it declares a handler for it, or
-if one of its effects raised it in a walk this file carries. That is still
-computed from the file alone — a walk is part of the file — and it takes the
+if one of its effects threw it in a trace this file carries. That is still
+computed from the file alone — a trace is part of the file — and it takes the
 shipped example from one false finding to none.
 
 **The layer cut is the argument list and nothing else.** The prototype also cut
@@ -1218,8 +1225,8 @@ ship as worked examples is reopened* names three candidates, and the middle one
 is "the change whose failure story is an out-of-memory kill reaching no
 handler". No program for that change exists on any branch — it was found in a
 search and never written up. So the shipped set is the acceptance set
-(`pr-313`), the plan (`map-300-woodwork`, which is where all three
-failure channels and an uncaught tag actually appear), and the small
+(`pr-313`), the plan (`map-300-woodwork`, which is where both
+failure causes and an uncaught tag actually appear), and the small
 `greet` example that uses every move kind in thirty-two moves. The panel-apply
 program stayed on its branch while a file could hold one graph; it is now the
 second graph of `pr-313`, which is what makes that example the first two-sheet
@@ -1270,7 +1277,7 @@ grouping is a pure function in the shared module, because the tab is built at
 runtime and the rendered page as a string cannot show what it draws.
 
 **A file states one change, not one graph.** This document is written
-throughout as though a flightpath file were one graph and its walks. It is now
+throughout as though a flightpath file were one graph and its traces. It is now
 one change: the id, the title, the blurb, the changed files, the sheet rule,
 the ambient values, the layers and one node map at the top level, and a
 `graphs` array beneath them. A graph is an entry point and the runs from it,
@@ -1294,16 +1301,16 @@ accepting both. The three shipped examples migrate: each has one entry today,
 so each becomes a one-graph file with the same nodes, the same runs, the same
 layers and the same findings.
 
-**Two additions to the validator, and no walk rule changed.** A walk is proved
+**Two additions to the validator, and no trace rule changed.** A trace is proved
 against the graph it belongs to, entering at that graph's entry. A graph whose
 `entry` is not in the node map is refused. A node no graph's entry reaches is a
 *finding*, exit zero, for the reason the other two structural findings are
-findings: it is not a graph-versus-walk contradiction, and a node written and
+findings: it is not a graph-versus-trace contradiction, and a node written and
 not yet connected is a work in progress rather than a mistake.
 
 **Every refusal now carries a path into the document.** A shape fault prints
-the path alone, because it is refused before any walk is read and there is no
-run or move to name. A walk fault prints the path and then the graph, the run
+the path alone, because it is refused before any trace is read and there is no
+run or move to name. A trace fault prints the path and then the graph, the run
 and the move in words, because counting into two arrays to find
 `graphs[1].presets[0]` is work a person should not have to do. The rule that a
 refusal names the move that emptied the frame stack, not the first to notice,
@@ -1321,7 +1328,7 @@ picker itself, and per-sheet page state, are a separate ticket; what shipped
 here is the page reading its graph through one accessor rather than off the
 file root, and a one-graph file showing no picker at all.
 
-**The head is two rows: identity above, the walk's controls below.** The tempo
+**The head is two rows: identity above, the run's controls below.** The tempo
 table puts the pickers and the step controls in the head and says nothing about
 their arrangement; the head was one flex row because two controls fitted on one.
 Three do not — a run picker wide enough to read a run's blurb crowds the title
@@ -1394,8 +1401,8 @@ answer.
 gains the panel-apply graph the prototype branch carried, so the acceptance set
 exercises the picker and the shared node map for real. Its two shared symbols,
 `resolveWoodwork` and `applyWoodFibre`, are defined once, and the prototype's
-walks were re-indexed onto the shipped definitions: the shipped
-`resolveWoodwork` carries two `note` steps the prototype has not got, and the
+traces were re-indexed onto the shipped definitions: the shipped
+`resolveWoodwork` carries two `comment` steps the prototype has not got, and the
 shipped `applyWoodFibre` calls `fibreMapFor` where the prototype inlined the
 bake. The three nodes only the second graph reaches were given the `touches`
 the prototype lacked, which is what takes `shelf-settings.ts` off the

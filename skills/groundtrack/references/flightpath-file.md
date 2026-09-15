@@ -1,7 +1,7 @@
 # The flightpath file
 
 A `<topic>.flightpath.json` file states **one change**: its facts, one node map,
-and a list of graphs. A graph is an entry point and the walks from it. You write
+and a list of graphs. A graph is an entry point and the traces from it. You write
 the file by hand. A page draws one graph at a time. Nothing runs the program the
 file describes.
 
@@ -31,7 +31,7 @@ for that reason.
 groundtrack draws two kinds of thing. A **change** is work already done: a
 written change, a branch, a set of edits. A **plan** is work not yet done: a
 map of tickets, a design still being argued. Both are graphs of nodes, and both
-are walked.
+carry traces.
 
 **The core is every file's:** `id`, `title`, `blurb`, `env`, `nodes`, `graphs`.
 
@@ -101,7 +101,7 @@ thing, so nothing accepts both.
 | `id` | string | The graph's own name. Letters, digits and hyphens; unique in the file. |
 | `title` | string | One line: the sheet picker's label. |
 | `blurb` | string | One or two sentences: what this entry point does. |
-| `entry` | string | The node id the walks enter. Must exist in `nodes`. |
+| `entry` | string | The node id the traces enter. Must exist in `nodes`. |
 | `presets` | array | Named runs from this entry. See [a run](#a-run). |
 
 **A node id is letters, digits and hyphens, and nothing else.** The id reaches
@@ -124,7 +124,7 @@ numbers. `why` says in one sentence why the change touches this file.
 | `role` | string | What kind of thing the node is. See [role](#role). |
 | `loc` | string | Where the node lives: a path, a ticket, a URL. |
 | `params` | array of strings | The names this node takes in. |
-| `channels` | object | `A`, `E`, `R`. See [channels](#channels). |
+| `channels` | object | `success`, `error`, `requirements`. See [channels](#channels). |
 | `steps` | array | The node's body. See [a step](#a-step). |
 | `touches` | array of strings | Paths from `files` this node changes. |
 | `enteredBy` | array of strings | Test files whose specs **call** this node. |
@@ -136,17 +136,33 @@ Any word. The page prints it and nothing branches on it. The words in use are
 
 ### channels
 
-- `A` — a string. What flows out of the node.
-- `E` — an array of strings. The failure tags the node can raise.
-- `R` — an array of strings. What the node needs to work.
+- `success` — a string. What flows out of the node.
+- `error` — an array of strings. The failure tags the node can throw.
+- `requirements` — an array of strings. What the node needs to work.
 
-**Never write a tag's kind here.** The `E` channel is a list of tags, and
+**Never write a tag's kind here.** `error` is a list of tags, and
 nothing more.
 
-The tree, the text output and the contract tab each print `retry`, `escape` or
-`die` beside a tag. The kind is derived file-wide, from the `throw` steps and
-the `raised` moves. A tag found in neither prints bare. A tag found with two
-kinds prints both, retry before escape before die.
+The tree, the text output and the contract tab each print `fail` or `die`
+beside a tag. The kind is derived file-wide, from the `throw` steps and
+the `raised` moves. A tag found in neither prints bare. A tag found with both
+prints both, fail before die.
+
+### fail and die
+
+Every `throw` step, `raised` object and `uncaught` move carries a `cause`.
+
+- **`fail` is an expected error.** A caller is meant to catch it.
+- **`die` is a defect.** Nothing is meant to catch it.
+
+**A fail is part of the contract, and a die never is.**
+
+- A node that throws a fail names the tag in its `error` list.
+- A node that throws a die does not name the tag there.
+- A fail that leaves a node, by `propagate` or at the top, is in that node's `error` list.
+- A die that leaves a node is not in that node's `error` list.
+
+The validator refuses each break of these rules. A handler for a die is legal, and `--check` reports it as a finding.
 
 ### enteredBy
 
@@ -159,31 +175,31 @@ Coverage of a lower node follows from the call edges, so no field states it.
 Every step has `op`. Every step may have `label`, a jump target other steps
 name, and `aside`, a remark about the step.
 
-**`note` is an op, and `aside` is the remark on any other step.** Two different
+**`comment` is an op, and `aside` is the remark on any other step.** Two different
 things, two different names.
 
-**No step carries a result.** What an effect returned is a fact in the walk,
+**No step carries a result.** What an effect returned is a fact in the trace,
 not a rule in the program.
 
 | `op` | Required fields | Optional |
 | --- | --- | --- |
-| `note` | `note` | `label`, `aside` |
-| `let` | `name`, `expr` | `label`, `aside` |
+| `comment` | `comment` | `label`, `aside` |
+| `var` | `name`, `expr` | `label`, `aside` |
 | `if` | `cond`, `then`, `else` | `label`, `aside` |
 | `goto` | `to` | `label`, `aside` |
 | `call` | `target` | `label`, `aside`, `args`, `bind`, `onError` |
 | `effect` | `kind`, `desc` | `label`, `aside`, `args`, `bind`, `onError` |
-| `throw` | `tag`, `message`, `channel` | `label`, `aside` |
+| `throw` | `tag`, `message`, `cause` | `label`, `aside` |
 | `return` | `expr` | `label`, `aside` |
 
 `then`, `else` and `to` name a `label` on a step of the **same** node. `target`
-names a node id. `channel` is one of `retry`, `escape`, `die`.
+names a node id. `cause` is `fail` or `die`.
 
 `onError` is an array of `{ tag, goto, bind? }`. `goto` names a `label` on a
 step of the same node.
 
 **`label` is a jump target and only a jump target.** An effect's readable name
-is `desc`. A walk move's readable name is `desc`.
+is `desc`. An effect move's readable name is `desc` too.
 
 ## A run
 
@@ -192,26 +208,26 @@ is `desc`. A walk move's readable name is `desc`.
 | `name` | string | The run's name. |
 | `blurb` | string | One sentence: what this run shows. |
 | `input` | object | The values this run starts from. Author-keyed. |
-| `walk` | object | `provenance` and `steps`. See [the walk](#the-walk). |
+| `trace` | object | `provenance` and `steps`. See [the trace](#the-trace). |
 
-## The walk
+## The trace
 
 `provenance` is `authored` (a person or an agent wrote it) or `captured` (a
 real run produced it). `steps` is a flat list of moves.
 
 **Three rules cover the whole tape.**
 
-1. **`k` is the op that ran.** A `let` step produces a `let` move, an `if` step
+1. **`k` is the op that ran.** A `var` step produces a `var` move, an `if` step
    an `if` move, a `call` a `call`. There is no mapping to learn. Four moves
-   name no op, because they move a frame rather than run a step: `handled`,
-   `unwind`, `done` and `uncaught`.
+   name no op, because they move a frame rather than run a step: `catch`,
+   `propagate`, `done` and `uncaught`.
 2. **`at` always names the step that ran.** Every move that runs a step has
    one. Three of the four frame moves run no step and carry none.
 
-   **`handled` is the exception, and it is not a second rule.** A handled catch
+   **`catch` is the exception, and it is not a second rule.** A catch move
    carries `at`, and that `at` names the call step whose `onError` caught —
    the step this frame is suspended at, not a step that just ran. It is the
-   one move that arrives after an unwind, so its `at` is the only way to say
+   one move that arrives after a propagate, so its `at` is the only way to say
    which guard did the catching.
 3. **`next` always names where the cursor goes in that same frame.** Every move
    that leaves a live cursor behind has one. The cursor never advances on its
@@ -224,34 +240,34 @@ demand a field of moves that cannot have it.
 
 | `k` | Fields |
 | --- | --- |
-| `note` | `at`, `next` — the following index |
-| `let` | `at`, `next` — the following index |
+| `comment` | `at`, `next` — the following index |
+| `var` | `at`, `next` — the following index |
 | `if` | `at`, `next` — the `then` label or the `else` label |
 | `goto` | `at`, `next` — the `to` label |
 | `call` | `at`, `to`, `next` — `next` is where **this** frame resumes |
-| `effect` | `at`, `kind`, `desc`, and then **either** `next` (+ `result?`, `attempt?`) **or** `raised` |
-| `throw` | `at`, `tag`, `message`, `channel` |
+| `effect` | `at`, `kind`, `desc`, and then **either** `next` (+ `result?`, `attempt?`) **or** `raised` — `attempt` counts the tries of an effect that ran more than once |
+| `throw` | `at`, `tag`, `message`, `cause` |
 | `return` | `at`, `value?` |
 
 ### The four moves that move a frame
 
 | `k` | Fields | Meaning |
 | --- | --- | --- |
-| `handled` | `at`, `goto`, `next` | The step at `at` declares this `goto` in its `onError`. The cursor landed at `next`, the step labelled `goto`. |
-| `unwind` | — | Pop a frame the error passed through. |
+| `catch` | `at`, `goto`, `next` | The step at `at` declares this `goto` in its `onError`. The cursor moves to `next`, the step labelled `goto`. |
+| `propagate` | — | Pop a frame the error leaves. |
 | `done` | `result?` | The entry frame returned. |
-| `uncaught` | `tag`, `message`, `channel` | Nothing caught the error. |
+| `uncaught` | `tag`, `message`, `cause` | Nothing caught the error. |
 
 ### Frames
 
-- **A walk begins at its graph's entry with the cursor at zero.** No move says so.
+- **A trace begins at its graph's entry with the cursor at zero.** No move says so.
 - **A call pushes the frame it names, and that frame enters at step zero.**
   Nothing else pushes a frame.
 - **The call's own `next` is the caller's continuation** — where the caller
   resumes when the callee returns. It is set when the call is made, *before*
   the callee is pushed, which is why a caller's cursor is already past its own
   guard while the callee runs.
-- **A frame is popped by a return or an unwind**, and by nothing else.
+- **A frame is popped by a return or a propagate**, and by nothing else.
 - **The two terminal moves are stack-free.** They arrive after the last frame
   has gone.
 
@@ -260,7 +276,7 @@ demand a field of moves that cannot have it.
 **A failing effect is one move, not two.** The effect move carries `raised`
 instead of `next`, and the ledger row is derived from that one move. There is
 no separate raise move, and `raise` is not a move kind. `raised` holds `tag`,
-`message` and `channel`.
+`message` and `cause`.
 
 **Model a failure the way the code does.** If the real effect throws, write an
 `effect` move with `raised`. If the real effect returns a failure value that an
@@ -271,28 +287,28 @@ route to the `throw` step. Both are ordinary, and the tape tells them apart.
 
 ```json
 [
-  { "k": "let",    "at": 0, "next": 1 },
+  { "k": "var",    "at": 0, "next": 1 },
   { "k": "call",   "at": 1, "to": "bind-sheet", "next": 2 },
   { "k": "effect", "at": 0, "kind": "net.get", "desc": "fetch the sheet",
                    "raised": { "tag": "SheetMissing", "message": "404",
-                               "channel": "escape" } },
-  { "k": "unwind" },
-  { "k": "handled", "at": 1, "goto": "warn", "next": 4 },
+                               "cause": "fail" } },
+  { "k": "propagate" },
+  { "k": "catch", "at": 1, "goto": "warn", "next": 4 },
   { "k": "return", "at": 5, "value": { "bound": false } },
   { "k": "done",   "result": { "refused": null } }
 ]
 ```
 
-Read it as: the entry frame runs a `let` and then calls, parking its own cursor
-at 2. The callee enters at zero, its effect raises, and the callee's frame
-unwinds. The entry frame's call step declared a handler, so the error is caught
-there and the cursor lands on the step labelled `warn`. The entry frame returns,
-and the walk is done with no frame open.
+Read it as: the entry frame runs a `var` and then calls, parking its own cursor
+at 2. The callee enters at zero, its effect throws, and the callee's frame
+propagates. The entry frame's call step declares a handler, so it catches the
+error there. The cursor lands on the step labelled `warn`. The entry frame
+returns, and the trace is done with no frame open.
 
 ## What the validator proves
 
-It proves the walk is a **legal path**, and it evaluates nothing. A walk is
-proved against the graph it belongs to, entering at that graph's entry.
+It proves the trace is a **legal path**, and it evaluates nothing. The validator
+proves a trace against the graph it belongs to, entering at that graph's entry.
 
 - Every `at` indexes a real step of the frame's node, and equals the cursor.
 - Every `next` indexes a real step of the same node.
@@ -300,7 +316,7 @@ proved against the graph it belongs to, entering at that graph's entry.
 - `next` lands somewhere the step can reach.
 - A call's `to` matches that step's `target`; an effect's `kind` matches that
   step's `kind`.
-- A handled catch names a step whose `onError` declares that `goto`, and lands
+- A catch names a step whose `onError` declares that `goto`, and lands
   on it.
 - Frames push and pop in order, and the terminal move arrives with none open.
 - **A tag claimed uncaught is refused when a frame in its way declares a
@@ -308,22 +324,24 @@ proved against the graph it belongs to, entering at that graph's entry.
 - **A refusal names the move that emptied the frame stack**, not the first move
   to notice.
 - **The three exceptional moves need an error to be travelling.** A throw and a
-  raising effect start one; an unwind keeps it; a handled catch and an uncaught
-  end it. So an `unwind` with nothing raised is refused, a `handled` that
-  catches nothing is refused, and an `uncaught` whose tag is not the one
-  travelling is refused. A `handled` is also refused when the `onError` entry
-  it names was declared for some other tag.
+  throwing effect start one; a propagate keeps it; a catch and an uncaught
+  end it. So the validator refuses a `propagate` with nothing thrown. It
+  refuses a `catch` that catches nothing. It refuses an `uncaught` whose tag is
+  not the one travelling. It also refuses a `catch` whose named `onError`
+  entry declares a different tag.
 - **While an error is travelling, only the moves that carry it may run.** A
   `return` that discards the error, and a `done` that arrives while it is
   still moving, are both refused. **An error is caught, or it reaches the
   top.** There is no third ending.
+- **A fail is in the error list of every node it leaves, and a die is in none.**
+- **A throw move and an uncaught move repeat the cause the error carries.**
 
 **What it cannot prove.** Which branch an `if` took, and what an effect
 returned. Both are claims you make. In practice a wrong branch is often caught
 anyway, because the moves after it no longer fit the graph.
 
 **Say this limit out loud when you hand the page over.** The material is
-durable, so a sceptical reader can check the drawing against it. The walk's
+durable, so a sceptical reader can check the drawing against it. The trace's
 structure is checked. Its values are not.
 
 ## What a refusal says
@@ -335,17 +353,17 @@ without reading the prose:
 greet.flightpath.json: graphs[0].entry: "nowhere" is not a node
 ```
 
-**A refusal in a walk names the graph, the run and the move in words** after the
+**A refusal in a trace names the graph, the run and the move in words** after the
 path, because counting into two arrays to find `graphs[1].presets[0]` is work a
 person should not have to do:
 
 ```text
-greet.flightpath.json: graphs[1].presets[0].walk.steps[4]: graph "panel-apply", run "a known user", move 4: call to "greet", but step 0 targets "lookupName"
+greet.flightpath.json: graphs[1].presets[0].trace.steps[4]: graph "panel-apply", run "a known user", move 4: call to "greet", but step 0 targets "lookupName"
 ```
 
-**A fault in the file's shape prints the path alone.** It is refused before any
-walk is read, so there is no run and no move to name, and a refusal never names
-one that does not exist.
+**A fault in the file's shape prints the path alone.** The validator refuses it
+before it reads any trace, so there is no run and no move to name. A refusal
+never names one that does not exist.
 
 ## layers
 
@@ -356,14 +374,14 @@ A layer redraws the graph for one context. Author-keyed; any name.
   "production": { "nodes": {} },
   "tests": {
     "entry": "build-shelf",
-    "nodes": { "bind-sheet": { "R": ["TextureLoader -> fakeLoader() · shelf.test.ts:483"] } }
+    "nodes": { "bind-sheet": { "requirements": ["TextureLoader -> fakeLoader() · shelf.test.ts:483"] } }
   }
 }
 ```
 
 - `entry` is optional and names the node this layer enters. Everything the call
   edges cannot reach from it draws as unreached.
-- `nodes.<id>.R` renames that node's requirements under this layer. **A layer
+- `nodes.<id>.requirements` renames that node's requirements under this layer. **A layer
   substitutes a token, never a node.** The geometry is untouched, so a redraw
   computes nothing.
 - **A cut edge is derived, never declared.** If a renamed token appears in a
@@ -380,12 +398,13 @@ exits zero. Each one is a thing you may have meant.
 
 - **Several nodes edit one file.** Legal, and worth seeing: it is the shape a
   change takes when one file carries two concerns.
-- **An `E` channel declaring a tag nothing beneath it can produce.** A node
+- **An `error` list declaring a tag nothing beneath it can produce.** A node
   produces a tag three ways: it throws it, a step of it declares a handler for
-  it, or one of its effects raised it in a walk this file carries.
+  it, or one of its effects threw it in a trace this file carries.
 - **A file in the change that no node accounts for**, by name. It reads every
   node of the change, so a file one graph covers is not reported because
   another graph does not.
 - **A node no graph's entry reaches**, so no sheet draws it. Legal: a node you
   have written and not yet connected is a work in progress.
 - **A call edge a layer cuts.**
+- **A handler for a tag the file throws as a die.** Legal, and it should be on purpose.

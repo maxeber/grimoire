@@ -91,13 +91,13 @@ test('the check validates a flightpath file, and fails on a broken one', () => {
 
   // Break exactly one thing: a move that ran a step of another op.
   const prog = JSON.parse(readFileSync(join(dir, 'skills', 'groundtrack', 'examples', 'greet.flightpath.json'), 'utf8'));
-  prog.graphs[0].presets[0].walk.steps[0].k = 'let';
+  prog.graphs[0].presets[0].trace.steps[0].k = 'var';
   writeFileSync(join(dir, 'skills', 'groundtrack', 'examples', 'greet.flightpath.json'), JSON.stringify(prog));
 
   const broken = run(checkIn(dir), [], { cwd: dir });
   assert.equal(broken.code, 1);
   assert.match(broken.stderr, /greet\.flightpath\.json failed --check/);
-  assert.match(broken.stderr, /a "let" move ran step 0, which is a "note"/);
+  assert.match(broken.stderr, /a "var" move ran step 0, which is a "comment"/);
 });
 
 test('the check fails an old-shape flightpath file', () => {

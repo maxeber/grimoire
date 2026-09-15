@@ -156,12 +156,12 @@
     "tests": {
       "nodes": {
         "bindSheet": {
-          "R": [
+          "requirements": [
             "THREE.TextureLoader → fakeLoader() · woodwork.test.ts:483"
           ]
         },
         "applyWoodFibre": {
-          "R": [
+          "requirements": [
             "CanvasTexture → () => fibre · woodwork.test.ts:827"
           ]
         }
@@ -177,17 +177,17 @@
         "settings"
       ],
       "channels": {
-        "A": "Woodwork",
-        "E": [],
-        "R": [
+        "success": "Woodwork",
+        "error": [],
+        "requirements": [
           "THREE",
           "woodwork.ts"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "The sheet is bound where the material is made, so a roster of any size costs a default page one sheet."
+          "op": "comment",
+          "comment": "The sheet is bound where the material is made, so a roster of any size costs a default page one sheet."
         },
         {
           "op": "call",
@@ -226,9 +226,9 @@
           "to": "fibre"
         },
         {
-          "op": "note",
+          "op": "comment",
           "label": "flat",
-          "note": "flat binds no map at all — nothing on the wire for the woodwork"
+          "comment": "flat binds no map at all — nothing on the wire for the woodwork"
         },
         {
           "op": "call",
@@ -267,17 +267,17 @@
         "requested"
       ],
       "channels": {
-        "A": "ResolvedWoodwork",
-        "E": [],
-        "R": []
+        "success": "ResolvedWoodwork",
+        "error": [],
+        "requirements": []
       },
       "steps": [
         {
-          "op": "note",
-          "note": "E is empty on purpose. A bad species is a VALUE in the A channel, not a throw — see the refusal below."
+          "op": "comment",
+          "comment": "The error list is empty on purpose. A bad species is a value the success channel carries, not a throw — see the refusal below."
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "species",
           "expr": "$env.roster.find((n) => n === requested) ?? null",
           "aside": "a find over the roster, not `requested in WOODWORK_SHEETS` — an object lookup answers true for toString"
@@ -289,16 +289,16 @@
           "else": "on"
         },
         {
-          "op": "note",
+          "op": "comment",
           "label": "off",
-          "note": "refused in the report, never dropped at parse: a dropped value looks exactly like a value that was applied"
+          "comment": "refused in the report, never dropped at parse: a dropped value looks exactly like a value that was applied"
         },
         {
           "op": "return",
           "expr": "({ species: $env.default, sheet: $env.sheets[$env.default], lay: $env.sheets[$env.default], refused: 'woodwork sheet: \"' + requested + '\" is not a sheet anybody has rendered, so the woodwork is showing ' + $env.default + '. The roster is ' + $env.roster.join(', ') })"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "on",
           "name": "sheet",
           "expr": "$env.sheets[species] ?? null"
@@ -325,14 +325,14 @@
         "lay"
       ],
       "channels": {
-        "A": "void",
-        "E": [],
-        "R": []
+        "success": "void",
+        "error": [],
+        "requirements": []
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Writes each member's world-space period into its UVs IN PLACE. The 0..1 values are gone, so re-laying means new geometry — which is why a species change is rebuild-class and there is no live path to offer."
+          "op": "comment",
+          "comment": "Writes each member's world-space period into its UVs IN PLACE. The 0..1 values are gone, so re-laying means new geometry — which is why a species change is rebuild-class and there is no live path to offer."
         },
         {
           "op": "return",
@@ -354,9 +354,9 @@
         "url"
       ],
       "channels": {
-        "A": "SheetBinding",
-        "E": [],
-        "R": [
+        "success": "SheetBinding",
+        "error": [],
+        "requirements": [
           "THREE.TextureLoader"
         ]
       },
@@ -386,8 +386,8 @@
           "args": "({ url })"
         },
         {
-          "op": "note",
-          "note": "Said out loud rather than raised, because a sheet that never arrives looks like a sheet that was never bound. That absorption is why E above is empty."
+          "op": "comment",
+          "comment": "Said out loud rather than thrown, because a sheet that never arrives looks like a sheet that was never bound. That absorption is why the error list above is empty."
         },
         {
           "op": "return",
@@ -413,9 +413,9 @@
         "lay"
       ],
       "channels": {
-        "A": "number — the scale actually in force",
-        "E": [],
-        "R": [
+        "success": "number — the scale actually in force",
+        "error": [],
+        "requirements": [
           "CanvasTexture"
         ]
       },
@@ -441,9 +441,9 @@
           "aside": "returns the scale IN FORCE, so no call site can report the one that was asked for"
         },
         {
-          "op": "note",
+          "op": "comment",
           "label": "nocanvas",
-          "note": "no 2D context — reported as refused, never silently smooth"
+          "comment": "no 2D context — reported as refused, never silently smooth"
         },
         {
           "op": "return",
@@ -465,19 +465,19 @@
         "lay"
       ],
       "channels": {
-        "A": "CanvasTexture | null",
-        "E": [],
-        "R": [
+        "success": "CanvasTexture | null",
+        "error": [],
+        "requirements": [
           "canvas 2d"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "The fibre rides the SAME UVs the figure does. Laid by the module's default constant it is 4.8x wrong under sapele — with every whole-frame number still in the normal range. #297's crossed-fibre defect, one surface over."
+          "op": "comment",
+          "comment": "The fibre rides the SAME UVs the figure does. Laid by the module's default constant it is 4.8x wrong under sapele — with every whole-frame number still in the normal range. #297's crossed-fibre defect, one surface over."
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "tiles",
           "expr": "lay.unitsPerTile / 0.5"
         },
@@ -512,30 +512,30 @@
         "built"
       ],
       "channels": {
-        "A": "ApplyReport",
-        "E": [],
-        "R": [
+        "success": "ApplyReport",
+        "error": [],
+        "requirements": [
           "THREE",
           "woodwork.ts"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Five report lists. applied / needsRebuild / needsReload / refused are transitions; resolved is a statement."
+          "op": "comment",
+          "comment": "Five report lists. applied / needsRebuild / needsReload / refused are transitions; resolved is a statement."
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "applied",
           "expr": "[]"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "needsRebuild",
           "expr": "[]"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "refused",
           "expr": "[]"
         },
@@ -563,7 +563,7 @@
           "else": "fibreNo"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "fibreOk",
           "name": "applied",
           "expr": "applied.concat('wood fibre: ' + current.materials.woodFibre + ' → ' + fibreInForce)"
@@ -573,7 +573,7 @@
           "to": "species"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "fibreNo",
           "name": "refused",
           "expr": "refused.concat('wood fibre: there is no canvas to draw it on, so the woodwork stays smooth')"
@@ -583,7 +583,7 @@
           "to": "species"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "holdFibre",
           "name": "fibreInForce",
           "expr": "built.fibre",
@@ -606,7 +606,7 @@
           "else": "readback"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "rebuild",
           "name": "needsRebuild",
           "expr": "needsRebuild.concat('woodwork sheet: ' + built.species + ' → ' + next.materials.woodSpecies)"
@@ -652,14 +652,14 @@
         "wanted"
       ],
       "channels": {
-        "A": "boolean",
-        "E": [],
-        "R": []
+        "success": "boolean",
+        "error": [],
+        "requirements": []
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Compared AFTER resolution, never as raw strings: everything off-roster resolves to the default, so walnut and rosewood name one shelf. Comparing the requests would offer a rebuild for a change a rebuild cannot make."
+          "op": "comment",
+          "comment": "Compared AFTER resolution, never as raw strings: everything off-roster resolves to the default, so walnut and rosewood name one shelf. Comparing the requests would offer a rebuild for a change a rebuild cannot make."
         },
         {
           "op": "call",
@@ -700,27 +700,27 @@
         "fibreAsked"
       ],
       "channels": {
-        "A": "WoodworkReadBack",
-        "E": [],
-        "R": []
+        "success": "WoodworkReadBack",
+        "error": [],
+        "requirements": []
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Pure, and in a module with no Three.js in it, so G54 can assert on it without a WebGL context."
+          "op": "comment",
+          "comment": "Pure, and in a module with no Three.js in it, so G54 can assert on it without a WebGL context."
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "sheet",
           "expr": "wanted.sheet === null ? 'no map — the mean-matched flat twin' : wanted.sheet.url + ', laid at ' + wanted.lay.unitsPerTile + ' world units'"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "waiting",
           "expr": "wanted.species === built ? '' : ' — built with ' + built + ', rebuild to change it'"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "lines",
           "expr": "['woodwork sheet: ' + wanted.species + ' (' + sheet + ')' + waiting, 'wood fibre: ' + fibreInForce + (fibreInForce === fibreAsked ? '' : ' (asked for ' + fibreAsked + ')')]",
           "aside": "G54's first draft matched the species by bare substring and was green on a read-back naming no species at all — rosewood and sapele each appear inside their own URL. Anchoring to `woodwork sheet: <name> (` reddened six clauses."
@@ -759,11 +759,11 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -774,12 +774,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -789,7 +789,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -816,7 +816,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -872,12 +872,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -964,11 +964,11 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -979,12 +979,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -994,7 +994,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1021,7 +1021,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1077,12 +1077,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1169,11 +1169,11 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1184,12 +1184,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1199,7 +1199,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -1226,7 +1226,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1282,12 +1282,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1374,11 +1374,11 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1389,12 +1389,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1404,7 +1404,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1428,7 +1428,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1443,7 +1443,7 @@
                 "next": 6
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 6,
                 "next": 7
               },
@@ -1460,12 +1460,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1542,7 +1542,7 @@
         },
         {
           "name": "the sheet 404s",
-          "blurb": "the load failure is warned, not raised — which is why bindSheet's E channel is empty",
+          "blurb": "the load failure is warned, not thrown — which is why bindSheet's error list is empty",
           "input": {
             "rowCount": 5,
             "settings": {
@@ -1553,11 +1553,11 @@
             },
             "sheetMissing": "/wood/rosewood-diff-1024.jpg"
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1568,12 +1568,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1583,7 +1583,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1610,7 +1610,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1638,11 +1638,11 @@
                 "raised": {
                   "tag": "SheetMissing",
                   "message": "404",
-                  "channel": "escape"
+                  "cause": "fail"
                 }
               },
               {
-                "k": "handled",
+                "k": "catch",
                 "at": 0,
                 "goto": "warn",
                 "next": 2
@@ -1656,7 +1656,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -1686,12 +1686,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1779,11 +1779,11 @@
             },
             "noCanvas": true
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1794,12 +1794,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1809,7 +1809,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1836,7 +1836,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1892,12 +1892,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -1920,7 +1920,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -2011,26 +2011,26 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2040,7 +2040,7 @@
                 "next": 11
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 11,
                 "next": 12
               },
@@ -2051,7 +2051,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2062,12 +2062,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2077,7 +2077,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2104,12 +2104,12 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2119,7 +2119,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2150,7 +2150,7 @@
                 "next": 14
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 14,
                 "next": 15
               },
@@ -2161,12 +2161,12 @@
                 "next": 16
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2176,7 +2176,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2203,22 +2203,22 @@
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2295,26 +2295,26 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2324,7 +2324,7 @@
                 "next": 11
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 11,
                 "next": 12
               },
@@ -2335,7 +2335,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2346,12 +2346,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2361,7 +2361,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2388,12 +2388,12 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2403,7 +2403,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2440,12 +2440,12 @@
                 "next": 16
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2455,7 +2455,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2482,22 +2482,22 @@
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2570,26 +2570,26 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2599,7 +2599,7 @@
                 "next": 11
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 11,
                 "next": 12
               },
@@ -2610,7 +2610,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2621,12 +2621,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2636,7 +2636,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -2663,12 +2663,12 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2678,7 +2678,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -2715,12 +2715,12 @@
                 "next": 16
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2730,7 +2730,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -2757,22 +2757,22 @@
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2852,26 +2852,26 @@
             },
             "noCanvas": true
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -2893,12 +2893,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2921,7 +2921,7 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 3,
                 "next": 4
               },
@@ -2936,7 +2936,7 @@
                 "next": 9
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 9,
                 "next": 10
               },
@@ -2952,7 +2952,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2963,12 +2963,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -2978,7 +2978,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3005,12 +3005,12 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3020,7 +3020,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3057,12 +3057,12 @@
                 "next": 16
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3072,7 +3072,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3099,22 +3099,22 @@
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -3191,26 +3191,26 @@
               }
             }
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -3232,12 +3232,12 @@
                 "next": 1
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3274,7 +3274,7 @@
                 "next": 7
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 7,
                 "next": 8
               },
@@ -3290,7 +3290,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -3301,12 +3301,12 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3316,7 +3316,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3343,12 +3343,12 @@
                 "next": 3
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3358,7 +3358,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3395,12 +3395,12 @@
                 "next": 16
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
@@ -3410,7 +3410,7 @@
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -3437,22 +3437,22 @@
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },

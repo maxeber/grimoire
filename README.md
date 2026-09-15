@@ -68,7 +68,7 @@ flags: [`skills/eagle-eye/README.md`](skills/eagle-eye).
 
 Use for a plan already made or work already done, when a reader needs to see
 its shape — what calls what, what each part hands back, where it breaks, and
-what it needs to work. Writes one call graph with recorded walks through it,
+what it needs to work. Writes one call graph with recorded traces through it,
 renders a self-contained page, and prints the same graph as an indented tree on
 request. Not for a conversation with nothing durable behind it.
 

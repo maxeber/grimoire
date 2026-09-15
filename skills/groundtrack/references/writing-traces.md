@@ -1,8 +1,8 @@
-# Writing a walk
+# Writing a trace
 
-A walk is a list of moves you write by hand. Read
+A trace is a list of moves you write by hand. Read
 [`flightpath-file.md`](flightpath-file.md) for the field shape. This page is
-about getting a walk right, and about the two mistakes that measurement says
+about getting a trace right, and about the two mistakes that measurement says
 you will actually make.
 
 ## The loop
@@ -15,27 +15,27 @@ node <skill>/scripts/render.mjs <topic>.flightpath.json --check
 
 Refusals go to standard error and the exit code is 1. Findings go to standard
 output and the exit code stays 0. A refusal names the file and a reason,
-always. When the fault is in a walk it names the run and the move as well.
+always. When the fault is in a trace it names the run and the move as well.
 
 **The loop ends on a clean checker, and a clean checker still prints findings.**
 The loop never fixes them, because a finding never refuses. Read every finding
 when the loop ends, and answer each one before you call the file done.
 
 **Do not write the whole file and then validate once.** Write the graph, run
-the validator, and only then write the first walk. A walk written against a
-graph that does not hold is a walk you will rewrite.
+the validator, and only then write the first trace. A trace written against a
+graph that does not hold is a trace you will rewrite.
 
 Measured on a weak agent over nine runs: with the validator in hand, eight in
 nine reach a clean checker, in a median of two passes and a worst case of
 three. Without it, four in nine were legal on the first attempt and nobody
 found out which four.
 
-## Walk the code, not the diagram
+## Follow the code, not the diagram
 
 Open the material and follow one route through it, move by move. Write the move
 as you pass it. Do not write the shape you expect and then look for it.
 
-A walk written from a remembered shape drifts at the first branch, and the
+A trace written from a remembered shape drifts at the first branch, and the
 drift is silent until a `next` lands somewhere the step cannot reach — often
 four moves later, where the refusal is harder to read.
 
@@ -54,29 +54,33 @@ then push.
 
 ## A failure is one move
 
-An effect that failed carries `raised` and no `next`. There is no separate
-raise move. If you catch yourself writing two moves for one failure, the shape
-has already told you it only wants one.
+An effect that failed carries `raised` and no `next`. No second move
+follows to throw it. If you catch yourself writing two moves for one failure,
+the shape has already told you it only wants one.
 
 Then decide which kind of failure it is:
 
-- **The effect throws.** The effect move carries `raised`. What follows is an
-  `unwind` for each frame the error passes through, then either a `handled` in
-  a frame whose call step declares that tag, or an `uncaught`.
+- **The effect throws.** The effect move carries `raised`. A `propagate`
+  follows for each frame the error leaves. Then comes either an `uncaught`, or
+  a `catch` in a frame whose call step declares that tag.
 - **The effect returns a failure value the code inspects.** The effect move
   carries `next` to the `if` that inspects it, and the `if` routes to the
   `throw` step.
 
 Both are ordinary. Pick the one the real code does.
 
+**Give the error its cause.** Write `fail` for an error the node's `error`
+list names. Write `die` for a defect the list does not name. Every `throw` move
+and the `uncaught` move repeat the cause the error carries.
+
 ## The two things measurement says you will get wrong
 
 ### One: a spurious pop
 
-A `return` or an `unwind` you did not mean empties the frame stack, and every
+A `return` or a `propagate` you did not mean empties the frame stack, and every
 move after it is refused. One measured run went 34 errors, then 36, then 36,
 then 36, and finished blaming the checker — when the whole fault was one
-`unwind` a single move earlier than the refusal pointed.
+`propagate` a single move earlier than the refusal pointed.
 
 The validator now names **the move that emptied the stack**, not the first move
 to notice. When you see that refusal, look at the move it names and nowhere
@@ -97,20 +101,20 @@ The rest is on you. Before you call the file done:
 
 - Read every `onError` you wrote and find the line in the material that catches
   that tag. If there is no such line, delete the handler.
-- Read every `E` channel and find what raises each tag.
+- Read every `error` list and find what throws each tag.
 - Read every `role` and check the node does what the word says. A node marked
   pure that runs an effect is a claim the page prints and nothing tests.
 
 ## Provenance is not decoration
 
-`authored` means a person or an agent wrote this walk from reading the
+`authored` means a person or an agent wrote this trace from reading the
 material. `captured` means a real run produced it. **Write `authored` unless a
 run produced it.** The page stamps the two differently on purpose, because an
-authored walk is a longer claim and not a check.
+authored trace is a longer claim and not a check.
 
-No recorder ships, so today every walk you write is `authored`.
+No recorder ships, so today every trace you write is `authored`.
 
-## What a good walk shows
+## What a good trace shows
 
 One route, chosen because it shows something. A file with five runs that all
 take the happy path is a file whose run picker changes nothing.

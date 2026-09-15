@@ -111,14 +111,14 @@ test('hardenKeys makes a parsed file answer only for keys the author wrote', () 
 
 test('hardenKeys reaches the layers, a layer\'s nodes, and a run\'s input', () => {
   const parsed = JSON.parse(
-    '{"nodes":{"a":{}},"layers":{"tests":{"nodes":{"a":{"R":["x"]}}}},"presets":[{"input":{"user":1}}]}',
+    '{"nodes":{"a":{}},"layers":{"tests":{"nodes":{"a":{"requirements":["x"]}}}},"presets":[{"input":{"user":1}}]}',
   );
   const hard = G.hardenKeys(parsed);
   assert.equal(hard.layers.constructor, undefined);
   assert.equal(hard.layers.tests.nodes.constructor, undefined);
   assert.equal(hard.presets[0].input.constructor, undefined);
   // The author's own keys survive at every level.
-  assert.deepEqual(hard.layers.tests.nodes.a.R, ['x']);
+  assert.deepEqual(hard.layers.tests.nodes.a.requirements, ['x']);
   assert.equal(hard.presets[0].input.user, 1);
 });
 
@@ -130,10 +130,10 @@ test('a label named after a prototype member is not a label until a step carries
   // labelsOf feeds the jump check, which asks `L[s.to] === undefined`. On a
   // plain object that is false for a label nobody declared, so the refusal
   // that names the fault never fires.
-  const node = { steps: [{ op: 'note', note: 'x' }] };
+  const node = { steps: [{ op: 'comment', comment: 'x' }] };
   assert.equal(G.labelsOf(node).constructor, undefined);
   // And a step that does carry it still resolves.
-  const labelled = { steps: [{ op: 'note', note: 'x', label: 'constructor' }] };
+  const labelled = { steps: [{ op: 'comment', comment: 'x', label: 'constructor' }] };
   assert.equal(G.labelsOf(labelled).constructor, 0);
 });
 
@@ -355,7 +355,7 @@ test('a sheet\'s state starts on its own graph, and two sheets do not share one'
 test('a sheet\'s state is folded from its own first run', () => {
   const prog = twoGraphs();
   const a = G.sheetState(prog, 0);
-  assert.deepEqual(a.states, G.fold(G.graphView(prog, 0), prog.graphs[0].presets[0].walk));
+  assert.deepEqual(a.states, G.fold(G.graphView(prog, 0), prog.graphs[0].presets[0].trace));
 });
 
 /* -- the footer band ------------------------------------------------------ */
@@ -429,19 +429,19 @@ test('a graph id the id pattern refuses reaches no attribute', () => {
 test('the fold seeds the entry frame with the cursor at zero, before any move', () => {
   // A walk begins in the entry node with the cursor at zero. No move says so,
   // so the seed state has to.
-  const s = G.fold(greet, runNamed(greet, 'a known user').walk);
+  const s = G.fold(greet, runNamed(greet, 'a known user').trace);
   assert.deepEqual(s[0].frames.map(f => [f.nodeId, f.pc]), [['greet', 0]]);
   assert.deepEqual(s[0].ledger, []);
   assert.equal(s[0].ended, null);
 });
 
 test('one state per cursor position, and one more than there are moves', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   assert.equal(G.fold(greet, walk).length, walk.steps.length + 1);
 });
 
 test('a call pushes a frame at step zero and parks the caller at its own next', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const i = walk.steps.findIndex(m => m.k === 'call');
   const after = s[i + 1];
@@ -452,22 +452,22 @@ test('a call pushes a frame at step zero and parks the caller at its own next', 
 });
 
 test('a return pops the frame and clears the caller from its call', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const i = walk.steps.findIndex(m => m.k === 'return');
   assert.deepEqual(s[i + 1].frames.map(f => f.nodeId), ['greet']);
   assert.equal(s[i + 1].frames[0].callAt, undefined);
 });
 
-test('an unwind pops the frame and keeps the error travelling', () => {
-  const walk = runNamed(greet, 'no such user').walk;
+test('a propagate pops the frame and keeps the error travelling', () => {
+  const walk = runNamed(greet, 'no such user').trace;
   const s = G.fold(greet, walk);
-  const i = walk.steps.findIndex(m => m.k === 'unwind');
+  const i = walk.steps.findIndex(m => m.k === 'propagate');
   assert.deepEqual(s[i + 1].frames.map(f => f.nodeId), ['greet']);
   // The caller is still suspended at the call it made, which is the case the
   // uncaught check exists for.
   assert.equal(s[i + 1].frames[0].callAt, 1);
-  assert.ok(s[i + 1].errorPath.some(e => e.how === 'passed through'));
+  assert.ok(s[i + 1].errorPath.some(e => e.how === 'propagated'));
 });
 
 test('an effect mark outlives the frame that produced it', () => {
@@ -475,71 +475,71 @@ test('an effect mark outlives the frame that produced it', () => {
   // site. Read off the open frame, a node's marks vanished from the drawing
   // the moment it returned, while the tree kept them — one graph seen two
   // ways, disagreeing. The fold carries both keyings for that reason.
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const end = s[s.length - 1];
   assert.equal(end.frames.length, 0, 'nothing is on the stack at the end');
-  assert.equal(end.nodeEffects['lookupName[0]'], 'landed');
-  assert.equal(end.nodeEffects['greet[6]'], 'landed');
+  assert.equal(end.nodeEffects['lookupName[0]'], 'returned');
+  assert.equal(end.nodeEffects['greet[6]'], 'returned');
   // And it is still cumulative-to-the-cursor, not the whole walk at once.
   assert.deepEqual(s[0].nodeEffects, {});
 });
 
 test('the ledger grows one row per effect, in order, with what the walk claims', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const end = s[s.length - 1];
   assert.deepEqual(end.ledger.map(l => [l.nodeId, l.kind, l.outcome]), [
-    ['lookupName', 'db.get', 'landed'],
-    ['greet', 'http.post', 'landed'],
+    ['lookupName', 'db.get', 'returned'],
+    ['greet', 'http.post', 'returned'],
   ]);
 });
 
-test('a failing effect is one move, and it lands in the ledger as raised', () => {
-  const walk = runNamed(greet, 'the post fails').walk;
+test('a failing effect is one move, and it lands in the ledger as threw', () => {
+  const walk = runNamed(greet, 'the post fails').trace;
   const s = G.fold(greet, walk);
   const end = s[s.length - 1];
-  const failed = end.ledger.filter(l => l.outcome === 'failed');
+  const failed = end.ledger.filter(l => l.outcome === 'threw');
   assert.equal(failed.length, 1);
   assert.equal(failed[0].raised.tag, 'SendFailed');
   assert.equal(end.ended, 'uncaught');
   assert.deepEqual(end.frames, []);
 });
 
-test('a handled catch moves the cursor and records the catch on the error path', () => {
-  const walk = runNamed(greet, 'no such user').walk;
+test('a catch moves the cursor and records the catch on the error path', () => {
+  const walk = runNamed(greet, 'no such user').trace;
   const s = G.fold(greet, walk);
-  const i = walk.steps.findIndex(m => m.k === 'handled');
+  const i = walk.steps.findIndex(m => m.k === 'catch');
   assert.ok(s[i + 1].errorPath.some(e => e.how === 'caught'));
   assert.equal(s[i + 1].frames[0].pc, walk.steps[i].next);
 });
 
 test('every error-path entry that names a node carries the call site of its frame', () => {
   // An entry names a node, and the tree is one row per call site. By the time
-  // the cursor sits on the catch, the frames that threw and unwound are popped,
+  // the cursor sits on the catch, the frames that threw and propagated are popped,
   // so the site cannot be recovered afterwards: the fold has to write it down
   // while it holds the frame.
-  const walk = runNamed(greet, 'no such user').walk;
+  const walk = runNamed(greet, 'no such user').trace;
   const s = G.fold(greet, walk);
-  const i = walk.steps.findIndex(m => m.k === 'handled');
+  const i = walk.steps.findIndex(m => m.k === 'catch');
   assert.deepEqual(s[i + 1].errorPath.map(e => [e.how, e.nodeId, e.site]), [
     ['thrown', 'lookupName', 'greet#1'],
-    ['passed through', 'lookupName', 'greet#1'],
+    ['propagated', 'lookupName', 'greet#1'],
     ['caught', 'greet', '@entry'],
   ]);
 });
 
 test('an error that reaches the top names no node and no site', () => {
-  const s = G.fold(greet, runNamed(greet, 'the post fails').walk);
+  const s = G.fold(greet, runNamed(greet, 'the post fails').trace);
   const path = s[s.length - 1].errorPath;
   assert.deepEqual(path.map(e => [e.how, e.nodeId, e.site]), [
-    ['raised', 'greet', '@entry'],
+    ['thrown', 'greet', '@entry'],
     ['reached the top uncaught', null, undefined],
   ]);
 });
 
 test('the fold records which edges the walk took, and which nodes it reached', () => {
-  const walk = runNamed(layered, 'the sheet 404s').walk;
+  const walk = runNamed(layered, 'the sheet 404s').trace;
   const end = G.fold(layered, walk).slice(-1)[0];
   assert.ok(end.edges.includes('buildShelf>bindSheet'));
   assert.ok(end.visited.includes('fibreMapFor'));
@@ -552,7 +552,7 @@ test('the fold records which edges the walk took, and which nodes it reached', (
 
 test('stepping backward returns the state stepping forward produced, move for move', () => {
   for (const preset of greet.presets) {
-    const s = G.fold(greet, preset.walk);
+    const s = G.fold(greet, preset.trace);
     for (let i = s.length - 1; i > 0; i--) {
       const { state } = G.back(s, i);
       assert.deepEqual(state, s[i - 1], `${preset.name} at move ${i}`);
@@ -561,7 +561,7 @@ test('stepping backward returns the state stepping forward produced, move for mo
 });
 
 test('stepping back over a call redraws it callee to caller', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const i = walk.steps.findIndex(m => m.k === 'call') + 1;
   assert.deepEqual(s[i].moved, { from: 'greet', to: 'lookupName', dir: 'call' });
@@ -569,7 +569,7 @@ test('stepping back over a call redraws it callee to caller', () => {
 });
 
 test('stepping back over a return redraws it caller to callee', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   const i = walk.steps.findIndex(m => m.k === 'return') + 1;
   assert.deepEqual(s[i].moved, { from: 'lookupName', to: 'greet', dir: 'return' });
@@ -577,7 +577,7 @@ test('stepping back over a return redraws it caller to callee', () => {
 });
 
 test('a move that walks no edge redraws nothing', () => {
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const s = G.fold(greet, walk);
   assert.equal(s[1].moved, null); // the opening note
   assert.equal(G.back(s, 1).redraw, null);
@@ -605,8 +605,8 @@ test('a renamed token in a call step argument cuts that edge', () => {
 
 test('a token that appears in no call argument cuts nothing', () => {
   const prog = JSON.parse(JSON.stringify(layered));
-  prog.layers.tests.nodes.bindSheet.R = ['SomethingNobodyPasses -> a double'];
-  prog.layers.tests.nodes.applyWoodFibre.R = ['AlsoNobody -> a double'];
+  prog.layers.tests.nodes.bindSheet.requirements = ['SomethingNobodyPasses -> a double'];
+  prog.layers.tests.nodes.applyWoodFibre.requirements = ['AlsoNobody -> a double'];
   assert.deepEqual(G.cutEdges(prog), []);
 });
 
@@ -618,7 +618,7 @@ test('both arrow spellings name the same renamed token', () => {
 /* -- the tree ------------------------------------------------------------- */
 
 test('one row is a call site, so a node called twice appears twice', () => {
-  const rows = G.treeRows(layered, runNamed(layered, 'the sheet 404s').walk);
+  const rows = G.treeRows(layered, runNamed(layered, 'the sheet 404s').trace);
   assert.equal(rows.filter(r => r.id === 'bindSheet').length, 2);
   // And the two carry different end marks, which is what makes the second row
   // worth printing.
@@ -629,18 +629,18 @@ test('one row is a call site, so a node called twice appears twice', () => {
 test('the tree marks a repeat and stops, so a cycle terminates', () => {
   const prog = JSON.parse(JSON.stringify(greet));
   prog.nodes.lookupName.steps.push({ op: 'call', target: 'greet', label: 'again' });
-  const rows = G.treeRows(prog, runNamed(prog, 'a known user').walk);
+  const rows = G.treeRows(prog, runNamed(prog, 'a known user').trace);
   assert.ok(rows.some(r => r.repeat));
   assert.ok(rows.length < 10, 'the walk terminated');
 });
 
 test('the tree reads its marks at the cursor, not only at the end', () => {
   // Stepping works in tree mode. Only the animation goes.
-  const walk = runNamed(greet, 'a known user').walk;
+  const walk = runNamed(greet, 'a known user').trace;
   const states = G.fold(greet, walk);
   const atStart = G.treeRows(greet, walk, null, 0, states);
   const atEnd = G.treeRows(greet, walk, null, undefined, states);
-  assert.equal(atStart.find(r => r.id === 'lookupName').state, 'not reached');
+  assert.equal(atStart.find(r => r.id === 'lookupName').state, 'not called');
   assert.equal(atEnd.find(r => r.id === 'lookupName').state, 'returned');
 });
 
@@ -653,34 +653,34 @@ test('the tree reads its marks at the cursor, not only at the end', () => {
 const twoSites = G.graphView(errorPastTwoSites(JSON.parse(readFileSync(exampleFlightpath, 'utf8'))), 0);
 /** Each row as [node, the site's aside, where it stands on the error path]. */
 const errorRows = (prog, name, at) => {
-  const walk = runNamed(prog, name).walk;
+  const walk = runNamed(prog, name).trace;
   return G.treeRows(prog, walk, null, at, G.fold(prog, walk)).map(r => [
     r.id,
     r.site ? r.site.aside : null,
-    r.error ? r.error.how : null,
+    r.errorPath ? r.errorPath.how : null,
   ]);
 };
-const cursorAfter = (prog, name, k) => runNamed(prog, name).walk.steps.findIndex(m => m.k === k) + 1;
+const cursorAfter = (prog, name, k) => runNamed(prog, name).trace.steps.findIndex(m => m.k === k) + 1;
 
-test('a row on the error path says where it stands: thrown, passed through, or caught', () => {
-  const at = cursorAfter(twoSites, 'the alias is missing', 'handled');
+test('a row on the error path says where it stands: thrown, propagated, or caught', () => {
+  const at = cursorAfter(twoSites, 'the alias is missing', 'catch');
   assert.deepEqual(errorRows(twoSites, 'the alias is missing', at), [
     ['greet', null, ['caught']],
-    ['loadProfile', 'the only call that can fail', ['passed through']],
+    ['loadProfile', 'the only call that can fail', ['propagated']],
     // The same node from the other site took no part, so it carries nothing.
     ['lookupName', 'by id', null],
     ['lookupName', 'by alias', ['thrown']],
   ]);
 });
 
-test('the row the error started at says so, and not also that it passed through', () => {
+test('the row the error started at says so, and not also that it propagated', () => {
   // The fold records the throwing frame twice: it threw, and then it unwound.
   // Only the first is a position. Read as two, the row that threw would
   // carry the mark every frame the error merely crossed carries too.
-  const walk = runNamed(twoSites, 'the alias is missing').walk;
-  const at = cursorAfter(twoSites, 'the alias is missing', 'handled');
+  const walk = runNamed(twoSites, 'the alias is missing').trace;
+  const at = cursorAfter(twoSites, 'the alias is missing', 'catch');
   const path = G.fold(twoSites, walk)[at].errorPath;
-  assert.deepEqual(path.filter(e => e.site === 'loadProfile#1').map(e => e.how), ['thrown', 'passed through']);
+  assert.deepEqual(path.filter(e => e.site === 'loadProfile#1').map(e => e.how), ['thrown', 'propagated']);
   const [, , thrower] = errorRows(twoSites, 'the alias is missing', at).find(([, aside]) => aside === 'by alias');
   assert.deepEqual(thrower, ['thrown']);
 });
@@ -704,13 +704,13 @@ test('a row that raised and caught its own error says both', () => {
   };
   const walk = {
     steps: [
-      { k: 'effect', at: 0, kind: 'db.get', desc: 'read', raised: { tag: 'Gone', message: 'no row', channel: 'escape' } },
-      { k: 'handled', at: 0, goto: 'out', next: 1 },
+      { k: 'effect', at: 0, kind: 'db.get', desc: 'read', raised: { tag: 'Gone', message: 'no row', cause: 'fail' } },
+      { k: 'catch', at: 0, goto: 'out', next: 1 },
     ],
   };
   const rows = G.treeRows(prog, walk);
-  assert.deepEqual(rows[0].error.how, ['raised', 'caught']);
-  assert.equal(rows[0].error.tag, 'Gone');
+  assert.deepEqual(rows[0].errorPath.how, ['thrown', 'caught']);
+  assert.equal(rows[0].errorPath.tag, 'Gone');
   // One word for the marks that can only be one thing — the stripe down a
   // row's edge, the glyph before its name. Where the frame ended up.
   assert.equal(rows[0].path, 'caught');
@@ -719,42 +719,39 @@ test('a row that raised and caught its own error says both', () => {
 test('the row carries one word for where its frame ended up, beside the full path', () => {
   // A stripe and a glyph can each say one thing, so `path` is the last
   // position in `error.how` — never the last RAW entry for the site. The fold
-  // puts a throwing frame on the path twice, thrown then passed through, and
+  // puts a throwing frame on the path twice, thrown then propagated, and
   // reading the raw entries would strip the mark off the row that threw.
-  const at = cursorAfter(twoSites, 'the alias is missing', 'handled');
-  const walk = runNamed(twoSites, 'the alias is missing').walk;
+  const at = cursorAfter(twoSites, 'the alias is missing', 'catch');
+  const walk = runNamed(twoSites, 'the alias is missing').trace;
   const rows = G.treeRows(twoSites, walk, null, at, G.fold(twoSites, walk));
   assert.deepEqual(
     rows.map(r => [r.site ? r.site.aside : null, r.path]),
-    [[null, 'caught'], ['the only call that can fail', 'passed through'], ['by id', null], ['by alias', 'thrown']],
+    [[null, 'caught'], ['the only call that can fail', 'propagated'], ['by id', null], ['by alias', 'thrown']],
   );
 });
 
-test('one open frame is the frame the walk is in, and the rest are waiting under it', () => {
-  // `state` still says "on stack" for all of them — it is what --text prints
-  // and what the checks read. `top` is the second signal, so the page can give
-  // the running frame full ink and the waiting ones the system's state rule.
+test('one open frame is running, and the rest are waiting under it', () => {
   const name = 'the alias is missing';
-  const walk = runNamed(twoSites, name).walk;
-  const at = walk.steps.findIndex(m => m.k === 'throw');
-  const rows = G.treeRows(twoSites, walk, null, at, G.fold(twoSites, walk));
-  const open = rows.filter(r => r.state === 'on stack');
+  const trace = runNamed(twoSites, name).trace;
+  const at = trace.steps.findIndex(m => m.k === 'throw');
+  const rows = G.treeRows(twoSites, trace, null, at, G.fold(twoSites, trace));
+  const open = rows.filter(r => r.state === 'running' || r.state === 'waiting');
   assert.ok(open.length > 1, 'more than one frame is open at the throw');
-  assert.equal(open.filter(r => r.top).length, 1, 'exactly one of them is the frame the walk is in');
-  assert.equal(open[open.length - 1].top, true, 'and it is the deepest');
-  // A row nothing entered is never the top, whatever the stack is doing.
-  assert.deepEqual([...new Set(rows.filter(r => r.state !== 'on stack').map(r => r.top))], [false]);
+  assert.equal(rows.filter(r => r.state === 'running').length, 1, 'exactly one frame is running');
+  assert.equal(open[open.length - 1].state, 'running', 'and it is the deepest');
+  // `top` still marks the running row, for the page's rule weight.
+  assert.deepEqual(rows.map(r => r.top), rows.map(r => r.state === 'running'));
 });
 
 test('the error path marks nothing before the raise and nothing after the return that ends it', () => {
   const name = 'the alias is missing';
-  const walk = runNamed(twoSites, name).walk;
+  const walk = runNamed(twoSites, name).trace;
   const marked = at => errorRows(twoSites, name, at).filter(r => r[2]).length;
   const thrownAt = walk.steps.findIndex(m => m.k === 'throw');
   assert.equal(marked(0), 0, 'before the first move');
   assert.equal(marked(thrownAt), 0, 'the cursor on the throw, not yet past it');
   assert.equal(marked(thrownAt + 1), 1, 'past the throw, only the row that threw');
-  const caughtAt = cursorAfter(twoSites, name, 'handled');
+  const caughtAt = cursorAfter(twoSites, name, 'catch');
   assert.equal(marked(caughtAt), 3, 'the catch, and every frame the error crossed');
   const endsAt = walk.steps.map(m => m.k).lastIndexOf('return') + 1;
   assert.equal(marked(endsAt), 0, 'the return after the catch ends the error');
@@ -773,14 +770,14 @@ test('an error that reaches the top adds no row, and marks only the frames it cr
   // node, so no row carries it and no row is made for it.
   assert.deepEqual(errorRows(twoSites, 'the store is down'), [
     ['greet', null, null],
-    ['loadProfile', 'the only call that can fail', ['passed through']],
+    ['loadProfile', 'the only call that can fail', ['propagated']],
     ['lookupName', 'by id', null],
-    ['lookupName', 'by alias', ['raised']],
+    ['lookupName', 'by alias', ['thrown']],
   ]);
   // And on the shipped example: the entry raised, and the lookup it called
   // earlier and which returned took no part.
   assert.deepEqual(errorRows(greet, 'the post fails'), [
-    ['greet', null, ['raised']],
+    ['greet', null, ['thrown']],
     ['lookupName', 'the only call that can fail', null],
   ]);
 });
@@ -788,11 +785,11 @@ test('an error that reaches the top adds no row, and marks only the frames it cr
 test('the error path is a second signal, independent of the walk state', () => {
   // A row can be on the stack and on the error path at once: greet is still
   // open when it catches.
-  const walk = runNamed(twoSites, 'the alias is missing').walk;
-  const at = cursorAfter(twoSites, 'the alias is missing', 'handled');
+  const walk = runNamed(twoSites, 'the alias is missing').trace;
+  const at = cursorAfter(twoSites, 'the alias is missing', 'catch');
   const entry = G.treeRows(twoSites, walk, null, at)[0];
-  assert.equal(entry.state, 'on stack');
-  assert.deepEqual(entry.error.how, ['caught']);
+  assert.equal(entry.state, 'running');
+  assert.deepEqual(entry.errorPath.how, ['caught']);
 });
 
 /* -- two copies of one subtree ---------------------------------------------
@@ -806,24 +803,24 @@ test('the error path is a second signal, independent of the walk state', () => {
 const twoCopies = G.graphView(repeatedSubtree(JSON.parse(readFileSync(exampleFlightpath, 'utf8'))), 0);
 /** The two lookupName rows, which are the copies, in tree order. */
 const copies = (prog, name, at) => {
-  const walk = runNamed(prog, name).walk;
+  const walk = runNamed(prog, name).trace;
   return G.treeRows(prog, walk, null, at, G.fold(prog, walk)).filter(r => r.id === 'lookupName');
 };
 
 test('a copy of a repeated subtree carries only what happened under it', () => {
   const [first, second] = copies(twoCopies, 'the second copy fails');
-  assert.equal(second.path, 'raised', 'the copy the walk failed in says so');
-  assert.equal(first.error, null, 'and the copy that returned cleanly says nothing');
+  assert.equal(second.path, 'thrown', 'the copy the walk failed in says so');
+  assert.equal(first.errorPath, null, 'and the copy that returned cleanly says nothing');
 });
 
 test('a copy that returned reads returned while the other copy is still in', () => {
   const [first, second] = copies(twoCopies, 'the second copy fails');
   assert.equal(first.state, 'returned');
-  assert.equal(second.state, 'on stack');
+  assert.equal(second.state, 'running');
 });
 
 test('one row is the frame the walk is in, however many copies share its call step', () => {
-  const walk = runNamed(twoCopies, 'the second copy fails').walk;
+  const walk = runNamed(twoCopies, 'the second copy fails').trace;
   const rows = G.treeRows(twoCopies, walk, null, undefined, G.fold(twoCopies, walk));
   assert.equal(rows.filter(r => r.top).length, 1, 'exactly one row');
   const [first, second] = rows.filter(r => r.id === 'lookupName');
@@ -833,8 +830,8 @@ test('one row is the frame the walk is in, however many copies share its call st
 
 test('an effect mark answers for its own copy', () => {
   const [first, second] = copies(twoCopies, 'the second copy fails');
-  assert.deepEqual(first.effects.map(e => e.mark), ['landed'], 'the copy that found its row');
-  assert.deepEqual(second.effects.map(e => e.mark), ['failed'], 'the copy the store was down for');
+  assert.deepEqual(first.effects.map(e => e.mark), ['returned'], 'the copy that found its row');
+  assert.deepEqual(second.effects.map(e => e.mark), ['threw'], 'the copy the store was down for');
 });
 
 /* -- deeper than the tree draws --------------------------------------------
@@ -848,7 +845,7 @@ test('an effect mark answers for its own copy', () => {
 const recursive = G.graphView(selfRecursive(JSON.parse(readFileSync(exampleFlightpath, 'utf8'))), 0);
 
 test('the tree draws a repeated node once more and stops, however deep the walk runs', () => {
-  const walk = runNamed(recursive, 'three frames down').walk;
+  const walk = runNamed(recursive, 'three frames down').trace;
   const end = G.fold(recursive, walk).pop();
   assert.equal(end.frames.length, 3, 'the walk is three frames down');
   const rows = G.treeRows(recursive, walk, null, undefined, G.fold(recursive, walk));
@@ -856,12 +853,12 @@ test('the tree draws a repeated node once more and stops, however deep the walk 
 });
 
 test('a failure below the last row drawn is carried by the row that stopped', () => {
-  const walk = runNamed(recursive, 'three frames down').walk;
+  const walk = runNamed(recursive, 'three frames down').trace;
   const rows = G.treeRows(recursive, walk, null, undefined, G.fold(recursive, walk));
   const repeat = rows[rows.length - 1];
   assert.equal(repeat.repeat, true);
-  assert.equal(repeat.path, 'raised', 'the repeat row says the error started under it');
-  assert.deepEqual(repeat.effects.map(e => e.mark), ['failed'], 'and carries the mark of the frame that failed');
+  assert.equal(repeat.path, 'thrown', 'the repeat row says the error started under it');
+  assert.deepEqual(repeat.effects.map(e => e.mark), ['threw'], 'and carries the mark of the frame that failed');
   assert.equal(repeat.top, true, 'the walk is somewhere inside that subtree');
 });
 
@@ -869,25 +866,25 @@ test('no mark the walk made is missing from the tree', () => {
   // The invariant the repeat row exists to keep. Every chain the fold entered
   // is spoken for by exactly one row, so a walk below the drawn rows moves a
   // mark rather than losing it.
-  const walk = runNamed(recursive, 'three frames down').walk;
+  const walk = runNamed(recursive, 'three frames down').trace;
   const end = G.fold(recursive, walk).pop();
   const entered = Object.keys(end.sites).filter(k => end.sites[k].entered);
   assert.equal(entered.length, 3, 'three frames went in');
   const marks = G.treeRows(recursive, walk, null, undefined, G.fold(recursive, walk))
     .flatMap(r => r.effects.map(e => e.mark));
-  assert.ok(marks.includes('failed'), 'the deepest frame failed and the tree says so');
+  assert.ok(marks.includes('threw'), 'the deepest frame failed and the tree says so');
 });
 
 test('a failure is not hidden by a frame that succeeded at the same step', () => {
   // Two frames one row speaks for, marking the SAME step differently. Merging
   // by insertion order would take the deeper chain, which is the one that
-  // landed — and the row would report a clean record beside its own raised
+  // returned — and the row would report a clean record beside its own thrown
   // stripe, contradicting itself on one line.
-  const walk = runNamed(recursive, 'the deeper frame lands and the shallower one fails').walk;
+  const walk = runNamed(recursive, 'the deeper frame lands and the shallower one fails').trace;
   const rows = G.treeRows(recursive, walk, null, undefined, G.fold(recursive, walk));
   const repeat = rows[rows.length - 1];
-  assert.equal(repeat.path, 'raised', 'the row says an error started under it');
-  assert.deepEqual(repeat.effects.map(e => e.mark), ['failed'], 'so it must not also say the step recorded cleanly');
+  assert.equal(repeat.path, 'thrown', 'the row says an error started under it');
+  assert.deepEqual(repeat.effects.map(e => e.mark), ['threw'], 'so it must not also say the step recorded cleanly');
 });
 
 test('a call step sums its copies, because the listing shows a node and not a path', () => {
@@ -895,7 +892,7 @@ test('a call step sums its copies, because the listing shows a node and not a pa
   // walk did with it. It has a node and a step index in hand and no path, so
   // it cannot ask the tree's table, which is keyed by the path from the entry.
   // This is the second reading of the same fold, and the two must agree.
-  const walk = runNamed(twoCopies, 'the second copy fails').walk;
+  const walk = runNamed(twoCopies, 'the second copy fails').trace;
   const end = G.fold(twoCopies, walk).pop();
   // loadProfile calls lookupName at one step, and the tree draws that step
   // twice. One copy came back; the other is still in.
@@ -908,7 +905,7 @@ test('a call step sums its copies, because the listing shows a node and not a pa
 });
 
 test('the tree carries the layer rename on the row', () => {
-  const rows = G.treeRows(greet, runNamed(greet, 'a known user').walk, 'tests');
+  const rows = G.treeRows(greet, runNamed(greet, 'a known user').trace, 'tests');
   const row = rows.find(r => r.id === 'lookupName');
   assert.ok(row.rename && row.rename.length, 'the row carries the renamed tokens');
 });
@@ -925,7 +922,7 @@ test('cyclomatic complexity is one plus the ifs, the handlers and the loops', ()
 test('a jump backward is a loop, and a node with no fork has one path', () => {
   const node = {
     steps: [
-      { op: 'note', note: 'top', label: 'top' },
+      { op: 'comment', comment: 'top', label: 'top' },
       { op: 'if', cond: 'again?', then: 'top', else: 'out' },
       { op: 'return', expr: 'x', label: 'out' },
     ],
@@ -938,65 +935,65 @@ test('a jump backward is a loop, and a node with no fork has one path', () => {
 /* -- the failure kind ----------------------------------------------------- */
 
 test('the kind table reads the throw steps and the raised moves of the whole file', () => {
-  // greet's lookupName throws NoSuchUser as an escape. Nothing throws
-  // SendFailed anywhere; one walk raises it from an effect, as a retry. Both
+  // greet's lookupName throws NoSuchUser as a fail. Nothing throws
+  // SendFailed anywhere; one trace raises it from an effect, as a fail. Both
   // reach the table, because both are what the file says.
   // Spread to compare, because the table has no prototype on purpose — see
   // the tag named after a property of every object, below.
-  assert.deepEqual({ ...G.failureKinds(greet) }, { NoSuchUser: ['escape'], SendFailed: ['retry'] });
+  assert.deepEqual({ ...G.failureKinds(greet) }, { NoSuchUser: ['fail'], SendFailed: ['fail'] });
 });
 
 test('a tag the file gives no kind for is absent from the table, so the row prints bare', () => {
   const prog = JSON.parse(JSON.stringify(greet));
-  prog.nodes.greet.channels.E.push('Ghost');
+  prog.nodes.greet.channels.error.push('Ghost');
   assert.equal(G.failureKinds(prog).Ghost, undefined);
 });
 
 test('a handler is not a source of a kind', () => {
-  // An onError entry names the tag it catches and no channel. It says where a
+  // An onError entry names the tag it catches and no cause. It says where a
   // failure stops, never what kind of failure it was. greet declares a handler
   // for NoSuchUser and throws nothing; take lookupName's throw away and the
   // tag has no kind left, however many handlers name it.
   const prog = JSON.parse(JSON.stringify(greet));
   prog.nodes.lookupName.steps = prog.nodes.lookupName.steps.filter(s => s.op !== 'throw');
-  // The kind is file-wide, so the walks are cleared where the file keeps them.
-  // Emptying the view's own `presets` would leave every graph's walks in place
-  // and the table would still find the raise.
+  // The kind is file-wide, so the traces are cleared where the file keeps them.
+  // Emptying the view's own `presets` would leave every graph's traces in place
+  // and the table would still find the raised effect.
   for (const g of prog.graphs) g.presets = [];
   prog.presets = [];
   assert.deepEqual({ ...G.failureKinds(prog) }, {});
 });
 
 test('a throw move is not a source of a kind — the step it ran is', () => {
-  // The move repeats the step's channel, so reading both would be reading one
+  // The move repeats the step's cause, so reading both would be reading one
   // fact twice. Contradict them and the step is what the table says. The
   // validator refuses this file; the module is asked directly, which is what
   // makes the source of the fact visible.
   const prog = JSON.parse(JSON.stringify(greet));
-  for (const p of prog.presets) for (const m of p.walk.steps) if (m.k === 'throw') m.channel = 'die';
-  assert.deepEqual(G.failureKinds(prog).NoSuchUser, ['escape']);
+  for (const p of prog.presets) for (const m of p.trace.steps) if (m.k === 'throw') m.cause = 'die';
+  assert.deepEqual(G.failureKinds(prog).NoSuchUser, ['fail']);
 });
 
-test('a kind supplied only by another graph\'s walk still reaches this sheet', () => {
+test('a kind supplied only by another graph\'s trace still reaches this sheet', () => {
   // The kind is file-wide, and this is the case that says so. Read per graph,
-  // a tag whose only `raised` lives in a walk of a graph you are not looking
+  // a tag whose only `raised` lives in a trace of a graph you are not looking
   // at loses its kind and prints bare — no error, no failing test, and
   // invisible in every one-graph file that ships. The whole file is one
   // change, so what the change says about a tag holds on every sheet of it.
   const prog = JSON.parse(JSON.stringify(greet));
-  const fails = prog.graphs[0].presets.find(p => p.walk.steps.some(m => m.k === 'effect' && m.raised));
+  const fails = prog.graphs[0].presets.find(p => p.trace.steps.some(m => m.k === 'effect' && m.raised));
   const dies = JSON.parse(JSON.stringify(fails));
-  for (const m of dies.walk.steps) if (m.k === 'effect' && m.raised) m.raised.channel = 'die';
+  for (const m of dies.trace.steps) if (m.k === 'effect' && m.raised) m.raised.cause = 'die';
 
   // Move the fatal reading into a second graph, and leave the first with only
-  // the retry. Read file-wide the tag has both; read per graph it has one.
+  // the fail. Read file-wide the tag has both; read per graph it has one.
   prog.graphs.push({ id: 'second', title: 'a second entry', blurb: 'b', entry: 'lookupName', presets: [dies] });
-  assert.deepEqual(G.failureKinds(prog).SendFailed, ['retry', 'die']);
+  assert.deepEqual(G.failureKinds(prog).SendFailed, ['fail', 'die']);
 
   // And a view of the *first* graph gives the same answer, which is the point:
   // the reader on sheet one is told what the change knows, not what sheet one
   // happens to contain.
-  assert.deepEqual(G.failureKinds(G.graphView(prog, 0)).SendFailed, ['retry', 'die']);
+  assert.deepEqual(G.failureKinds(G.graphView(prog, 0)).SendFailed, ['fail', 'die']);
 });
 
 test('a tag named after a property of every object is still just a tag', () => {
@@ -1006,44 +1003,44 @@ test('a tag named after a property of every object is still just a tag', () => {
   // that is not a list of kinds. A file with such a tag rendered before this
   // table existed, and has to keep rendering.
   const prog = JSON.parse(JSON.stringify(greet));
-  prog.nodes.greet.channels.E.push('constructor', 'toString', '__proto__');
+  prog.nodes.greet.channels.error.push('constructor', 'toString', '__proto__');
   const table = G.failureKinds(prog);
   for (const tag of ['constructor', 'toString', '__proto__']) {
     assert.equal(table[tag], undefined, `${tag} has no kind`);
   }
-  const rows = G.treeRows(prog, runNamed(prog, 'a known user').walk);
+  const rows = G.treeRows(prog, runNamed(prog, 'a known user').trace);
   const entry = rows.find(r => r.id === 'greet');
   for (const tag of ['constructor', 'toString', '__proto__']) {
     assert.equal(entry.kinds[tag], undefined, `${tag} carries no kind onto the row`);
   }
   // And the tags themselves are still on the row, to be printed bare.
-  assert.ok(entry.E.includes('constructor'));
+  assert.ok(entry.error.includes('constructor'));
 });
 
-test('a tag raised with two kinds keeps both, retry before escape before die', () => {
-  // A tag that retries in one place and dies in another is two facts, and
+test('a tag raised with two kinds keeps both, fail before die', () => {
+  // A tag that fails in one place and dies in another is two facts, and
   // flattening them to one would lose the one the reader came for.
   const prog = JSON.parse(JSON.stringify(greet));
-  const fails = prog.presets.find(p => p.walk.steps.some(m => m.k === 'effect' && m.raised));
+  const fails = prog.presets.find(p => p.trace.steps.some(m => m.k === 'effect' && m.raised));
   const dies = JSON.parse(JSON.stringify(fails));
   dies.name = 'the post dies';
-  for (const m of dies.walk.steps) if (m.k === 'effect' && m.raised) m.raised.channel = 'die';
-  // Written to the graph, which is where the file keeps its walks and where
+  for (const m of dies.trace.steps) if (m.k === 'effect' && m.raised) m.raised.cause = 'die';
+  // Written to the graph, which is where the file keeps its traces and where
   // the file-wide table reads them. Die is met first; the order out is still
-  // retry, die.
+  // fail, die.
   prog.graphs[0].presets = [dies, fails];
   prog.presets = prog.graphs[0].presets;
-  assert.deepEqual(G.failureKinds(prog).SendFailed, ['retry', 'die']);
+  assert.deepEqual(G.failureKinds(prog).SendFailed, ['fail', 'die']);
 });
 
 test('the tree row carries the kinds of the tags it prints, and nothing else', () => {
-  const rows = G.treeRows(greet, runNamed(greet, 'a known user').walk);
+  const rows = G.treeRows(greet, runNamed(greet, 'a known user').trace);
   const entry = rows.find(r => r.id === 'greet');
   const callee = rows.find(r => r.id === 'lookupName');
-  assert.deepEqual({ ...entry.kinds }, { NoSuchUser: ['escape'], SendFailed: ['retry'] });
-  assert.deepEqual({ ...callee.kinds }, { NoSuchUser: ['escape'] });
-  // The E channel is still the list of tags it always was.
-  assert.deepEqual(callee.E, ['NoSuchUser']);
+  assert.deepEqual({ ...entry.kinds }, { NoSuchUser: ['fail'], SendFailed: ['fail'] });
+  assert.deepEqual({ ...callee.kinds }, { NoSuchUser: ['fail'] });
+  // The error list is still the list of tags it always was.
+  assert.deepEqual(callee.error, ['NoSuchUser']);
 });
 
 /* -- what a node does with a tag ------------------------------------------ */
@@ -1064,7 +1061,7 @@ test('a node that both throws a tag and catches it says both', () => {
   const node = {
     steps: [
       { op: 'call', target: 'x', onError: [{ tag: 'Wobble', goto: 'out' }] },
-      { op: 'throw', tag: 'Wobble', message: 'again', channel: 'retry' },
+      { op: 'throw', tag: 'Wobble', message: 'again', cause: 'fail' },
       { op: 'return', expr: 'x', label: 'out' },
     ],
   };
@@ -1076,8 +1073,8 @@ test('a node that both throws a tag and catches it says both', () => {
 test('the suggested run is the longest walk', () => {
   for (const prog of [greet, layered]) {
     const i = G.suggestRun(prog);
-    const longest = Math.max(...prog.presets.map(p => p.walk.steps.length));
-    assert.equal(prog.presets[i].walk.steps.length, longest);
+    const longest = Math.max(...prog.presets.map(p => p.trace.steps.length));
+    assert.equal(prog.presets[i].trace.steps.length, longest);
   }
 });
 

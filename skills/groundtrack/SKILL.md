@@ -1,6 +1,6 @@
 ---
 name: groundtrack
-description: Use for a plan already made or work already done, when a reader needs to see its shape — what calls what, what each part hands back, where it breaks, and what it needs to work. Writes one call graph with recorded walks through it, renders a self-contained page, and prints the same graph as an indented tree on request. Not for a conversation with nothing durable behind it.
+description: Use for a plan already made or work already done, when a reader needs to see its shape — what calls what, what each part hands back, where it breaks, and what it needs to work. Writes one call graph with recorded traces through it, renders a self-contained page, and prints the same graph as an indented tree on request. Not for a conversation with nothing durable behind it.
 ---
 
 # groundtrack
@@ -41,16 +41,16 @@ a bound the reader did not choose.
 
 Every node carries three channels, and they are the point of the drawing.
 
-- **A** — what flows out of the node.
-- **E** — where it breaks: the failure tags it can raise. Each tag is a
-  **retry**, an **escape** or a **die**.
-- **R** — what it needs to work.
+- **success** — what flows out of the node.
+- **error** — where it breaks: the tags it can throw as a **fail**. A **die**
+  never appears in this list.
+- **requirements** — what it needs to work.
 
-The three failure kinds are different facts. A blip that retries, an error that
-escapes to a caller, and a fault that destroys the process are not one thing. A
-process killed for running out of memory reaches no handler, so nothing logs
-it, and the debugging session drops where the data was worth having. The E
-channel is where a reader sees that in advance.
+The two failure kinds are different facts. A fail is an expected error, and a
+caller is meant to catch it. A die is a defect, and nothing is meant to catch
+it. A process killed for running out of memory reaches no handler, so nothing
+logs it. The debugging session drops where the data was worth having. The
+`error` list is where a reader sees that in advance.
 
 ## Procedure
 
@@ -83,10 +83,10 @@ channel is where a reader sees that in advance.
    the shape, and
    [`skills/groundtrack/examples/greet.flightpath.json`](examples/greet.flightpath.json)
    for a complete legal file. Write the nodes and the graphs first. Validate.
-   Then write the walks, one at a time.
+   Then write the traces, one at a time.
 
 5. **Validate, read the refusal, fix, repeat.** See
-   [`references/writing-walks.md`](references/writing-walks.md) for the loop and
+   [`references/writing-traces.md`](references/writing-traces.md) for the loop and
    for the two mistakes measurement says you will make.
 
 6. **Read every finding, and answer each one.** `--check` exits zero and still
@@ -95,9 +95,9 @@ channel is where a reader sees that in advance.
 
    Answer a finding in one of two ways. Fix the file, or write one line saying
    why the finding is what you meant. A node you have written and not yet
-   connected is a finding you write the line for. You usually fix an `E` tag
-   nothing beneath it produces. Draw what raises the tag, or drop a tag the
-   program never raises.
+   connected is a finding you write the line for. You usually fix an `error` tag
+   nothing beneath it produces. Draw what throws the tag, or drop a tag the
+   program never throws.
 
    Both answers are legitimate. Never skip this step. **Give the reader the
    findings you kept**, each with the line you wrote for it. A reader who never
@@ -105,7 +105,7 @@ channel is where a reader sees that in advance.
 
 7. **Render the page**, and say where it is.
 
-8. **State the limit.** The validator proves the walk is a legal path. It
+8. **State the limit.** The validator proves the trace is a legal path. It
    cannot prove which branch an `if` took or what an effect returned. Those
    stay your claims. Say this when you hand the page over.
 
@@ -146,7 +146,7 @@ graph to read asks.
 
 ## The page
 
-The page draws one graph and steps a cursor over one recorded walk.
+The page draws one graph and steps a cursor over one recorded trace.
 
 **A file with several graphs is one page with several sheets.** The head holds
 two rows: the title above, and below it the sheet picker, the run picker and the
@@ -161,22 +161,23 @@ and come back and it is as you left it.
 
 Nothing is computed while the reader watches. Every branch an `if` took, every
 value an effect returned, and every catch is a literal in the file. That is
-what makes the walk a list of checkable claims.
+what makes the trace a list of checkable claims.
 
-The reader steps forward and back, holds the walk on the next effect or the
+The reader steps forward and back, holds the run on the next effect or the
 next error, reads the call stack and the effects ledger, opens one node to see
 its body, and flips between the drawing and a tree.
 
-The cutaway follows the cursor. Each move opens the node the walk is in and
+The cutaway follows the cursor. Each move opens the node the trace is in and
 brings the step that ran into view. A node opened by hand stays open until the
 cursor next moves.
 
-The source tab marks each line with what the walk did to it: the line the
-cursor is on, a line in a frame still on the stack, a line that ran, and a
+The source tab marks each line with what the run did to it. It marks four
+kinds of line. The first is the line the cursor is on. The second is a line in
+a frame still running or waiting. The third is a line that ran. The fourth is a
 line the run never reached. The last is the one worth having — an untaken
 branch is the first thing a reader interrogates, so it stays legible rather
 than being hidden. A call or an effect also carries its outcome, and only
-once the walk has given it one. A token is coloured because the run touched
+once the run has given it one. A token is coloured because the run touched
 it, never because of what it is.
 
 The files tab reads as a directory tree, so a change of many files reads as a
@@ -242,9 +243,12 @@ in a plain text fence.
   the reader.
 - **One row is a call site**, not a node. A node called twice appears twice.
 - **A repeated node is marked and stopped**, or a cycle never terminates.
-- **Every E tag on a row carries its failure kind**, derived from the file and
-  never written in it. A tag the file gives no kind for prints bare.
-- **Suggest the longest walk.** It is the only rule that names exactly one run
+- **An `error` tag carries its failure kind when the file states one**, `fail`
+  or `die`.
+  The renderer derives the kind from the file's `throw` steps and `raised`
+  objects. The `error` list never states it. A tag the file gives no kind
+  for prints bare.
+- **Suggest the longest trace.** It is the only rule that names exactly one run
   in every worked example, with no tie.
 - **List every run you did not print**, by name, with the blurb its author
   wrote. The reader overrules your suggestion from that line alone.
@@ -257,7 +261,7 @@ The material is durable, so a sceptical reader can go and check the drawing
 against it. That is the whole reason this skill prefers real material over a
 tidy invented example.
 
-The validator proves the walk is a legal path through the graph the file
+The validator proves the trace is a legal path through the graph the file
 declares. **It cannot prove which branch was taken or what an effect
 returned.** Those stay the author's claims.
 

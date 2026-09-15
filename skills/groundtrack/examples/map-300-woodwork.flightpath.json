@@ -117,28 +117,25 @@
         "preAllocate"
       ],
       "channels": {
-        "A": "a rendered bookcase on main",
-        "E": [
-          "FanOutRefused",
-          "ShippedAShimmer"
-        ],
-        "R": [
+        "success": "a rendered bookcase on main",
+        "error": [],
+        "requirements": [
           "9 closed decision tickets",
           "3 prototype branches, reference only"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Six implementation tickets, a linear chain, and the map's own destination ticket. Exactly one is takeable at a time."
+          "op": "comment",
+          "comment": "Six implementation tickets, a linear chain, and the map's own destination ticket. Exactly one is takeable at a time."
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "premiseSettled",
           "expr": "false"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "numbersFixed",
           "expr": "false"
         },
@@ -157,7 +154,7 @@
           "aside": "ticket 1 shares no source file with the rest and fixes something broken on main today, so it lands as its own PR"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "coplanarLanded",
           "expr": "true"
         },
@@ -166,7 +163,7 @@
           "to": "gateChain"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "skipFix",
           "name": "coplanarLanded",
           "expr": "false",
@@ -184,7 +181,7 @@
           "label": "fanout",
           "tag": "FanOutRefused",
           "message": "tickets 2–6 are one feature in one module — every one edits buildShelf, the materials block and woodwork.ts",
-          "channel": "die"
+          "cause": "die"
         },
         {
           "op": "call",
@@ -257,9 +254,9 @@
           "expr": "({ onMain: true, rows: shipped.rows, prs: shipped.prs, adrs: shipped.adrs })"
         },
         {
-          "op": "note",
+          "op": "comment",
           "label": "reroute",
-          "note": "#281 chose sapele on sound reasoning and the render said 94% of what it moved was the average colour rather than the grain. #287's seed read from the books died on arithmetic. Both were plausible."
+          "comment": "#281 chose sapele on sound reasoning and the render said 94% of what it moved was the average colour rather than the grain. #287's seed read from the books died on arithmetic. Both were plausible."
         },
         {
           "op": "call",
@@ -270,7 +267,7 @@
           "bind": "answer"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "premiseSettled",
           "expr": "true",
           "aside": "the habit that caught both: build the arm nobody planned, and measure before concluding"
@@ -280,9 +277,9 @@
           "to": "seq"
         },
         {
-          "op": "note",
+          "op": "comment",
           "label": "shimmer",
-          "note": "The tie was always there — 46 coplanar overlapping face pairs. Every woodwork face carrying the identical flat colour is the only reason 36 of them were invisible."
+          "comment": "The tie was always there — 46 coplanar overlapping face pairs. Every woodwork face carrying the identical flat colour is the only reason 36 of them were invisible."
         },
         {
           "op": "call",
@@ -294,7 +291,7 @@
           "op": "throw",
           "tag": "ShippedAShimmer",
           "message": "ticket 1 landed after the texture, so every visitor between the two deploys saw 46 flickering pairs",
-          "channel": "die"
+          "cause": "die"
         },
         {
           "op": "effect",
@@ -305,7 +302,7 @@
           "aside": "a row number is a fact about when something landed, not a name — cite slug and number together, never the number alone"
         },
         {
-          "op": "let",
+          "op": "var",
           "name": "numbersFixed",
           "expr": "true"
         },
@@ -324,17 +321,17 @@
       "loc": "issues/301 → PR #308",
       "params": [],
       "channels": {
-        "A": "G51 coplanar-faces",
-        "E": [],
-        "R": [
+        "success": "G51 coplanar-faces",
+        "error": [],
+        "requirements": [
           "case.ts",
           "the inset constants"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "The one slice safe to run alongside the others, and the only one whose fix is already needed on main."
+          "op": "comment",
+          "comment": "The one slice safe to run alongside the others, and the only one whose fix is already needed on main."
         },
         {
           "op": "effect",
@@ -370,12 +367,12 @@
         "premiseSettled"
       ],
       "channels": {
-        "A": "G52 sheet-size",
-        "E": [
+        "success": "G52 sheet-size",
+        "error": [
           "ShimmerOnMain",
           "PremiseOverturned"
         ],
-        "R": [
+        "requirements": [
           "woodwork.ts (new)",
           "scene.ts",
           "a Poly Haven sheet, CC0"
@@ -393,7 +390,7 @@
           "label": "reveal",
           "tag": "ShimmerOnMain",
           "message": "all 46 pairs become visible at once",
-          "channel": "escape"
+          "cause": "fail"
         },
         {
           "op": "if",
@@ -407,7 +404,7 @@
           "label": "overturned",
           "tag": "PremiseOverturned",
           "message": "94% of what the chosen sheet moved was the average colour, not the grain",
-          "channel": "retry"
+          "cause": "fail"
         },
         {
           "op": "effect",
@@ -442,17 +439,17 @@
       "loc": "issues/303 → PR #310",
       "params": [],
       "channels": {
-        "A": "materials.woodFibre",
-        "E": [],
-        "R": [
+        "success": "materials.woodFibre",
+        "error": [],
+        "requirements": [
           "woodwork.ts",
           "a 2D canvas"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "The sheet's own normal map measured 0.000% at every rung on two different sheets. The drawn fibre adds 0.742% of frame level. Not an extra texture — a better use of one."
+          "op": "comment",
+          "comment": "The sheet's own normal map measured 0.000% at every rung on two different sheets. The drawn fibre adds 0.742% of frame level. Not an extra texture — a better use of one."
         },
         {
           "op": "effect",
@@ -461,8 +458,8 @@
           "args": "({ pr: 310 })"
         },
         {
-          "op": "note",
-          "note": "No gate row. The look is the owner's verdict, on a live build or on screenshots, never on a number."
+          "op": "comment",
+          "comment": "No gate row. The look is the owner's verdict, on a live build or on screenshots, never on a number."
         },
         {
           "op": "return",
@@ -482,17 +479,17 @@
       "loc": "issues/304 → PR #311",
       "params": [],
       "channels": {
-        "A": "a constant, not a knob",
-        "E": [],
-        "R": [
+        "success": "a constant, not a knob",
+        "error": [],
+        "requirements": [
           "woodwork.ts",
           "prototype/297"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "#297 measured all 41 veneers Poly Haven publishes; the darkness constraint leaves exactly one candidate, third-nearest 24.8 luma away. That is why it is a constant."
+          "op": "comment",
+          "comment": "#297 measured all 41 veneers Poly Haven publishes; the darkness constraint leaves exactly one candidate, third-nearest 24.8 luma away. That is why it is a constant."
         },
         {
           "op": "effect",
@@ -517,17 +514,17 @@
       "loc": "issues/305 → PR #312",
       "params": [],
       "channels": {
-        "A": "per-member variation + ?woodSeed",
-        "E": [],
-        "R": [
+        "success": "per-member variation + ?woodSeed",
+        "error": [],
+        "requirements": [
           "woodwork.ts",
           "shelf-url.ts"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "?woodSeed pins the root so the render harness can force one; a fresh page draws a fresh root. The backboard's key must carry the root — its absence renders correctly and only misreports."
+          "op": "comment",
+          "comment": "?woodSeed pins the root so the render harness can force one; a fresh page draws a fresh root. The backboard's key must carry the root — its absence renders correctly and only misreports."
         },
         {
           "op": "effect",
@@ -556,11 +553,11 @@
         "numbersFixed"
       ],
       "channels": {
-        "A": "G53 one-sheet + G54 woodwork-readback",
-        "E": [
+        "success": "G53 one-sheet + G54 woodwork-readback",
+        "error": [
           "NumberClaimedTwice"
         ],
-        "R": [
+        "requirements": [
           "woodwork.ts",
           "scene.ts",
           "debug-panel.ts"
@@ -578,7 +575,7 @@
           "label": "claim",
           "tag": "NumberClaimedTwice",
           "message": "an identifier can be claimed twice by two branches and nothing notices",
-          "channel": "escape"
+          "cause": "fail"
         },
         {
           "op": "effect",
@@ -623,9 +620,9 @@
         "rows"
       ],
       "channels": {
-        "A": "the treatment on main",
-        "E": [],
-        "R": [
+        "success": "the treatment on main",
+        "error": [],
+        "requirements": [
           "docs/adr/",
           "docs/images/",
           "the tracker"
@@ -686,17 +683,17 @@
         "question"
       ],
       "channels": {
-        "A": "an answer the plan can use",
-        "E": [],
-        "R": [
+        "success": "an answer the plan can use",
+        "error": [],
+        "requirements": [
           "a render",
           "a branch that never merges"
         ]
       },
       "steps": [
         {
-          "op": "note",
-          "note": "Reference, not a merge base. Nothing on these branches fast-forwards."
+          "op": "comment",
+          "comment": "Reference, not a merge base. Nothing on these branches fast-forwards."
         },
         {
           "op": "effect",
@@ -737,21 +734,21 @@
             "premiseHolds": true,
             "preAllocate": false
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
@@ -767,7 +764,7 @@
                 "next": 5
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -799,7 +796,7 @@
                 "value": "G51"
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -861,7 +858,7 @@
                 "next": 12
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -876,7 +873,7 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 2,
                 "next": 3
               },
@@ -892,7 +889,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -918,7 +915,7 @@
                 "next": 14
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1128,21 +1125,21 @@
             "premiseHolds": true,
             "preAllocate": false
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
@@ -1158,7 +1155,7 @@
                 "next": 5
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1190,7 +1187,7 @@
                 "value": "G51"
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1209,16 +1206,16 @@
                 "at": 9,
                 "tag": "FanOutRefused",
                 "message": "tickets 2–6 are one feature in one module — every one edits buildShelf, the materials block and woodwork.ts",
-                "channel": "die"
+                "cause": "die"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
                 "k": "uncaught",
                 "tag": "FanOutRefused",
                 "message": "tickets 2–6 are one feature in one module — every one edits buildShelf, the materials block and woodwork.ts",
-                "channel": "die"
+                "cause": "die"
               }
             ]
           }
@@ -1232,21 +1229,21 @@
             "premiseHolds": true,
             "preAllocate": false
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
@@ -1256,7 +1253,7 @@
                 "next": 7
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 7,
                 "next": 8
               },
@@ -1281,19 +1278,19 @@
                 "at": 1,
                 "tag": "ShimmerOnMain",
                 "message": "all 46 pairs become visible at once",
-                "channel": "escape"
+                "cause": "fail"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
-                "k": "handled",
+                "k": "catch",
                 "at": 10,
                 "goto": "shimmer",
                 "next": 21
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 21,
                 "next": 22
               },
@@ -1304,7 +1301,7 @@
                 "next": 23
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1340,16 +1337,16 @@
                 "at": 23,
                 "tag": "ShippedAShimmer",
                 "message": "ticket 1 landed after the texture, so every visitor between the two deploys saw 46 flickering pairs",
-                "channel": "die"
+                "cause": "die"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
                 "k": "uncaught",
                 "tag": "ShippedAShimmer",
                 "message": "ticket 1 landed after the texture, so every visitor between the two deploys saw 46 flickering pairs",
-                "channel": "die"
+                "cause": "die"
               }
             ]
           }
@@ -1363,21 +1360,21 @@
             "premiseHolds": false,
             "preAllocate": false
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
@@ -1393,7 +1390,7 @@
                 "next": 5
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1425,7 +1422,7 @@
                 "value": "G51"
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1460,19 +1457,19 @@
                 "at": 3,
                 "tag": "PremiseOverturned",
                 "message": "94% of what the chosen sheet moved was the average colour, not the grain",
-                "channel": "retry"
+                "cause": "fail"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
-                "k": "handled",
+                "k": "catch",
                 "at": 10,
                 "goto": "reroute",
                 "next": 17
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 17,
                 "next": 18
               },
@@ -1483,7 +1480,7 @@
                 "next": 19
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1511,7 +1508,7 @@
                 "value": "rosewood, not sapele"
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 19,
                 "next": 20
               },
@@ -1568,7 +1565,7 @@
                 "next": 12
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1583,7 +1580,7 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 2,
                 "next": 3
               },
@@ -1599,7 +1596,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1625,7 +1622,7 @@
                 "next": 14
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1835,21 +1832,21 @@
             "premiseHolds": true,
             "preAllocate": true
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 1,
                 "next": 2
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 2,
                 "next": 3
               },
@@ -1865,7 +1862,7 @@
                 "next": 5
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1897,7 +1894,7 @@
                 "value": "G51"
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -1959,7 +1956,7 @@
                 "next": 12
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -1974,7 +1971,7 @@
                 "next": 2
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 2,
                 "next": 3
               },
@@ -1990,7 +1987,7 @@
                 "next": 13
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2016,7 +2013,7 @@
                 "next": 14
               },
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -2051,13 +2048,13 @@
                 "at": 1,
                 "tag": "NumberClaimedTwice",
                 "message": "an identifier can be claimed twice by two branches and nothing notices",
-                "channel": "escape"
+                "cause": "fail"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
-                "k": "handled",
+                "k": "catch",
                 "at": 14,
                 "goto": "renumber",
                 "next": 24
@@ -2073,7 +2070,7 @@
                 "next": 25
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 25,
                 "next": 26
               },

@@ -163,7 +163,7 @@ const Groundtrack = (() => {
       layout: layout(view),
       run: 0,
       at: 0,
-      states: fold(view, view.presets[0].walk),
+      states: fold(view, view.presets[0].trace),
       layer: layerNames.length ? layerNames[0] : null,
       open: view.entry,
       tab: 'source',
@@ -252,25 +252,25 @@ const Groundtrack = (() => {
 
   const effectsOf = node => (node.steps || []).map((s, i) => ({ ...s, at: i })).filter(s => s.op === 'effect');
 
-  /* -- the failure kind ----------------------------------------------------
+  /* -- the failure cause ---------------------------------------------------
    *
-   * The three kinds a failure can be, in the order they print. A retry is a
-   * blip, a die is a crash, and an escape is between them, so a tag carrying
-   * two reads worst-last.
+   * The two causes a failure can have, in the order they print. A fail is an
+   * expected error a caller handles. A die is a defect, and never part of the
+   * contract.
    */
-  const KINDS = ['retry', 'escape', 'die'];
+  const KINDS = ['fail', 'die'];
 
   /** tag -> the kinds the file gives it, in KINDS order.
    *
    * Two sources, and only two: a `throw` step in the node map, and an effect
-   * move that `raised` in a walk. Both name a channel, and between them they
+   * move that `raised` in a trace. Both name a cause, and between them they
    * are every place the file says what kind of failure a tag is. A tag named
-   * nowhere but an E channel is absent from this table, and prints bare — the
+   * nowhere but an error list is absent from this table, and prints bare — the
    * page does not invent a kind the file never stated.
    *
    * An `onError` handler is not a source. It names the tag it catches and no
-   * channel: it says where a failure stops, never what kind it was. Nor is a
-   * walk's `throw` move, which repeats the channel of the step it ran — one
+   * cause: it says where a failure stops, never what kind it was. Nor is a
+   * trace's `throw` move, which repeats the cause of the step it ran — one
    * fact, written once, read from the step.
    *
    * It is derived rather than declared for the same reason a cut edge is: a
@@ -278,9 +278,9 @@ const Groundtrack = (() => {
    */
   function failureKinds(prog) {
     const seen = bare();
-    const add = (tag, channel) => {
-      if (tag === undefined || !KINDS.includes(channel)) return;
-      (seen[tag] = seen[tag] || new Set()).add(channel);
+    const add = (tag, cause) => {
+      if (tag === undefined || !KINDS.includes(cause)) return;
+      (seen[tag] = seen[tag] || new Set()).add(cause);
     };
     /* `nodes` and `graphs` are core fields the validator requires, so neither
      * is guarded here. A guard could never fire on a file this module is given
@@ -295,11 +295,11 @@ const Groundtrack = (() => {
      * nothing at all on the file, where the field does not exist. A tag that
      * only another graph's walk raises would have printed bare. */
     for (const node of Object.values(prog.nodes)) {
-      for (const s of node.steps || []) if (s.op === 'throw') add(s.tag, s.channel);
+      for (const s of node.steps || []) if (s.op === 'throw') add(s.tag, s.cause);
     }
     for (const p of prog.graphs.flatMap(g => g.presets)) {
-      for (const m of (p.walk && p.walk.steps) || []) {
-        if (m.k === 'effect' && m.raised) add(m.raised.tag, m.raised.channel);
+      for (const m of (p.trace && p.trace.steps) || []) {
+        if (m.k === 'effect' && m.raised) add(m.raised.tag, m.raised.cause);
       }
     }
     const out = bare();
@@ -371,11 +371,11 @@ const Groundtrack = (() => {
     let visited = [prog.entry];
     let edges = [];
     /* Every entry that names a node also names the call site of its frame —
-     * the popped frame on an unwind, the top frame on a raise, a throw or a
-     * catch. The tree is one row per call site and has to know which row an
-     * entry is, and it cannot work that out later: by the time the cursor sits
-     * on the catch, the frames that raised and unwound are gone. The entry for
-     * an error reaching the top names neither. */
+     * the popped frame on an unwind, the top frame on a throw or a catch. The
+     * tree is one row per call site and has to know which row an entry is,
+     * and it cannot work that out later: by the time the cursor sits on the
+     * catch, the frames that threw and unwound are gone. The entry for an
+     * error reaching the top names neither. */
     let errorPath = [];
     /* BY PATH FROM THE ENTRY, which is what the tree reads. A chain key is the
      * frame's chain joined: `@entry/greet#0/loadProfile#1`. No node id can hold
@@ -415,24 +415,24 @@ const Groundtrack = (() => {
       let moved = null;
       const top = frames[frames.length - 1];
 
-      if (m.k === 'unwind') {
+      if (m.k === 'propagate') {
         const gone = frames.pop();
         if (gone) {
-          moved = { from: gone.nodeId, to: frames.length ? frames[frames.length - 1].nodeId : null, dir: 'unwind' };
-          errorPath = errorPath.concat([{ nodeId: gone.nodeId, site: gone.site, chain: gone.chain.slice(), how: 'passed through' }]);
+          moved = { from: gone.nodeId, to: frames.length ? frames[frames.length - 1].nodeId : null, dir: 'propagate' };
+          errorPath = errorPath.concat([{ nodeId: gone.nodeId, site: gone.site, chain: gone.chain.slice(), how: 'propagated' }]);
         }
       } else if (m.k === 'done') {
         frames = [];
         ended = 'done';
       } else if (m.k === 'uncaught') {
-        errorPath = errorPath.concat([{ nodeId: null, how: 'reached the top uncaught', tag: m.tag, message: m.message, channel: m.channel }]);
+        errorPath = errorPath.concat([{ nodeId: null, how: 'reached the top uncaught', tag: m.tag, message: m.message, cause: m.cause }]);
         frames = [];
         ended = 'uncaught';
       } else if (top) {
 
         switch (m.k) {
-          case 'note':
-          case 'let':
+          case 'comment':
+          case 'var':
           case 'if':
           case 'goto':
             top.pc = m.next;
@@ -454,7 +454,7 @@ const Groundtrack = (() => {
             break;
           }
           case 'effect': {
-            const outcome = m.raised !== undefined ? 'failed' : 'landed';
+            const outcome = m.raised !== undefined ? 'threw' : 'returned';
             touch(top.chain).effects[`${top.nodeId}[${m.at}]`] = outcome;
             nodeEffects = { ...nodeEffects, [`${top.nodeId}[${m.at}]`]: outcome };
             ledger = ledger.concat([
@@ -470,16 +470,16 @@ const Groundtrack = (() => {
               },
             ]);
             if (m.raised !== undefined) {
-              errorPath = [{ nodeId: top.nodeId, site: top.site, chain: top.chain.slice(), how: 'raised', tag: m.raised.tag, message: m.raised.message, channel: m.raised.channel }];
+              errorPath = [{ nodeId: top.nodeId, site: top.site, chain: top.chain.slice(), how: 'thrown', tag: m.raised.tag, message: m.raised.message, cause: m.raised.cause }];
             } else {
               top.pc = m.next;
             }
             break;
           }
           case 'throw':
-            errorPath = [{ nodeId: top.nodeId, site: top.site, chain: top.chain.slice(), how: 'thrown', tag: m.tag, message: m.message, channel: m.channel }];
+            errorPath = [{ nodeId: top.nodeId, site: top.site, chain: top.chain.slice(), how: 'thrown', tag: m.tag, message: m.message, cause: m.cause }];
             break;
-          case 'handled':
+          case 'catch':
             top.pc = m.next;
             errorPath = errorPath.concat([{ nodeId: top.nodeId, site: top.site, chain: top.chain.slice(), how: 'caught', goto: m.goto }]);
             break;
@@ -566,7 +566,7 @@ const Groundtrack = (() => {
     const cuts = [];
     for (const [ln, layer] of Object.entries(prog.layers || {})) {
       for (const [nid, ov] of Object.entries((layer && layer.nodes) || {})) {
-        const tokens = ((ov && ov.R) || []).map(renamedToken).filter(Boolean);
+        const tokens = ((ov && ov.requirements) || []).map(renamedToken).filter(Boolean);
         for (const [callerId, caller] of Object.entries(prog.nodes)) {
           (caller.steps || []).forEach((s, i) => {
             if (s.op !== 'call') return;
@@ -592,7 +592,7 @@ const Groundtrack = (() => {
    * draws below both of its callers. The call runs down the left of a pair and
    * the declared error return up its right: one corridor, two directions.
    */
-  const W = 288, GAP_X = 48, GAP_Y = 96, PAD = 36;
+  const W = 356, GAP_X = 48, GAP_Y = 96, PAD = 36;
 
   /* A sheet draws one graph, and one graph is what its entry reaches. So the
    * drawing places the reachable set and not the node map: on a change with
@@ -689,7 +689,7 @@ const Groundtrack = (() => {
           from, to,
           call: `M${sx},${sy} L${sx},${my} L${ex},${my} L${ex},${ey}`,
           err: `M${ex + 20},${ey} L${ex + 20},${my + 12} L${sx + 20},${my + 12} L${sx + 20},${sy}`,
-          hasE: ((prog.nodes[to].channels || {}).E || []).length > 0,
+          hasE: ((prog.nodes[to].channels || {}).error || []).length > 0,
         });
       }
     }
@@ -704,17 +704,10 @@ const Groundtrack = (() => {
    * stopped, or a cycle never terminates.
    */
 
-  /** The four words the fold writes on the error path, sorted into the three
-   *  positions a row can take. A raise and a throw are one position — where
-   *  the error started. The tree, the text and the page all sort by this one
-   *  table, so the three cannot disagree about which word is which.
-   *
-   *  What each position LOOKS like is not here and must not come here: the
-   *  page keeps its own PATH_MARK of classes and glyphs, keyed by the word
-   *  rather than the position, because a raise and a throw are one position
-   *  and still draw differently. That table reads this one for the position,
-   *  so the two cannot drift apart on the only thing they share. */
-  const ERROR_POSITION = Object.freeze({ raised: 'raised', thrown: 'raised', 'passed through': 'passed', caught: 'caught' });
+  /** Three of the four words the fold writes on the error path, each its own
+   *  position — `reached the top uncaught` names no node, so it needs none.
+   *  The tree, the text and the page all sort by this one table. */
+  const ERROR_POSITION = Object.freeze({ thrown: 'thrown', propagated: 'propagated', caught: 'caught' });
 
   /** What one CALL STEP did, summed over every path that reached it.
    *
@@ -804,10 +797,10 @@ const Groundtrack = (() => {
        * mark the same step with different outcomes, and the row has one mark to
        * show for both. Taking the last one written would take the deepest
        * frame, which is an accident of the order the fold entered them: the row
-       * would report a clean record beside its own raised stripe and contradict
+       * would report a clean record beside its own thrown stripe and contradict
        * itself on one line. The failure is the half a reader must not lose. */
       for (const at of Object.keys(end.sites[key].effects)) {
-        if (drawn[i].effects[at] === 'failed') continue;
+        if (drawn[i].effects[at] === 'threw') continue;
         drawn[i].effects[at] = end.sites[key].effects[at];
       }
     }
@@ -816,13 +809,12 @@ const Groundtrack = (() => {
       if (i !== undefined) drawn[i].open = true;
     }
 
-    /* WHICH open frame is the one running. `state` says a row is on the stack;
-     * it does not say whether the walk is in it or merely under it, and on a
-     * deep stack that is most of the rows. A separate boolean and not a fourth
-     * `state`, for the reason the error position is separate: `state` is what
-     * --text prints and what the checks read, and a value they have never seen
-     * would change both. The page spends it on rule weight — the running frame
-     * keeps full ink, the ones waiting under it take the system's state rule.
+    /* WHICH open frame is the one running. `state` already says `running` or
+     * `waiting` for every open row, and `top` is kept alongside it rather than
+     * folded away: `state` is what --text prints and what the checks read,
+     * and a page-only signal has no business changing what they see. The page
+     * spends `top` on rule weight — the running frame keeps full ink, the ones
+     * waiting under it take the system's state rule.
      *
      * Read through `speaksFor` like every other signal. Where a recursion runs
      * below the drawn rows that makes the repeat row the row the walk is in,
@@ -831,20 +823,20 @@ const Groundtrack = (() => {
      * land on one row that way, and it is still one row. */
     const topRow = end.frames.length ? speaksFor(end.frames[end.frames.length - 1].chain) : undefined;
 
-    /* Where each row stands on the error path at the cursor: raised or thrown,
-     * passed through, caught. A second signal beside `state` and not a fourth
-     * value of it, because a row can be on the stack and on the path at once —
-     * the frame that catches is still open.
+    /* Where each row stands on the error path at the cursor: thrown, propagated,
+     * caught. A second signal beside `state` and not a fourth value of it,
+     * because a row can be running or waiting and on the path at once — the
+     * frame that catches is still open.
      *
      * Matched by the chain each entry carries, never by its node. A node called
      * from three sites is three rows, and at most one of them is the frame the
      * error crossed; a node whose CALLER is drawn twice is two rows, and the
      * same holds. The chain tells both apart, which `caller#step` could not.
      *
-     * The frame an error starts in is on the fold's path twice — it raised,
+     * The frame an error starts in is on the fold's path twice — it threw,
      * then it unwound — and only the first is a position. The row where the
-     * error started says so; `passed through` is for the frames it crossed. A
-     * frame that raises and catches its own error says both, in path order.
+     * error started says so; `propagated` is for the frames it crossed. A
+     * frame that throws and catches its own error says both, in path order.
      *
      * The entry for an error reaching the top names no chain, so it matches no
      * row and makes none. Nor do the frames still open when it gets there:
@@ -858,27 +850,27 @@ const Groundtrack = (() => {
     const errorOf = r => {
       const how = r.how;
       if (!how.length) return null;
-      const started = how.some(h => ERROR_POSITION[h] === 'raised');
-      return { how: started ? how.filter(h => h !== 'passed through') : how.slice(), tag: end.errorPath[0].tag };
+      const started = how.some(h => ERROR_POSITION[h] === 'thrown');
+      return { how: started ? how.filter(h => h !== 'propagated') : how.slice(), tag: end.errorPath[0].tag };
     };
 
     /* WHERE THE FRAME ENDED UP — one word, for a mark that can only be one
      * thing: a stripe down a row's edge, a glyph before its name. `error.how`
-     * can hold two, and a frame that raises and then catches its own error is
+     * can hold two, and a frame that throws and then catches its own error is
      * both; the last is where it came to rest, and the rail still lists the
      * whole path in order.
      *
      * Read from `error.how` and never from `end.errorPath` directly. The fold
      * puts the frame that started an error on the path twice — thrown, then
-     * passed through as it unwinds — so the last RAW entry for that row says
-     * "passed through" and the row that threw would lose its mark. `errorOf`
+     * propagated as it unwinds — so the last RAW entry for that row says
+     * "propagated" and the row that threw would lose its mark. `errorOf`
      * has already dropped that second entry, which is the whole reason it
      * filters. */
     const pathOf = error => (error ? error.how[error.how.length - 1] : null);
 
     return drawn.map((r, i) => {
       const ch = r.node.channels || {};
-      const rename = layer && layer.nodes && layer.nodes[r.id] ? layer.nodes[r.id].R : null;
+      const rename = layer && layer.nodes && layer.nodes[r.id] ? layer.nodes[r.id].requirements : null;
       const error = errorOf(r);
       const reached = r.entered > 0;
       return {
@@ -886,20 +878,20 @@ const Groundtrack = (() => {
         id: r.id,
         name: r.node.name,
         role: r.node.role,
-        A: ch.A,
-        E: (ch.E || []).slice(),
-        kinds: (ch.E || []).reduce((m, t) => (kinds[t] ? ((m[t] = kinds[t].slice()), m) : m), bare()),
-        R: (ch.R || []).slice(),
+        success: ch.success,
+        error: (ch.error || []).slice(),
+        kinds: (ch.error || []).reduce((m, t) => (kinds[t] ? ((m[t] = kinds[t].slice()), m) : m), bare()),
+        requirements: (ch.requirements || []).slice(),
         rename: rename ? rename.slice() : null,
         site: r.site ? { label: r.site.label, aside: r.site.aside } : null,
-        state: !reached ? 'not reached' : r.open ? 'on stack' : 'returned',
+        state: !reached ? 'not called' : r.open ? (i === topRow ? 'running' : 'waiting') : 'returned',
         top: i === topRow,
-        error,
+        errorPath: error,
         path: pathOf(error),
         effects: effectsOf(r.node).map(e => ({
           kind: e.kind,
           desc: e.desc,
-          mark: (reached && r.effects[`${r.id}[${e.at}]`]) || 'not reached',
+          mark: (reached && r.effects[`${r.id}[${e.at}]`]) || 'not called',
         })),
         repeat: r.repeat,
       };
@@ -1097,12 +1089,12 @@ const Groundtrack = (() => {
     return bits.join('');
   }
 
-  /** The longest walk. It is the only rule that names exactly one run in all
+  /** The longest trace. It is the only rule that names exactly one run in all
    *  three worked programs with no tie, so it is the one the text suggests. */
   function suggestRun(prog) {
     let best = 0;
     prog.presets.forEach((p, i) => {
-      if (p.walk.steps.length > prog.presets[best].walk.steps.length) best = i;
+      if (p.trace.steps.length > prog.presets[best].trace.steps.length) best = i;
     });
     return best;
   }

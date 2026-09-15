@@ -73,11 +73,12 @@ body { margin: 0; }
    floor is 70, and the labels stay there; running text at 70 on paper read as
    grey, and a reader who cannot read an aside has been handed nothing. */
 .dim { color: var(--av-ink-80); }
-/* An effect that landed and an effect that failed are the walk-sheet roles the
-   design system names, not the raw marks: a failed effect and an error in
-   flight are one condition, and an effect that landed is resolved exactly as a
-   caught error is. Asking for the role is what lets the site theme answer with
-   redline, where caution folds to ink and would have said nothing. */
+/* An effect that returned and an effect that threw are the walk-sheet roles
+   the design system names, not the raw marks: an effect that threw and an
+   error in flight are one condition, and an effect that returned is resolved
+   exactly as a caught error is. Asking for the role is what lets the site
+   theme answer with redline, where caution folds to ink and would have said
+   nothing. */
 .ok { color: var(--av-path-caught); }
 .caut { color: var(--av-path); }
 
@@ -124,7 +125,7 @@ body { height: 100vh; box-sizing: border-box; padding: var(--av-s1);
   grid-template-areas: 'head head' 'plan side' 'cut side' 'block block';
   overflow: hidden; }
 
-/* Head — the pickers and the step controls. It drives the walk.
+/* Head — the pickers and the step controls. It drives the run.
    Two rows: the lockup and the step controls above, the pickers below. The
    pickers went under the title because a select wide enough to read a run's
    blurb crowds the title off a narrow screen when both share a row, and the
@@ -196,7 +197,7 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
    on a narrow window they start at the left like everything else. */
 .btn-group { display: flex; gap: var(--av-s1); align-items: center; flex: none; }
 /* The scheme control, top right of the lockup row rather than down with the
-   walk controls: it changes how the sheet is READ, not where the cursor is.
+   run controls: it changes how the sheet is READ, not where the cursor is.
 
    It shows the DESTINATION, not the state: the moon is offered while the page
    is light. Both drawings ship in the markup and one carries [hidden], rather
@@ -245,9 +246,9 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 #wires { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .sheet-root.tree-on .plan { cursor: default; }
 
-/* The wires. Line weight says what the walk did: on the stack now, bold;
-   walked, thin; not yet, a hairline in construction ink. A cut edge is dashed.
-   No hex value lives here — every stroke reads the ramp. */
+/* The wires. Line weight says what the run did: open now, bold;
+   run already, thin; not yet, a hairline in construction ink. A cut edge is
+   dashed. No hex value lives here — every stroke reads the ramp. */
 .wire { fill: none; stroke: var(--av-ink-30); stroke-width: var(--av-rule-hair); }
 .wire--walked { stroke: var(--av-ink); stroke-width: var(--av-rule-thin); }
 .wire--live { stroke: var(--av-ink); stroke-width: var(--av-rule-bold); }
@@ -266,8 +267,8 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 
 /* A node is a part on the drawing. Its states are line weights: the open one
    carries an outline set off the box, one on the stack a hairline outside it,
-   one the walk has not reached a hairline box in construction ink. */
-.nd { position: absolute; width: 288px; background: var(--av-paper); border: var(--av-rule-bold) solid var(--av-ink);
+   one the run has never called a hairline box in construction ink. */
+.nd { position: absolute; width: 356px; background: var(--av-paper); border: var(--av-rule-bold) solid var(--av-ink);
   padding: var(--av-s2); cursor: pointer; overflow: hidden; transition: border-color 150ms; }
 .nd--cold { border-width: var(--av-rule-hair); border-color: var(--av-ink-30); color: var(--av-ink-70); }
 .nd--sel { outline: var(--av-rule-thin) solid var(--av-ink); outline-offset: 7px; }
@@ -276,7 +277,7 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 .nd-top { display: flex; align-items: center; gap: var(--av-s1); margin-bottom: 2px; }
 .nd-name { font-weight: 600; font-size: var(--av-t-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nd-loc { font-size: var(--av-t-micro); color: var(--av-ink-70); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nd-ch { display: grid; grid-template-columns: 1.2rem 1fr; gap: 0 var(--av-s1); font-size: var(--av-t-micro);
+.nd-ch { display: grid; grid-template-columns: max-content 1fr; gap: 0 var(--av-s1); font-size: var(--av-t-micro);
   margin-top: var(--av-s1); padding-top: var(--av-s1); border-top: var(--av-rule-hair) solid var(--av-ink-12); }
 .nd-ch b { font-weight: 600; cursor: help; }
 .nd-ch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -291,8 +292,8 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 .nd-cut { font-size: var(--av-t-micro); color: var(--av-caution); margin-top: 3px; }
 .chip-help { cursor: help; }
 
-/* The tree. The same file and the same walk, on paper. Stepping works here;
-   only the animation goes. A row on the stack carries a bold left rule; the
+/* The tree. The same file and the same run, on paper. Stepping works here;
+   only the animation goes. A running row carries a bold left rule; the
    row whose node is open in the cutaway carries a thin ink box, the same
    outline the drawing gives the open node. No fill. */
 .tree { padding: var(--av-s4) var(--av-s3); overflow: auto; height: 100%; display: none; flex-direction: column; gap: 2px; }
@@ -310,15 +311,15 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
   font-size: var(--av-t-annot); border: var(--av-rule-hair) solid var(--av-ink-12);
   border-left: var(--av-rule-bold) solid transparent; cursor: pointer; }
 .tr--cold { color: var(--av-ink-70); }
-/* On the stack, and the two are not the same job. The frame the walk is IN
-   keeps full ink; the frames waiting under it take the system's state rule,
-   which is ink 55 — a stroke that means something is held to 3:1, and it
-   never takes a hue, because a position on the stack is not a condition. */
+/* Running and waiting, and the two are not the same job. The frame the run is
+   IN keeps full ink; the frames waiting under it take the system's state
+   rule, which is ink 55 — a stroke that means something is held to 3:1, and
+   it never takes a hue, because waiting is not a condition. */
 .tr--active { border-left-color: var(--av-ink); }
 .tr--waiting { border-left-color: var(--av-state-rule); }
 .tr--sel { border-color: var(--av-ink); border-width: var(--av-rule-thin); border-left-width: var(--av-rule-bold); }
 /* Selection is already the box on all four sides, so the left rule stays the
-   walk's to spend. */
+   run's to spend. */
 .tr--sel.tr--waiting { border-left-color: var(--av-state-rule); }
 .tr-name { font-weight: 600; overflow-wrap: anywhere; }
 .tr-kind { align-self: baseline; }
@@ -343,28 +344,28 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 .gt-chip::before { content: ''; width: 5px; height: 5px; border-radius: 50%;
   background: currentColor; flex: none; }
 
-/* Where a row's call site stands on the current error: raised or thrown,
-   passed through, caught. Three channels, because a hue is not one — the site
+/* Where a row's call site stands on the current error: thrown, propagated,
+   caught. Three channels, because a hue is not one — the site
    scheme folds the path to redline and a colour-blind reader has no hue at
    all — and each says the same thing on its own:
 
      the stripe   an inset rule down the row's left edge, just inside the
-                  walk-state border. Drafting order: the object outline is
+                  run-state border. Drafting order: the object outline is
                   outermost and its annotation sits within, which also puts
                   the stripe hard against the glyph and the word it qualifies
                   so the three read as one mark.
      the glyph    before the name. The channel that survives one ink.
      the word     a chip after the name. The channel that needs no legend.
 
-   Left and not right: the right edge never argues with the walk-state rule,
+   Left and not right: the right edge never argues with the run-state rule,
    which is why the stripe would start there — but a reader enters a row at
    its left edge, and that is where the rarest signal on the sheet belongs.
-   Only the raise takes a rule under the row as well; it is the one position a
+   Only the throw takes a rule under the row as well; it is the one position a
    reader looks for first. The tag stays outside the chip, as author text: the
    chip sets caps and a tag is the author's. */
 .tr--onpath { box-shadow: inset 3px 0 0 var(--av-path); }
 .tr--caught { box-shadow: inset 3px 0 0 var(--av-path-caught); }
-.tr--raised { box-shadow: inset 3px 0 0 var(--av-path); border-bottom: var(--av-rule-bold) solid var(--av-ink); }
+.tr--thrown { box-shadow: inset 3px 0 0 var(--av-path); border-bottom: var(--av-rule-bold) solid var(--av-ink); }
 .tr-gl { font-weight: 600; margin-right: var(--av-s1); color: var(--av-path); cursor: help; }
 .tr-gl--caught { color: var(--av-path-caught); }
 .tr-pl { font-size: var(--av-t-micro); color: var(--av-path); margin-left: var(--av-s2); }
@@ -372,16 +373,16 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 .tr-err-tag { font-weight: 600; margin-left: var(--av-s1); }
 
 /* THE EFFECT OUTCOME, at the weight of the path label. It is the answer to a
-   sheet that reads monochrome on a walk where nothing breaks: landed, failed
-   and not reached is a closed set, derived per call site, live the moment a
+   sheet that reads monochrome on a run where nothing breaks: returned, threw
+   and not called is a closed set, derived per call site, live the moment a
    node is entered. It already owned the two roles — .ok and .caut above — and
    spent them on an 11px word inside an ink-70 line, where the colour was
-   present and invisible. Not reached is an absence and an absence costs no
+   present and invisible. Not called is an absence and an absence costs no
    ink, so drawTree never gives it the chip in the first place — it stays plain
    text at the floor, and the chips that ARE drawn all mean something. */
-.tr-fxm--not-reached { color: var(--av-ink-70); }
+.tr-fxm--not-called { color: var(--av-ink-70); }
 
-/* The rail. It reads the walk, and it moves on every step. Deleting it changes
+/* The rail. It reads the run, and it moves on every step. Deleting it changes
    the drawing's scale by nothing, so what goes in it is never an argument
    about the drawing, and the tools are its header. */
 .side { grid-area: side; position: relative; overflow-y: auto; display: flex; flex-direction: column;
@@ -393,7 +394,7 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
   padding: var(--av-s2) var(--av-s3); border-bottom: var(--av-rule-hair) solid var(--av-ink);
   position: sticky; top: 0; background: var(--av-paper); z-index: 1; }
 /* The tools. Every control that changes how the sheet is READ, then the holds
-   that say where a walk stops. They are the panel's own rows, not a block: no
+   that say where a run stops. They are the panel's own rows, not a block: no
    frame, no fill, no rules between buttons. A key column makes them read as a
    table. The live tool takes the tab treatment, full ink and a bold bottom
    rule, which is line weight and not a fill. They left the plan pane because
@@ -553,7 +554,7 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 .sheetfacts span + span { padding-left: var(--av-s3); border-left: var(--av-rule-hair) solid var(--av-ink-12); }
 .sheetfacts b { font-weight: 600; color: var(--av-ink); }
 /* The trace is a dimension line the reader can take hold of at any time,
-   including while the walk is playing. */
+   including while the run is playing. */
 .trace-span { position: relative; flex: 1; height: 18px; display: flex; align-items: center; cursor: pointer;
   touch-action: none; }
 .trace-rule { position: absolute; inset: 50% 0 auto; height: 0; border-top: var(--av-rule-thin) solid var(--av-ink-30); }
@@ -651,18 +652,18 @@ button[data-help][aria-disabled=true] { cursor: help; }
       <svg class="scheme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter" aria-hidden="true" hidden><circle cx="12" cy="12" r="5"></circle><line x1="19.6" y1="12" x2="22.4" y2="12"></line><line x1="18.582" y1="8.2" x2="21.007" y2="6.8"></line><line x1="15.8" y1="5.418" x2="17.2" y2="2.993"></line><line x1="12" y1="4.4" x2="12" y2="1.6"></line><line x1="8.2" y1="5.418" x2="6.8" y2="2.993"></line><line x1="5.418" y1="8.2" x2="2.993" y2="6.8"></line><line x1="4.4" y1="12" x2="1.6" y2="12"></line><line x1="5.418" y1="15.8" x2="2.993" y2="17.2"></line><line x1="8.2" y1="18.582" x2="6.8" y2="21.007"></line><line x1="12" y1="19.6" x2="12" y2="22.4"></line><line x1="15.8" y1="18.582" x2="17.2" y2="21.007"></line><line x1="18.582" y1="15.8" x2="21.007" y2="17.2"></line></svg>
     </button>
    </div>
-   <!-- Everything that drives the walk, under the lockup and in the order a
+   <!-- Everything that drives the run, under the lockup and in the order a
         reader chooses it: the sheet, then the run on it, then the controls
         that step that run. The sheet reads first because it changes slower
         than a run and it changes what the runs are. -->
    <div class="head-row">
     <!--SHEETS-->
     <label class="av-label" for="run">run</label>
-    <select id="run" data-help="Which recorded walk to step. Each run is one route through the graph."></select>
+    <select id="run" data-help="Which recorded run to step. Each run is one route through the graph."></select>
     <div class="btn-group">
       <button class="btn" id="first" data-help="Back to the start">|&lt;</button>
       <button class="btn" id="prev" data-help="Step back one move">&lt;</button>
-      <button class="btn" id="play" data-help="Run the walk. It stops at a hold, or at the end.">play</button>
+      <button class="btn" id="play" data-help="Play the run. It stops at a hold, or at the end.">play</button>
       <button class="btn" id="next" data-help="Step forward one move">&gt;</button>
       <button class="btn" id="last" data-help="Jump to the end">&gt;|</button>
       <span class="stepnow" id="stepnow" data-help="The move the cursor is on, out of the moves in this run"></span>
@@ -704,14 +705,14 @@ button[data-help][aria-disabled=true] { cursor: help; }
         <span class="grp-k av-label">hold</span>
         <div class="grp-v">
           <label data-help="When playing, stop on the next move that touches the outside world — a network call, a file, the console."><input type="checkbox" id="holdEffect">effect</label>
-          <label data-help="When playing, stop on the next throw, the next effect that raises, or an error reaching the top uncaught."><input type="checkbox" id="holdError">error</label>
+          <label data-help="When playing, stop on the next throw, the next effect that throws, or an error reaching the top uncaught."><input type="checkbox" id="holdError">error</label>
         </div>
       </div>
     </div>
-    <div class="blk"><span class="av-label" data-help="The frames open at the cursor, top first. How the walk got to the node it is on.">call stack</span><div id="stack"></div></div>
-    <div class="blk"><span class="av-label" data-help="The values this run started from. Read-only: the walk was recorded under exactly these.">inputs</span><div id="inputs"></div></div>
-    <div class="blk"><span class="av-label" data-help="How far the current error has travelled: where it was raised, which frames it passed through, and where it was caught.">error path</span><div id="errpath"></div></div>
-    <div class="blk"><span class="av-label" data-help="Every effect the walk has run so far, in order, with what the author says it returned or raised.">effects ledger</span><div id="ledger"></div></div>
+    <div class="blk"><span class="av-label" data-help="The frames open at the cursor, top first. How the run got to the node it is on.">call stack</span><div id="stack"></div></div>
+    <div class="blk"><span class="av-label" data-help="The values this run started from. Read-only: the run was recorded under exactly these.">arguments</span><div id="inputs"></div></div>
+    <div class="blk"><span class="av-label" data-help="How far the current error has travelled: where it was thrown, which frames it propagated through, and where it was caught.">error path</span><div id="errpath"></div></div>
+    <div class="blk"><span class="av-label" data-help="Every effect the run has run so far, in order, with what the author says it returned or threw.">effects ledger</span><div id="ledger"></div></div>
   </div>
 
   <div class="cut" id="cut">
@@ -723,7 +724,7 @@ button[data-help][aria-disabled=true] { cursor: help; }
       <div class="tabs">
         <button class="tab tab--on" data-tab="source" data-help="The node's steps, with the cursor marked">source</button>
         <button class="tab" data-tab="files" data-help="The files this node changes, the files other nodes change, and every file in the change, so you can see where one sits in the whole. Each row carries its added and removed lines and how it changed: new, modified, deleted or forbidden.">files</button>
-        <button class="tab" data-tab="contract" data-help="What the node declares: what it takes, returns, can raise, and needs">contract</button>
+        <button class="tab" data-tab="contract" data-help="What the node declares: what it takes, what it returns on success, the errors it can throw, and what it requires">contract</button>
       </div>
     </div>
     <div class="tape" id="cutBody"></div>
@@ -760,16 +761,13 @@ const $ = id => document.getElementById(id);
 /* Fixed text the page shows for the three channels and the two stamps. None
    of it is author text, which is why it may sit in an attribute. */
 const HELP = {
-  A: 'A — what flows out of this node when it returns.',
-  E: 'E — where it breaks: the failure tags this node can raise. Each one is a retry, an escape or a die.',
-  R: 'R — what this node needs to work. A layer can rename these.',
+  success: 'success — what this node returns.',
+  error: 'error — the tags this node can throw as a fail. A die is a defect, and never listed here.',
+  requirements: 'requirements — what this node needs to work. A layer can rename these.',
   role: 'What kind of thing this node is. The page prints it; nothing branches on it.',
-  /* Keyed by the position G.ERROR_POSITION sorts a fold word into, which is
-     what drawTree looks a row's help note up by. PATH_MARK is keyed by the
-     word itself, because two words share a position and draw differently. */
   err: {
-    raised: 'Where the current error started: this call raised it or threw it.',
-    passed: 'The current error left this call without being caught, on its way up.',
+    thrown: 'Where the current error started: this call threw it.',
+    propagated: 'The current error left this call without being caught, on its way up.',
     caught: 'A handler at this call caught the current error.',
   },
   authored: 'Written by hand from the material. A claim about the program, not a recording of it.',
@@ -777,7 +775,7 @@ const HELP = {
   paths: 'Cyclomatic complexity of the node as drawn: one, plus one for each if, each error handler and each backward jump. It measures the drawing, and the drawing is what the author chose to draw of the code.',
 };
 
-/* The page holds the walk to the graph before drawing it. A move naming a step
+/* The page holds the trace to the graph before drawing it. A move naming a step
    the node has not got, or a pop with no frame open, is refused rather than
    drawn. */
 function holdToGraph(prog) {
@@ -787,8 +785,8 @@ function holdToGraph(prog) {
     if (!prog.nodes || !prog.nodes[g.entry]) bad.push('graph "' + g.id + '": the entry node is not in the node map');
     for (const p of g.presets || []) {
       let depth = 1;
-      (p.walk.steps || []).forEach((m, i) => {
-        if (m.k === 'unwind' || m.k === 'return') {
+      (p.trace.steps || []).forEach((m, i) => {
+        if (m.k === 'propagate' || m.k === 'return') {
           if (depth < 1) bad.push('graph "' + g.id + '" run "' + p.name + '" move ' + i + ': ' + m.k + ' with no frame open');
           depth -= 1;
         } else if (m.k === 'call') {
@@ -832,7 +830,7 @@ function start() {
      from then on. That is the whole of what "a sheet keeps its own run,
      cursor, layer, view and open node" is: a switch swaps which state the page
      is reading, and never rebuilds one that exists. Made lazily because a
-     ten-graph file would otherwise fold every walk of every graph before
+     ten-graph file would otherwise fold every trace of every graph before
      drawing the first. */
   const SHEETS = PROG.graphs.map(function () { return null; });
   let sheetAt = 0;
@@ -852,7 +850,7 @@ function start() {
   const rOf = id => {
     const layer = S.layer ? PROG.layers[S.layer] : null;
     const ov = layer && layer.nodes && layer.nodes[id];
-    return ov && ov.R ? ov.R : (PROG.nodes[id].channels || {}).R || [];
+    return ov && ov.requirements ? ov.requirements : (PROG.nodes[id].channels || {}).requirements || [];
   };
   const cutsFrom = (from, at) => CUTS.filter(c => c.layer === S.layer && c.from === from && c.at === at);
   const layerEntry = () => {
@@ -930,19 +928,19 @@ function start() {
     const onStack = st.frames.some(f => f.nodeId === id);
     const top = st.frames.length && st.frames[st.frames.length - 1].nodeId === id;
     const visited = st.visited.indexOf(id) >= 0;
-    const erroring = st.errorPath.some(e => e.nodeId === id && (e.how === 'raised' || e.how === 'thrown'));
+    const erroring = st.errorPath.some(e => e.nodeId === id && e.how === 'thrown');
     const cold = !reach.has(id) || !visited;
     const cls =
       'nd' + (cold ? ' nd--cold' : '') + (onStack ? ' nd--active' : '') +
       (erroring ? ' nd--error' : '') + (S.open === id ? ' nd--sel' : '');
     const chip = top
-      ? '<span class="av-label chip-help" style="margin-left:auto" data-help="The frame the cursor is in">on stack</span>'
+      ? '<span class="av-label chip-help" style="margin-left:auto" data-help="The frame the cursor is in">running</span>'
       : onStack
         ? '<span class="av-label chip-help" style="margin-left:auto" data-help="On the stack, suspended at a call, waiting for the callee to return">waiting</span>'
         : visited
-          ? '<span style="margin-left:auto"><span class="av-state av-state--normal chip-help" data-help="Entered and returned earlier in this walk">returned</span></span>'
+          ? '<span style="margin-left:auto"><span class="av-state av-state--normal chip-help" data-help="Entered and returned earlier in this run">returned</span></span>'
           : '';
-    const E = (ch.E || []).length ? (ch.E || []).map(esc).join(' &middot; ') : '<span class="none">never</span>';
+    const E = (ch.error || []).length ? (ch.error || []).map(esc).join(' &middot; ') : '<span class="none">never</span>';
     const R = rOf(id).length ? esc(rOf(id).join(', ')) : '<span class="none">none</span>';
     // Keyed by node, not by call site. The drawing shows one box per node, so
     // a mark read off the open frame would disappear the moment that frame
@@ -950,7 +948,7 @@ function start() {
     const fx = G.effectsOf(n)
       .map(function (e) {
         const mark = st.nodeEffects[id + '[' + e.at + ']'];
-        const k = mark === 'failed' ? ' fx--fail' : mark === 'landed' ? ' fx--ok' : '';
+        const k = mark === 'threw' ? ' fx--fail' : mark === 'returned' ? ' fx--ok' : '';
         return (
           '<div class="fx' + k + '"><span class="fx-dot"></span><span class="fx-lead"></span>' +
           '<span class="fx-txt">' + esc(e.kind) + ' <span class="dim">' + esc(e.desc) + '</span></span></div>'
@@ -966,8 +964,8 @@ function start() {
       '<div class="nd-top"><span class="av-label chip-help" data-help="' + HELP.role + '">' + esc(n.role) + '</span>' + chip + '</div>' +
       '<div class="nd-name">' + esc(n.name) + '</div>' +
       '<div class="nd-loc">' + esc(n.loc) + '</div>' +
-      '<div class="nd-ch">' + channelKey('A') + '<span>' + esc(ch.A || '—') + '</span>' +
-      channelKey('E') + '<span>' + E + '</span>' + channelKey('R') + '<span>' + R + '</span></div>' +
+      '<div class="nd-ch">' + channelKey('success') + '<span>' + esc(ch.success || '—') + '</span>' +
+      channelKey('error') + '<span>' + E + '</span>' + channelKey('requirements') + '<span>' + R + '</span></div>' +
       fx + cutNote + '</div>'
     );
   }
@@ -976,47 +974,46 @@ function start() {
   /* HOW THE SHEET DRAWS ONE OF THE FOLD'S WORDS. Presentation only: which
      position a word IS stays with G.ERROR_POSITION in the module, so the tree,
      the rail and the text still cannot disagree about that. The glyphs are
-     drafting marks and not pictures — a filled lozenge where the error
-     started and a hollow one where it was thrown by hand, a vertical where it
-     merely crossed, a corner where it stopped, an arrow where it left the top.
-     The tree and the rail read this same table, so one word looks the same in
-     both. Only the last has no row class: an error reaching the top names no
-     node, so no row carries it and the rail states it alone. */
+     drafting marks and not pictures — a filled lozenge where the error was
+     thrown, a vertical where it propagated, a corner where it stopped, an
+     arrow where it left the top. The tree and the rail read this same table,
+     so one word looks the same in both. Only the last has no row class: an
+     error reaching the top names no node, so no row carries it and the rail
+     states it alone. */
   const PATH_MARK = {
-    'raised': { cls: 'tr--raised', glyph: '◆' },
-    'thrown': { cls: 'tr--raised', glyph: '◇' },
-    'passed through': { cls: 'tr--onpath', glyph: '│' },
+    'thrown': { cls: 'tr--thrown', glyph: '◆' },
+    'propagated': { cls: 'tr--onpath', glyph: '│' },
     'caught': { cls: 'tr--caught', glyph: '└' },
     'reached the top uncaught': { cls: null, glyph: '↑' },
   };
 
   function drawTree() {
-    const rows = G.treeRows(SHEET, SHEET.presets[S.run].walk, S.layer, S.at, S.states);
+    const rows = G.treeRows(SHEET, SHEET.presets[S.run].trace, S.layer, S.at, S.states);
     return rows
       .map(function (row) {
         /* Two independent signals on one row, because a frame that catches is
-           on the stack and on the path at once. Walk state takes the row's own
+           open and on the path at once. Run state takes the row's own
            left border, the error path an inset stripe just within it. */
         const p = row.path ? PATH_MARK[row.path] : null;
         const position = row.path ? G.ERROR_POSITION[row.path] : null;
         const caught = position === 'caught';
         const cls =
-          'tr' + (row.state === 'not reached' ? ' tr--cold' : '') +
-          (row.state === 'on stack' ? (row.top ? ' tr--active' : ' tr--waiting') : '') +
+          'tr' + (row.state === 'not called' ? ' tr--cold' : '') +
+          (row.state === 'running' ? ' tr--active' : row.state === 'waiting' ? ' tr--waiting' : '') +
           (p && p.cls ? ' ' + p.cls : '') + (row.id === S.open ? ' tr--sel' : '');
-        const E = row.E.length ? row.E.map(eTag.bind(null, row.kinds)).join(' &middot; ') : '<span class="none">never</span>';
-        const rr = row.rename && row.rename.length ? row.rename : row.R;
+        const E = row.error.length ? row.error.map(eTag.bind(null, row.kinds)).join(' &middot; ') : '<span class="none">never</span>';
+        const rr = row.rename && row.rename.length ? row.rename : row.requirements;
         const R = rr.length ? esc(rr.join(', ')) : '<span class="none">none</span>';
         const marks = row.effects
           .map(function (f) {
             /* The outcome takes the weight of the path label. Same two roles,
-               not a third and fourth name: an effect that failed and an error
-               in flight are one condition, and one that landed is resolved.
-               Not reached is an absence, so it takes no chip at all — it stays
+               not a third and fourth name: an effect that threw and an error
+               in flight are one condition, and one that returned is resolved.
+               Not called is an absence, so it takes no chip at all — it stays
                plain text at the ink floor, and every chip drawn means
                something. */
-            const k = f.mark === 'failed' ? 'caut' : f.mark === 'landed' ? 'ok' : 'none';
-            const chip = f.mark === 'not reached' ? '' : ' gt-chip';
+            const k = f.mark === 'threw' ? 'caut' : f.mark === 'returned' ? 'ok' : 'none';
+            const chip = f.mark === 'not called' ? '' : ' gt-chip';
             return '<span class="tr-fx">&middot; ' + esc(f.kind) +
               ' <span class="' + k + chip + ' tr-fxm--' + f.mark.replace(/ /g, '-') + '">' + esc(f.mark) + '</span></span>';
           })
@@ -1036,15 +1033,15 @@ function start() {
           : '';
         const plabel = p
           ? '<span class="tr-pl' + (caught ? ' tr-pl--caught' : '') + ' gt-chip">' + row.path + '</span>' +
-            (position === 'raised' ? '<span class="tr-err-tag">' + esc(row.error.tag) + '</span>' : '')
+            (position === 'thrown' ? '<span class="tr-err-tag">' + esc(row.errorPath.tag) + '</span>' : '')
           : '';
         return (
           '<div class="' + cls + '" data-node="' + row.id + '" style="padding-left:' + (row.depth * 24 + 12) + 'px">' +
           '<span class="tr-name">' + (row.depth ? '&rarr; ' : '') + glyph + esc(row.name) +
           (row.repeat ? ' <span class="none">(seen above — stopped)</span>' : '') + plabel + '</span>' +
           '<span class="av-label tr-kind" data-help="' + HELP.role + '">' + esc(row.role) + '</span>' +
-          '<span class="tr-ch">' + channelKey('A') + ' ' + esc(row.A || '—') + '<span class="sep"></span>' + channelKey('E') + ' ' + E +
-          '<span class="sep"></span>' + channelKey('R') + ' ' + R + '</span>' +
+          '<span class="tr-ch">' + channelKey('success') + ' ' + esc(row.success || '—') + '<span class="sep"></span>' + channelKey('error') + ' ' + E +
+          '<span class="sep"></span>' + channelKey('requirements') + ' ' + R + '</span>' +
           '<span class="tr-under">' + siteText + marks + '</span></div>'
         );
       })
@@ -1081,13 +1078,13 @@ function start() {
   }
 
   function drawErrPath(st) {
-    if (!st.errorPath.length) return '<div class="av-annot">nothing has raised</div>';
+    if (!st.errorPath.length) return '<div class="av-annot">nothing has thrown</div>';
     return st.errorPath
       .map(function (e) {
         const who = e.nodeId ? PROG.nodes[e.nodeId].name : 'the top';
         const tag = e.tag ? ' <b>' + esc(e.tag) + '</b>' : '';
         const msg = e.message ? ' <span class="dim">' + esc(e.message) + '</span>' : '';
-        const ch = e.channel ? ' <span class="caut">' + esc(e.channel) + '</span>' : '';
+        const ch = e.cause ? ' <span class="caut">' + esc(e.cause) + '</span>' : '';
         /* The same glyph the tree draws for the same word, so the rail's list
            and the marked rows beside it read as one path in two views. */
         const mark = PATH_MARK[e.how];
@@ -1102,8 +1099,8 @@ function start() {
     if (!st.ledger.length) return '<div class="av-annot">nothing touched the outside world yet</div>';
     return st.ledger
       .map(function (l, i) {
-        const mark = l.outcome === 'failed'
-          ? '<span class="caut">raised ' + esc(l.raised.tag) + ' — ' + esc(l.raised.message) + '</span>'
+        const mark = l.outcome === 'threw'
+          ? '<span class="caut">threw ' + esc(l.raised.tag) + ' — ' + esc(l.raised.message) + '</span>'
           : '<span class="ok">' + (l.result === undefined ? 'went on' : esc(show(l.result))) + '</span>';
         return (
           '<div class="led"><span class="led-seq">' + (i + 1) + '</span><span class="led-body">' +
@@ -1116,7 +1113,7 @@ function start() {
 
   /* -- the cutaway -------------------------------------------------------- */
 
-  /* Which lines the walk has touched, up to the cursor. The frames of every
+  /* Which lines the run has touched, up to the cursor. The frames of every
    * state so far are the record: a pc a frame sat on is a pc the run reached.
    * Read forward from zero rather than from the current state, because a
    * frame that has already returned is gone from st.frames and its lines are
@@ -1130,15 +1127,15 @@ function start() {
     return seen;
   }
 
-  /* A call or an effect is marked by what the walk did with it, never by what
+  /* A call or an effect is marked by what the run did with it, never by what
    * it is. The fold already records both: an effect's outcome by node and pc,
-   * a call site's entries and returns by key. A site the run has not reached
+   * a call site's entries and returns by key. A site the run has never called
    * carries no mark at all — an unmarked site is a fact, not a gap. */
   function siteClass(st, open, s, i) {
     if (s.op === 'effect') {
       const outcome = st.nodeEffects[open + '[' + i + ']'];
-      return outcome === 'failed' ? ' av-code-site--failed'
-        : outcome === 'landed' ? ' av-code-site--caught'
+      return outcome === 'threw' ? ' av-code-site--failed'
+        : outcome === 'returned' ? ' av-code-site--caught'
         : '';
     }
     /* SUMMED OVER EVERY PATH THAT REACHED THIS STEP. A listing is one node's
@@ -1151,16 +1148,16 @@ function start() {
     /* Still on the stack: the call has an outcome later, not now. */
     if (site.open) return '';
     /* EVERY entry came back, not merely one of them. A site is one line of
-     * source, and a walk can run that line more than once — a loop, a retry.
+     * source, and a run can run that line more than once — a loop, a repeat.
      * `returned > 0` would call a site that went in twice and came back once
      * a clean return, which is the reading a reader is most likely to act on
      * and the one most likely to be wrong. */
     if (site.returned === site.entered) return ' av-code-site--caught';
     /* Entered more times than it returned, and nothing from it is on the
-     * stack: at least one of those entries left by raising. Read from the
+     * stack: at least one of those entries left by throwing. Read from the
      * site's own counts and not from st.errorPath, which holds where an error
-     * is NOW — a failure a handler caught and the walk then ran past leaves
-     * errorPath empty while the call it came from stays failed. */
+     * is NOW — a failure a handler caught and the run then ran past leaves
+     * errorPath empty while the call it came from still threw. */
     return ' av-code-site--path';
   }
 
@@ -1174,13 +1171,13 @@ function start() {
       .map(function (s, i) {
         const site = 'av-code-site' + siteClass(st, S.open, s, i);
         const body =
-          s.op === 'note' ? '<span class="av-code-note">' + esc(s.note) + '</span>'
-          : s.op === 'let' ? '<span class="av-code-kw">let</span> <span class="av-code-name">' + esc(s.name) + '</span> <span class="av-code-note">=</span> <span class="av-code-lit">' + esc(s.expr) + '</span>'
+          s.op === 'comment' ? '<span class="av-code-note">' + esc(s.comment) + '</span>'
+          : s.op === 'var' ? '<span class="av-code-kw">var</span> <span class="av-code-name">' + esc(s.name) + '</span> <span class="av-code-note">=</span> <span class="av-code-lit">' + esc(s.expr) + '</span>'
           : s.op === 'if' ? '<span class="av-code-kw">if</span> <span class="av-code-lit">' + esc(s.cond) + '</span> <span class="av-code-note">&rarr;</span> <span class="av-code-name">' + esc(s.then) + '</span> <span class="av-code-kw">else</span> <span class="av-code-name">' + esc(s.else) + '</span>'
           : s.op === 'goto' ? '<span class="av-code-kw">goto</span> <span class="av-code-name">' + esc(s.to) + '</span>'
           : s.op === 'call' ? '<span class="av-code-kw">call</span> <span class="' + site + '">' + esc(s.target) + '</span>'
           : s.op === 'effect' ? '<span class="av-code-kw">effect</span> <span class="' + site + '">' + esc(s.kind) + '</span> <span class="av-code-note">' + esc(s.desc) + '</span>'
-          : s.op === 'throw' ? '<span class="av-code-kw">throw</span> <span class="av-code-name">' + esc(s.tag) + '</span> <span class="av-code-lit">' + esc(s.channel) + '</span> <span class="av-code-note">' + esc(s.message) + '</span>'
+          : s.op === 'throw' ? '<span class="av-code-kw">throw</span> <span class="av-code-name">' + esc(s.tag) + '</span> <span class="av-code-lit">' + esc(s.cause) + '</span> <span class="av-code-note">' + esc(s.message) + '</span>'
           : '<span class="av-code-kw">return</span> <span class="av-code-lit">' + esc(s.expr) + '</span>';
         const aside = s.aside ? '<div class="av-code-note">' + esc(s.aside) + '</div>' : '';
         const handlers = (s.onError || [])
@@ -1238,9 +1235,9 @@ function start() {
     return (
       line('role', esc(n.role), HELP.role) +
       line('takes', (n.params || []).length ? esc((n.params || []).join(', ')) : '<span class="none">nothing</span>') +
-      line('A — returns', esc(ch.A || '—'), HELP.A) +
-      line('E — breaks', (ch.E || []).length ? (ch.E || []).map(eContract.bind(null, n)).join('') : '<span class="none">never</span>', HELP.E) +
-      line('R — needs', rOf(S.open).length ? esc(rOf(S.open).join(', ')) : '<span class="none">nothing</span>', HELP.R) +
+      line('success', esc(ch.success || '—'), HELP.success) +
+      line('error', (ch.error || []).length ? (ch.error || []).map(eContract.bind(null, n)).join('') : '<span class="none">never</span>', HELP.error) +
+      line('requirements', rOf(S.open).length ? esc(rOf(S.open).join(', ')) : '<span class="none">nothing</span>', HELP.requirements) +
       line('entered by', (n.enteredBy || []).length ? esc((n.enteredBy || []).join(', ')) : '<span class="none">no spec calls this node</span>',
         'The test files whose specs call this node directly. A node covered through its caller lists none.') +
       line('paths', cxText, HELP.paths)
@@ -1250,7 +1247,7 @@ function start() {
   /* -- the footer band ---------------------------------------------------- */
   function drawTitleBlock() {
     const run = SHEET.presets[S.run];
-    const authored = run.walk.provenance === 'authored';
+    const authored = run.trace.provenance === 'authored';
     const cell = (k, v) => '<div class="av-titleblock-cell"><span class="av-titleblock-key">' + k + '</span><span class="av-titleblock-val">' + v + '</span></div>';
     /* Authored draws as a bordered caution stamp, captured as a nominal one —
        one of green's few honest uses. */
@@ -1266,7 +1263,7 @@ function start() {
       cell('nodes', String(LAYOUT.order.length)) +
       cell('runs', String(SHEET.presets.length)) +
       cell('changed files', PROG.files ? String(PROG.files.length) : '<span class="none">not stated</span>') +
-      cell('walk', stamp)
+      cell('trace', stamp)
     );
   }
 
@@ -1314,7 +1311,7 @@ function start() {
     $('scaleNow').textContent = '1:' + (1 / S.zoom).toFixed(2);
     $('root').classList.toggle('tree-on', S.tree);
 
-    /* The cutaway follows the cursor: the step the walk is on is brought into
+    /* The cutaway follows the cursor: the step the run is on is brought into
        view after the tape has been rebuilt, and so is the open row of the
        tree. Nearest edge only, so a step already in view moves nothing. */
     const here = $('cutBody').querySelector('.av-code-line--cursor, .av-code-line--live');
@@ -1349,7 +1346,7 @@ function start() {
 
   /* The cutaway opens the frame the cursor is in, so stepping, playing and
      scrubbing always show the step that ran. A node opened by hand stays open
-     until the cursor next moves. Once the walk has ended no frame is open, and
+     until the cursor next moves. Once the run has ended no frame is open, and
      the last node stays. */
   function follow() {
     const fr = S.states[S.at].frames;
@@ -1467,7 +1464,7 @@ function start() {
   $('run').addEventListener('change', function (e) {
     stopPlaying();
     S.run = Number(e.target.value);
-    S.states = G.fold(SHEET, SHEET.presets[S.run].walk);
+    S.states = G.fold(SHEET, SHEET.presets[S.run].trace);
     jumpTo(0);
     render();
   });
@@ -1806,9 +1803,9 @@ function start() {
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') hideTip();
     // A form control gets its own arrow keys. Without this, an arrow pressed
-    // on the run picker steps the walk and then the select's own change
+    // on the run picker steps the run and then the select's own change
     // handler reseeds it, so the step is spent and thrown away — and an arrow
-    // on either hold moved the walk for no reason at all.
+    // on either hold moved the run for no reason at all.
     const t = e.target;
     if (t && ['SELECT', 'INPUT', 'TEXTAREA'].indexOf(t.tagName) >= 0) return;
     if (t && t.isContentEditable) return;

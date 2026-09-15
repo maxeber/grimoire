@@ -57,7 +57,7 @@ function addSecondGraph(prog) {
     role: 'handler',
     loc: 'src/panel.ts:1',
     params: [],
-    channels: { A: 'void', E: [], R: [] },
+    channels: { success: 'void', error: [], requirements: [] },
     steps: [
       { op: 'call', target: 'lookupName', args: { id: 'id' } },
       { op: 'return', expr: 'undefined' },
@@ -75,7 +75,7 @@ function addSecondGraph(prog) {
         name: 'a known user',
         blurb: 'The same run name as the first graph, which is legal: uniqueness is per graph.',
         input: {},
-        walk: {
+        trace: {
           provenance: 'authored',
           steps: [
             { k: 'call', at: 0, to: 'lookupName', next: 1 },
@@ -127,15 +127,15 @@ test('a refusal in a walk names the path, then the graph, the run and the move',
   // instead, and the file contradicts itself: greet is still suspended at that
   // guarded call.
   const file = derive(prog => {
-    const w = runs(prog)[1].walk.steps;
-    const at = w.findIndex(m => m.k === 'handled');
-    w.splice(at, w.length - at, { k: 'uncaught', tag: 'NoSuchUser', message: 'no row', channel: 'escape' });
+    const w = runs(prog)[1].trace.steps;
+    const at = w.findIndex(m => m.k === 'catch');
+    w.splice(at, w.length - at, { k: 'uncaught', tag: 'NoSuchUser', message: 'no row', cause: 'fail' });
   });
   const r = check(file);
   assert.equal(r.code, 1, r.stdout);
   assert.match(
     r.stderr,
-    /case-\d+\.flightpath\.json: graphs\[0\]\.presets\[1\]\.walk\.steps\[\d+\]: graph "greet", run "no such user", move \d+: "NoSuchUser" is uncaught, but greet\[1\] declares onError for it/,
+    /case-\d+\.flightpath\.json: graphs\[0\]\.presets\[1\]\.trace\.steps\[\d+\]: graph "greet", run "no such user", move \d+: "NoSuchUser" is uncaught, but greet\[1\] declares onError for it/,
   );
 });
 
@@ -161,13 +161,13 @@ test('two graphs may share a run name, and a refusal names the second graph', ()
 
   const file = derive(prog => {
     addSecondGraph(prog);
-    prog.graphs[1].presets[0].walk.steps[0].to = 'greet'; // the step targets lookupName
+    prog.graphs[1].presets[0].trace.steps[0].to = 'greet'; // the step targets lookupName
   });
   const r = check(file);
   assert.equal(r.code, 1);
   assert.match(
     r.stderr.split('\n')[0],
-    /graphs\[1\]\.presets\[0\]\.walk\.steps\[0\]: graph "panel-apply", run "a known user", move 0: call to "greet", but step 0 targets "lookupName"/,
+    /graphs\[1\]\.presets\[0\]\.trace\.steps\[0\]: graph "panel-apply", run "a known user", move 0: call to "greet", but step 0 targets "lookupName"/,
   );
   // The first graph's identically named run is untouched, so nothing points at
   // it. Only the graph tells the two apart.
@@ -179,9 +179,9 @@ test('a refusal names the move that emptied the frame stack, not the first to no
   // blaming the checker — when the whole fault was one spurious unwind, a
   // single move earlier than the refusal pointed.
   const file = derive(prog => {
-    const walk = runs(prog)[0].walk.steps;
+    const walk = runs(prog)[0].trace.steps;
     const i = walk.findIndex(m => m.k === 'return');
-    walk.splice(i, 0, { k: 'unwind' }, { k: 'unwind' });
+    walk.splice(i, 0, { k: 'propagate' }, { k: 'propagate' });
   });
   const r = check(file);
   assert.equal(r.code, 1);
@@ -197,14 +197,14 @@ const cases = [
   ['a missing core field', p => delete p.blurb, /file: missing required key "blurb"/],
   ['a graph missing a core field', p => delete only(p).entry, /graphs\[0\]: missing required key "entry"/],
   ['an unknown key one letter from a real one', p => { p.nodes.greet.channles = {}; }, /nodes\.greet: unknown key "channles"/],
-  ['an unknown key on a step', p => { p.nodes.greet.steps[0].notes = 'x'; }, /steps\[0\] \(note\): unknown key "notes"/],
-  ['an unknown key on a move', p => { runs(p)[0].walk.steps[0].att = 0; }, /walk\.steps\[0\] \(note\): unknown key "att"/],
+  ['an unknown key on a step', p => { p.nodes.greet.steps[0].notes = 'x'; }, /steps\[0\] \(comment\): unknown key "notes"/],
+  ['an unknown key on a move', p => { runs(p)[0].trace.steps[0].att = 0; }, /trace\.steps\[0\] \(comment\): unknown key "att"/],
   // Found while walking, so it names the graph, the run and the move like
   // every other walk refusal. It reports through the shape helper, and once
   // printed a path and went quiet about which run it was in.
   ['an unknown key inside a raised', p => {
-    for (const m of runs(p)[2].walk.steps) if (m.raised) m.raised.extra = 'not a field';
-  }, /walk\.steps\[\d+\]\.raised: graph "greet", run "[^"]+", move \d+: unknown key "extra"/],
+    for (const m of runs(p)[2].trace.steps) if (m.raised) m.raised.extra = 'not a field';
+  }, /trace\.steps\[\d+\]\.raised: graph "greet", run "[^"]+", move \d+: unknown key "extra"/],
   ["a graph whose entry is not in the node map", p => { only(p).entry = 'nowhere'; }, /graphs\[0\]\.entry: "nowhere" is not a node/],
   // The node map comes from JSON.parse, so it answers five names the author
   // never wrote. Read as `!prog.nodes[id]`, every "is not a node" refusal
@@ -223,75 +223,75 @@ const cases = [
   ['a node id that is not plain', p => { p.nodes['greet!'] = p.nodes.greet; }, /nodes\.greet!: a node id must be plain letters, digits and hyphens/],
   ['a call to a node that is not there', p => { p.nodes.greet.steps[1].target = 'missing'; }, /target "missing" is not a node/],
   ['a goto naming no label', p => { p.nodes.greet.steps[4].to = 'nowhere'; }, /to "nowhere" is not a label in greet/],
-  ['a throw channel outside the three', p => { p.nodes.lookupName.steps[3].channel = 'panic'; }, /channel "panic" is not one of retry, escape, die/],
-  ['a provenance outside the two', p => { runs(p)[0].walk.provenance = 'guessed'; }, /provenance: "guessed" is not authored or captured/],
-  ['a layer naming a node that is not there', p => { p.layers.tests.nodes.absent = { R: ['x'] }; }, /layers\.tests\.nodes\.absent: is not a node/],
+  ['a throw cause outside the two', p => { p.nodes.lookupName.steps[3].cause = 'panic'; }, /cause "panic" is not one of fail, die/],
+  ['a provenance outside the two', p => { runs(p)[0].trace.provenance = 'guessed'; }, /provenance: "guessed" is not authored or captured/],
+  ['a layer naming a node that is not there', p => { p.layers.tests.nodes.absent = { requirements: ['x'] }; }, /layers\.tests\.nodes\.absent: is not a node/],
   ['an empty files list', p => { p.files = []; }, /files: state the changed files, or leave the key out/],
   ['an empty layer map', p => { p.layers = {}; }, /layers: state at least one layer, or leave the key out/],
-  ['a move kind that names no op', p => { runs(p)[0].walk.steps[0].k = 'raise'; }, /k "raise" is not a move kind/],
-  ['a move whose kind is not the step it ran', p => { runs(p)[0].walk.steps[0].k = 'let'; }, /a "let" move ran step 0, which is a "note"/],
-  ['an at that is not where the cursor sits', p => { runs(p)[0].walk.steps[0].at = 1; }, /ran step 1, but the cursor sits at 0/],
-  ['a next the step cannot reach', p => { runs(p)[0].walk.steps[0].next = 5; }, /no edge from 0 \(note\) to 5/],
-  ['a call whose target is not the step target', p => { runs(p)[0].walk.steps[1].to = 'greet'; }, /call to "greet", but step 1 targets "lookupName"/],
+  ['a move kind that names no op', p => { runs(p)[0].trace.steps[0].k = 'raise'; }, /k "raise" is not a move kind/],
+  ['a move whose kind is not the step it ran', p => { runs(p)[0].trace.steps[0].k = 'var'; }, /a "var" move ran step 0, which is a "comment"/],
+  ['an at that is not where the cursor sits', p => { runs(p)[0].trace.steps[0].at = 1; }, /ran step 1, but the cursor sits at 0/],
+  ['a next the step cannot reach', p => { runs(p)[0].trace.steps[0].next = 5; }, /no edge from 0 \(comment\) to 5/],
+  ['a call whose target is not the step target', p => { runs(p)[0].trace.steps[1].to = 'greet'; }, /call to "greet", but step 1 targets "lookupName"/],
   ['an effect carrying next and raised at once', p => {
-    const m = runs(p)[0].walk.steps.find(x => x.k === 'effect');
-    m.raised = { tag: 'X', message: 'y', channel: 'die' };
+    const m = runs(p)[0].trace.steps.find(x => x.k === 'effect');
+    m.raised = { tag: 'X', message: 'y', cause: 'die' };
   }, /an effect carries next or raised, never both/],
-  ['a handled catch its step does not declare', p => {
-    const m = runs(p)[1].walk.steps.find(x => x.k === 'handled');
+  ['a catch its step does not declare', p => {
+    const m = runs(p)[1].trace.steps.find(x => x.k === 'catch');
     m.goto = 'named';
     m.next = 3;
   }, /its onError does not name "named"/],
   ['a nodes map that is a list', p => { p.nodes = []; }, /nodes: expected an object keyed by node id/],
-  ['an unwind with no error travelling', p => {
-    const w = runs(p)[0].walk.steps;
-    w.splice(2, 0, { k: 'unwind' });
-  }, /unwind with no error travelling/],
+  ['a propagate with no error travelling', p => {
+    const w = runs(p)[0].trace.steps;
+    w.splice(2, 0, { k: 'propagate' });
+  }, /propagate with no error travelling/],
   ['an uncaught nothing raised', p => {
-    const w = runs(p)[0].walk.steps;
-    w.splice(w.length - 1, 1, { k: 'uncaught', tag: 'Invented', message: 'nothing raised this', channel: 'die' });
+    const w = runs(p)[0].trace.steps;
+    w.splice(w.length - 1, 1, { k: 'uncaught', tag: 'Invented', message: 'nothing raised this', cause: 'die' });
   }, /"Invented" reached the top uncaught, and no move before it raised anything/],
   ['an uncaught naming a tag other than the one travelling', p => {
-    const w = runs(p)[2].walk.steps;
+    const w = runs(p)[2].trace.steps;
     w[w.length - 1].tag = 'SomethingElse';
   }, /"SomethingElse" reached the top, but the error travelling is "SendFailed"/],
-  ['a handled that catches nothing', p => {
-    const w = runs(p)[0].walk.steps;
-    w.splice(2, 0, { k: 'handled', at: 1, goto: 'plain', next: 5 });
-  }, /handled at 1 catches nothing — no move before it raised/],
-  ['a handled whose goto is declared for another tag', p => {
+  ['a catch that catches nothing', p => {
+    const w = runs(p)[0].trace.steps;
+    w.splice(2, 0, { k: 'catch', at: 1, goto: 'plain', next: 5 });
+  }, /catch at 1 catches nothing — no move before it raised/],
+  ['a catch whose goto is declared for another tag', p => {
     p.nodes.greet.steps[1].onError.push({ tag: 'Other', goto: 'named' });
-    const w = runs(p)[1].walk.steps;
-    const m = w.find(x => x.k === 'handled');
+    const w = runs(p)[1].trace.steps;
+    const m = w.find(x => x.k === 'catch');
     m.goto = 'named';
     m.next = 3;
   }, /which greet declares for "Other", and the error travelling is "NoSuchUser"/],
   ['a return that discards a travelling error', p => {
-    // "no such user": the callee throws, its frame unwinds, and the caller
-    // catches. Drop the catch and let the caller return instead, and the walk
+    // "no such user": the callee throws, its frame propagates, and the caller
+    // catches. Drop the catch and let the caller return instead, and the trace
     // has thrown an error away with no catch and no top.
-    const w = runs(p)[1].walk.steps;
-    const at = w.findIndex(x => x.k === 'handled');
+    const w = runs(p)[1].trace.steps;
+    const at = w.findIndex(x => x.k === 'catch');
     w.splice(at, 1);
   }, /ran while "NoSuchUser" was still travelling \(raised at move \d+\)/],
   ['a done that arrives while an error is travelling', p => {
-    const w = runs(p)[2].walk.steps;
+    const w = runs(p)[2].trace.steps;
     w.splice(w.length - 1, 1, { k: 'done' });
   }, /done arrived while "SendFailed" was still travelling/],
-  ['a walk that ends while an error is still travelling', p => {
-    // The last move unwinds the last frame. No frame is open, so the
+  ['a trace that ends while an error is still travelling', p => {
+    // The last move propagates the last frame. No frame is open, so the
     // frames-still-open rule is content, and the error has nowhere left to go.
     only(p).presets = [runs(p)[2]];
-    const w = runs(p)[0].walk.steps;
-    w.splice(w.length - 1, 1, { k: 'unwind' });
-  }, /the walk ended while "SendFailed" was still travelling/],
-  ['a walk that ends with a frame open', p => {
+    const w = runs(p)[0].trace.steps;
+    w.splice(w.length - 1, 1, { k: 'propagate' });
+  }, /the trace ended while "SendFailed" was still travelling/],
+  ['a trace that ends with a frame open', p => {
     // Drop the entry frame's return and the done that followed it.
-    const w = runs(p)[0].walk.steps;
+    const w = runs(p)[0].trace.steps;
     w.splice(w.length - 2, 2);
-  }, /the walk ended with 1 frame\(s\) still open/],
+  }, /the trace ended with 1 frame\(s\) still open/],
   ['a done that arrives with a frame still open', p => {
-    const w = runs(p)[0].walk.steps;
+    const w = runs(p)[0].trace.steps;
     w.splice(w.length - 2, 1);
   }, /done arrived with 1 frame\(s\) still open/],
 ];
@@ -303,6 +303,108 @@ for (const [what, mutate, expected] of cases) {
     assert.match(r.stderr, expected);
   });
 }
+
+/* -- a fail is in the contract, a die never is ---------------------------- */
+
+const throwAsDie = prog => {
+  prog.nodes.lookupName.steps[3].cause = 'die';
+  for (const r of runs(prog)) for (const m of r.trace.steps) if (m.k === 'throw') m.cause = 'die';
+};
+
+test('a node that throws a fail names the tag in its error list', () => {
+  const file = derive(prog => { prog.nodes.lookupName.channels.error = []; });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(r.stderr, /nodes\.lookupName\.steps\[3\]: throws "NoSuchUser" as a fail, and lookupName's error list does not name it/);
+});
+
+test('a node that throws a die does not name the tag in its error list', () => {
+  const file = derive(throwAsDie);
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(r.stderr, /nodes\.lookupName\.steps\[3\]: throws "NoSuchUser" as a die, and lookupName's error list names it — a die is never in the list/);
+});
+
+test('a fail that leaves a node uncaught is in that node\'s error list', () => {
+  // SendFailed is raised by an effect, not thrown by a step, so only the trace
+  // can say it leaves greet.
+  const file = derive(prog => { prog.nodes.greet.channels.error = ['NoSuchUser']; });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(r.stderr, /presets\[2\]\.trace\.steps\[9\]: graph "greet", run "the post fails", move 9: "SendFailed" is a fail and leaves greet, but greet's error list does not name it/);
+});
+
+test('a die that leaves a node is not in that node\'s error list', () => {
+  const file = derive(prog => {
+    for (const m of runs(prog)[2].trace.steps) {
+      if (m.raised) m.raised.cause = 'die';
+      if (m.k === 'uncaught') m.cause = 'die';
+    }
+  });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(r.stderr, /move 9: "SendFailed" is a die and leaves greet, but greet's error list names it — a die is never in the list/);
+});
+
+test('a fail that leaves a node by propagate is in that node\'s error list', () => {
+  // "a known user": the db.get effect inside lookupName raises instead of
+  // returning. A propagate pops the lookupName frame before the uncaught at
+  // the top pops greet's — so this exercises the leaves() call on propagate,
+  // not the one on uncaught that the other tests above already cover.
+  const file = derive(prog => {
+    const w = runs(prog)[0].trace.steps;
+    w[2] = { k: 'effect', at: 0, kind: 'db.get', desc: 'read the name row', raised: { tag: 'StoreDown', message: 'store down', cause: 'fail' } };
+    w.splice(3, w.length - 3, { k: 'propagate' }, { k: 'uncaught', tag: 'StoreDown', message: 'store down', cause: 'fail' });
+    prog.nodes.greet.channels.error.push('StoreDown');
+  });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(r.stderr, /move 3: "StoreDown" is a fail and leaves lookupName, but lookupName's error list does not name it/);
+});
+
+test('catching a die is legal, and worth seeing', () => {
+  const file = derive(prog => {
+    throwAsDie(prog);
+    prog.nodes.lookupName.channels.error = [];
+    prog.nodes.greet.channels.error = ['SendFailed'];
+  });
+  const r = check(file);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /greet\[1\] catches "NoSuchUser", which the file throws as a die/);
+});
+
+/* -- a move restates its step's cause, or the cause travelling ------------ */
+
+test('a throw move whose cause does not match its step\'s cause is refused', () => {
+  // "no such user": lookupName.steps[3] throws NoSuchUser as a fail, and the
+  // throw move at move 4 repeats that cause. Misstate it there.
+  const file = derive(prog => {
+    const w = runs(prog)[1].trace.steps;
+    const at = w.findIndex(m => m.k === 'throw');
+    w[at].cause = 'die';
+  });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(
+    r.stderr,
+    /graphs\[0\]\.presets\[1\]\.trace\.steps\[\d+\]: graph "greet", run "no such user", move \d+: throw cause "die" does not match step cause "fail"/,
+  );
+});
+
+test('an uncaught move whose cause does not match the error travelling is refused', () => {
+  // "the post fails": the effect's raised.cause is "fail". Leave it, and
+  // misstate the cause on the uncaught move that carries the same tag.
+  const file = derive(prog => {
+    const w = runs(prog)[2].trace.steps;
+    w[w.length - 1].cause = 'die';
+  });
+  const r = check(file);
+  assert.equal(r.code, 1, r.stdout);
+  assert.match(
+    r.stderr,
+    /graphs\[0\]\.presets\[2\]\.trace\.steps\[\d+\]: graph "greet", run "the post fails", move \d+: "SendFailed" reached the top as a die, but the error travelling is a fail/,
+  );
+});
 
 test('the old one-graph shape is refused, and the message names graphs', () => {
   // A file states one change, not one graph. Accepting both shapes would be
@@ -463,11 +565,11 @@ test('the unaccounted-files finding reads every node of the change', () => {
 
 test('an E tag nothing beneath the node can produce is a finding', () => {
   const file = derive(prog => {
-    prog.nodes.greet.channels.E.push('NeverRaised');
+    prog.nodes.greet.channels.error.push('NeverRaised');
   });
   const r = check(file);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /greet declares E tag "NeverRaised", and nothing beneath it produces that tag/);
+  assert.match(r.stdout, /greet declares error tag "NeverRaised", and nothing beneath it produces that tag/);
 });
 
 /* -- the text output ------------------------------------------------------ */
@@ -489,7 +591,7 @@ test('the text prints one row per call site and lists the runs it did not print'
 
 test('the text suggests the longest walk', () => {
   const prog = JSON.parse(readFileSync(layeredFlightpath, 'utf8'));
-  const longest = runs(prog).reduce((a, b) => (b.walk.steps.length > a.walk.steps.length ? b : a));
+  const longest = runs(prog).reduce((a, b) => (b.trace.steps.length > a.trace.steps.length ? b : a));
   const r = run(groundtrack, [layeredFlightpath, '--text', ...firstPaint]);
   assert.match(r.stdout, new RegExp(`run "${longest.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 });
@@ -615,8 +717,8 @@ test('the text prints the failure kind beside every E tag', () => {
   const r = run(groundtrack, [exampleFlightpath, '--text']);
   assert.equal(r.code, 0, r.stderr);
   // greet declares NoSuchUser and SendFailed; lookupName declares NoSuchUser.
-  assert.equal((r.stdout.match(/NoSuchUser escape/g) || []).length, 2);
-  assert.equal((r.stdout.match(/SendFailed retry/g) || []).length, 1);
+  assert.equal((r.stdout.match(/NoSuchUser fail/g) || []).length, 2);
+  assert.equal((r.stdout.match(/SendFailed fail/g) || []).length, 1);
 });
 
 test('a tag the file gives no kind for prints bare', () => {
@@ -624,11 +726,11 @@ test('a tag the file gives no kind for prints bare', () => {
   // walk accounts for — the check reports it as a finding, and the row still
   // has to print it.
   const file = derive(prog => {
-    prog.nodes.greet.channels.E.push('Ghost');
+    prog.nodes.greet.channels.error.push('Ghost');
   });
   const r = run(groundtrack, [file, '--text']);
   assert.equal(r.code, 0, r.stderr);
-  assert.match(r.stdout, /Ghost(?! (retry|escape|die))/);
+  assert.match(r.stdout, /Ghost(?! (fail|die))/);
 });
 
 test('a tag named after a property of every object prints, rather than crashing the renderer', () => {
@@ -637,29 +739,30 @@ test('a tag named after a property of every object prints, rather than crashing 
   // row then asks the function for its kinds. The tag has no kind, so it
   // prints bare, exactly like any other tag the file says nothing about.
   const file = derive(prog => {
-    prog.nodes.greet.channels.E.push('constructor', 'toString');
+    prog.nodes.greet.channels.error.push('constructor', 'toString');
   });
   const r = run(groundtrack, [file, '--text']);
   assert.equal(r.code, 0, r.stderr);
-  assert.match(r.stdout, /constructor(?! (retry|escape|die))/);
+  assert.match(r.stdout, /constructor(?! (fail|die))/);
   assert.equal(check(file).code, 0);
 });
 
-test('a tag raised with two kinds prints both, retry before escape before die', () => {
-  // A tag that retries in one place and dies in another is two facts. The
-  // second run is the first with its channel changed, so the file says both.
+test('a tag raised with two kinds prints both, fail before die', () => {
+  // A tag that fails in one node and is a defect in another is two facts about
+  // the file. failureKinds reads the whole file for them, and a throw step
+  // counts even when no walk in this file exercises it — so a die for
+  // SendFailed is added to lookupName, which does not name the tag in its own
+  // error list. (A die can never leave greet's own frame: greet's error list
+  // names SendFailed, because the shipped "the post fails" run raises it as a
+  // fail there, and a fail and a die for one tag cannot both be true of one
+  // node.)
   const file = derive(prog => {
-    const fails = runs(prog).find(p => p.walk.steps.some(m => m.k === 'effect' && m.raised));
-    const dies = JSON.parse(JSON.stringify(fails));
-    dies.name = 'the post dies';
-    dies.blurb = 'the same failure, fatal';
-    for (const m of dies.walk.steps) if (m.k === 'effect' && m.raised) m.raised.channel = 'die';
-    runs(prog).unshift(dies); // met first, and still printed last
+    prog.nodes.lookupName.steps.push({ op: 'throw', tag: 'SendFailed', message: 'a defect, not a fail', cause: 'die' });
   });
-  assert.equal(check(file).code, 0);
+  assert.equal(check(file).code, 0, check(file).stderr);
   const r = run(groundtrack, [file, '--text']);
   assert.equal(r.code, 0, r.stderr);
-  assert.match(r.stdout, /SendFailed retry die/);
+  assert.match(r.stdout, /SendFailed fail die/);
 });
 
 test('the text says where the walks came from, above everything', () => {
@@ -685,8 +788,8 @@ test('the text marks where each row stood on an error that is still live at the 
   assert.equal(check(file).code, 0, 'the derived file is a legal program');
   const r = run(groundtrack, [file, '--text', 'the store is down']);
   assert.equal(r.code, 0, r.stderr);
-  assert.deepEqual(errorLines(r.stdout), ['', 'error path: passed through', '', 'error path: raised StoreDown']);
-  // The row that raised is the lookup by alias. The lookup by id is the same
+  assert.deepEqual(errorLines(r.stdout), ['', 'error path: propagated', '', 'error path: thrown StoreDown']);
+  // The row that threw is the lookup by alias. The lookup by id is the same
   // node from another call site, and it took no part.
   const rows = textRows(r.stdout);
   assert.ok(rows[3].some(l => l.includes('by alias')));
@@ -703,7 +806,15 @@ test('the text marks nothing when the walk ends with no error live', () => {
 test('the text marks the entry that raised, and no row for the top', () => {
   const r = run(groundtrack, [exampleFlightpath, '--text', 'the post fails']);
   assert.equal(r.code, 0, r.stderr);
-  assert.deepEqual(errorLines(r.stdout), ['error path: raised SendFailed', '']);
+  assert.deepEqual(errorLines(r.stdout), ['error path: thrown SendFailed', '']);
+});
+
+test('the text names the contract in words, not letters', () => {
+  const r = run(groundtrack, [exampleFlightpath, '--text']);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /success a greeting line {3}error NoSuchUser fail · SendFailed fail {3}requirements the name store/);
+  assert.doesNotMatch(r.stdout, /(^| {3})[AER] /m);
+  assert.match(r.stdout, /requirements under tests: /);
 });
 
 /* -- the page as a string ------------------------------------------------- */
@@ -761,8 +872,8 @@ test('the page tree marks the error path from the row, with a word and a rule fo
   // stay apart with every colour removed.
   const marks = between(html, 'const PATH_MARK', '};');
   const glyphs = [...marks.matchAll(/glyph: '([^']+)'/g)].map(m => m[1]);
-  assert.equal(glyphs.length, 5, 'a glyph per fold word, the top included');
-  assert.equal(new Set(glyphs).size, 5, 'and no two of them are the same mark');
+  assert.equal(glyphs.length, 4, 'a glyph per fold word, the top included');
+  assert.equal(new Set(glyphs).size, 4, 'and no two of them are the same mark');
   // The word too, which is the channel that needs no legend. It is one of the
   // fold's own four, so a reader never has to learn a key.
   assert.match(tree, /class="tr-pl[^"]*">' \+ row\.path/, 'the position is written out as its own word');
@@ -770,15 +881,15 @@ test('the page tree marks the error path from the row, with a word and a rule fo
   // and both sit in the row's own ink flow until a role paints them.
   assert.match(tree, /class="tr-gl/, 'the glyph is drawn before the name');
   assert.match(html, /\.gt-chip\b[^{]*\{[^}]*border:/, 'the chip is a hairline border, not a fill');
-  assert.match(tree, /tr-err-tag/, 'the tag stays beside the row that raised');
+  assert.match(tree, /tr-err-tag/, 'the tag stays beside the row that threw');
 
   // The stripe is the third channel and the only one that IS a hue.
-  for (const cls of ['tr--raised', 'tr--onpath', 'tr--caught']) {
+  for (const cls of ['tr--thrown', 'tr--onpath', 'tr--caught']) {
     assert.match(html, new RegExp(`\\.${cls}\\b[^{]*\\{[^}]*box-shadow`), `${cls} carries the path stripe`);
   }
-  // Raised takes a fourth signal the other two do not, in ink rather than hue,
+  // Thrown takes a fourth signal the other two do not, in ink rather than hue,
   // because it is the position a reader looks for first.
-  assert.match(html, /\.tr--raised\b[^{]*\{[^}]*border-bottom:[^;]*var\(--av-ink\)/, 'the raise is ruled under, in ink');
+  assert.match(html, /\.tr--thrown\b[^{]*\{[^}]*border-bottom:[^;]*var\(--av-ink\)/, 'the throw is ruled under, in ink');
   // The glyph and the word each take their OWN caught modifier. One shared
   // modifier string reads fine in the deck theme, where both roles resolve to
   // a colour, and paints the caught word redline in the site theme, where the
@@ -788,21 +899,17 @@ test('the page tree marks the error path from the row, with a word and a rule fo
     assert.match(html, new RegExp(`\\.${cls}\\b[^{]*\\{[^}]*var\\(--av-path-caught\\)`), `${cls} asks for the caught role`);
   }
   assert.match(html, /\.gt-chip\b[^{]*\{[^}]*border:/, 'the chip is a hairline border, not a fill');
-  assert.match(tree, /tr-err-tag/, 'the tag stays beside the row that raised');
+  assert.match(tree, /tr-err-tag/, 'the tag stays beside the row that threw');
   // The drawing is not this change: its box still reads the path by node.
   const box = between(html, 'function nodeBox(', '/* -- the tree');
-  assert.doesNotMatch(box, /\.error\b|tr-err|tr-gl/);
+  assert.doesNotMatch(box, /row\.error\b|\.error\.how|tr-err|tr-gl/);
 });
 
-test('the tree separates the frame the walk is in from the frames waiting under it', () => {
-  // `state` says "on stack" for every open frame, and on a deep stack that is
-  // most of the rows. `top` is the second, additive signal, so --text and the
-  // checks keep reading the same three states they always have.
+test('the tree separates the running frame from the frames waiting under it', () => {
   const html = pageOf(exampleFlightpath);
   const tree = between(html, 'function drawTree(', '/* -- the rail');
-  assert.match(tree, /row\.top \?/, 'the running frame and the waiting ones part');
+  assert.match(tree, /row\.state === 'running'/, 'the running frame and the waiting ones part');
   assert.match(tree, /tr--waiting/, 'and the waiting ones have their own class');
-  // Neither takes a hue: a position on the stack is not a condition.
   assert.match(html, /\.tr--waiting\b[^{]*\{[^}]*--av-state-rule/, 'waiting takes the system state rule');
   assert.match(html, /\.tr--active\b[^{]*\{[^}]*var\(--av-ink\)/, 'the running frame keeps full ink');
 });
@@ -820,6 +927,16 @@ test('the sheet asks for the walk-sheet roles, never the raw mark colours', () =
   const tree = between(html, 'function siteClass(', 'function drawSource(');
   assert.match(tree, /av-code-site--path/, 'the listing marks a failed site with the role');
   assert.match(tree, /av-code-site--caught/, 'the listing marks a returned site with the role');
+});
+
+test('the page prints the programming words, and none of the old ones', () => {
+  const html = pageOf(exampleFlightpath);
+  for (const word of ['>running<', '>waiting<', '>arguments<', "'propagated'", "'not called'", "'returned'", "'threw'"]) {
+    assert.ok(html.includes(word), `the page carries ${word}`);
+  }
+  for (const word of ['on stack', 'not reached', 'passed through', "'landed'", "'failed'", 'nothing has raised', '>inputs<', 'A — returns', 'E — breaks', 'R — needs']) {
+    assert.ok(!html.includes(word), `the page no longer carries ${word}`);
+  }
 });
 
 /** The page's own head markup, which is where the controls are.
@@ -1100,9 +1217,9 @@ test('author text reaches the page as text, in every field the page shows', () =
     prog.nodes.greet.loc = POISON; // a node's location — a path or a URL
     prog.nodes.greet.name = `N ${POISON}`;
     prog.nodes.greet.role = `R ${POISON}`;
-    prog.nodes.greet.channels.A = POISON;
-    prog.nodes.greet.channels.R = [POISON];
-    prog.nodes.greet.steps[0].note = POISON;
+    prog.nodes.greet.channels.success = POISON;
+    prog.nodes.greet.channels.requirements = [POISON];
+    prog.nodes.greet.steps[0].comment = POISON;
     prog.nodes.greet.steps[3].expr = POISON; // an expression
     prog.nodes.greet.steps[1].aside = POISON; // a step remark
     prog.nodes.greet.steps[6].desc = POISON; // an effect description
@@ -1110,7 +1227,7 @@ test('author text reaches the page as text, in every field the page shows', () =
     runs(prog)[0].blurb = `RB ${POISON}`;
     runs(prog)[0].input[POISON] = 'a run input name is author-keyed too';
     runs(prog)[0].input.user = POISON; // a run input
-    prog.layers.tests.nodes.lookupName = { R: [POISON] }; // a layer token
+    prog.layers.tests.nodes.lookupName = { requirements: [POISON] }; // a layer token
     prog.layers[`layer ${POISON}`] = { nodes: {} }; // and a layer name
     // A path with a separator in it, because the files tab splits on the
     // separator and prints each segment: poison the directory and the leaf.

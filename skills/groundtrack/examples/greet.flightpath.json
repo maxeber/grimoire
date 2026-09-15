@@ -29,7 +29,7 @@
       "entry": "greet",
       "nodes": {
         "lookupName": {
-          "R": [
+          "requirements": [
             "the name store → a fixed map · greet.test.ts:14"
           ]
         }
@@ -49,12 +49,12 @@
         "userId"
       ],
       "channels": {
-        "A": "a greeting line",
-        "E": [
+        "success": "a greeting line",
+        "error": [
           "NoSuchUser",
           "SendFailed"
         ],
-        "R": [
+        "requirements": [
           "the name store"
         ]
       },
@@ -66,8 +66,8 @@
       ],
       "steps": [
         {
-          "op": "note",
-          "note": "greet a user by name, or fall back to a plain hello"
+          "op": "comment",
+          "comment": "greet a user by name, or fall back to a plain hello"
         },
         {
           "op": "call",
@@ -92,7 +92,7 @@
           "else": "named"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "named",
           "name": "line",
           "expr": "\"Hello, \" + name"
@@ -102,7 +102,7 @@
           "to": "send"
         },
         {
-          "op": "let",
+          "op": "var",
           "label": "plain",
           "name": "line",
           "expr": "\"Hello there\""
@@ -130,11 +130,11 @@
         "id"
       ],
       "channels": {
-        "A": "a display name",
-        "E": [
+        "success": "a display name",
+        "error": [
           "NoSuchUser"
         ],
-        "R": [
+        "requirements": [
           "the name store"
         ]
       },
@@ -168,7 +168,7 @@
           "label": "missing",
           "tag": "NoSuchUser",
           "message": "no row for that id",
-          "channel": "escape"
+          "cause": "fail"
         }
       ]
     }
@@ -186,11 +186,11 @@
           "input": {
             "userId": "u-1"
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -226,7 +226,7 @@
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -259,15 +259,15 @@
         },
         {
           "name": "no such user",
-          "blurb": "The lookup returns no row, an if routes to the throw, and the handler catches. This is a failure the code inspects and raises itself.",
+          "blurb": "The lookup returns no row, an if routes to the throw, and the handler catches. This is a failure the code inspects and throws itself.",
           "input": {
             "userId": "u-404"
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -295,19 +295,19 @@
                 "at": 3,
                 "tag": "NoSuchUser",
                 "message": "no row for that id",
-                "channel": "escape"
+                "cause": "fail"
               },
               {
-                "k": "unwind"
+                "k": "propagate"
               },
               {
-                "k": "handled",
+                "k": "catch",
                 "at": 1,
                 "goto": "plain",
                 "next": 5
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 5,
                 "next": 6
               },
@@ -335,15 +335,15 @@
         },
         {
           "name": "the post fails",
-          "blurb": "The effect itself raises. It carries no next, and a raise follows it. Nothing catches it.",
+          "blurb": "The effect itself throws. It carries no next, and an uncaught follows it. Nothing catches it.",
           "input": {
             "userId": "u-1"
           },
-          "walk": {
+          "trace": {
             "provenance": "authored",
             "steps": [
               {
-                "k": "note",
+                "k": "comment",
                 "at": 0,
                 "next": 1
               },
@@ -379,7 +379,7 @@
                 "next": 3
               },
               {
-                "k": "let",
+                "k": "var",
                 "at": 3,
                 "next": 4
               },
@@ -397,14 +397,14 @@
                 "raised": {
                   "tag": "SendFailed",
                   "message": "502 from the greeting service",
-                  "channel": "retry"
+                  "cause": "fail"
                 }
               },
               {
                 "k": "uncaught",
                 "tag": "SendFailed",
                 "message": "502 from the greeting service",
-                "channel": "retry"
+                "cause": "fail"
               }
             ]
           }
