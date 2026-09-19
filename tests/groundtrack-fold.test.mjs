@@ -16,9 +16,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import {
-  root, exampleFlightpath, layeredFlightpath,
-  errorPastTwoSites, repeatedSubtree, selfRecursive,
+  root, examples, exampleFlightpath, layeredFlightpath,
+  errorPastTwoSites, repeatedSubtree, selfRecursive, callGraph,
 } from './helpers.mjs';
 
 const require = createRequire(import.meta.url);
@@ -1104,6 +1105,327 @@ test('the layout places every node of the sheet and draws every call edge once',
   const pairs = l.edges.map(e => `${e.from}>${e.to}`);
   assert.equal(new Set(pairs).size, pairs.length, 'no edge is drawn twice');
   assert.ok(l.canvasW > 0 && l.canvasH > 0);
+});
+
+/* -- the drawing, under recursion ----------------------------------------- */
+
+// No shipped example is recursive, so every graph here is derived from the
+// small one. Four shapes: a node that calls itself, a mutual pair, the pair
+// beside a plain branch — where the caller's sibling sits on its row — and a
+// node that both calls itself and sits in a mutual pair.
+const shaped = (entry, calls, errors) =>
+  G.graphView(callGraph(JSON.parse(readFileSync(exampleFlightpath, 'utf8')), entry, calls, errors), 0);
+const selfCall = () => G.graphView(selfRecursive(JSON.parse(readFileSync(exampleFlightpath, 'utf8'))), 0);
+const mutualPair = () => shaped('a', { a: ['b'], b: ['a'] }, ['a']);
+const pairBesideBranch = () => shaped('a', { a: ['b', 'c'], b: ['a'], c: ['d'], d: [] }, ['a', 'd']);
+const selfAndPair = () => shaped('a', { a: ['b'], b: ['b', 'a'] }, ['a', 'b']);
+const edgeOf = (l, from, to) => l.edges.find(e => e.from === from && e.to === to);
+
+test('a node that calls itself is drawn on the first row, centred like any entry', () => {
+  const l = G.layout(selfCall());
+  assert.equal(l.pos.scan.y, Math.min(...Object.values(l.pos).map(p => p.y)));
+  assert.equal(l.pos.scan.x, (l.canvasW - l.width) / 2);
+});
+
+test('no shipped drawing moves: an acyclic graph lays out as it did before back edges', () => {
+  // Digests of JSON.stringify(layout(view)) for every graph that ships, taken
+  // from the module as it stood before #88. None of these graphs is
+  // recursive, so the rule for a back edge must not move one box or one wire
+  // of them. An edit to an example that moves its drawing changes its digest
+  // too — which is a drawing change, and one a reviewer should see.
+  const before = {
+    'greet.flightpath.json#greet': '5cfa79b14ad3f38c20ce1f12f6b9357fd765e85eb2436bdb9b22e491637d29ae',
+    'map-300-woodwork.flightpath.json#ship-the-woodwork': '24929b648f8ba3e4b8c0742f48873384cc40c71db51010612795f5040f73a457',
+    'pr-313.flightpath.json#first-paint': '7b65f40072c10f562531f8a921bbf0194236ef4677ed5d751043f9e6b4edc243',
+    'pr-313.flightpath.json#panel-apply': 'd20101a80ba2641c4656c6c3e1009d8ed468dd2dfd37ebaf1562c53eac459fb8',
+  };
+  for (const key of Object.keys(before)) {
+    const [file, id] = key.split('#');
+    const prog = JSON.parse(readFileSync(join(examples, file), 'utf8'));
+    const l = G.layout(G.graphView(prog, prog.graphs.findIndex(g => g.id === id)));
+    assert.ok(l.edges.every(e => !e.back), key);
+    assert.equal(createHash('sha256').update(JSON.stringify(l)).digest('hex'), before[key], key);
+  }
+});
+
+test('a mutual pair draws its entry above the node it calls', () => {
+  const l = G.layout(mutualPair());
+  assert.ok(l.pos.a.y < l.pos.b.y);
+});
+
+test('a pair beside a plain branch keeps the entry on top and every forward wire running down', () => {
+  // Before back edges were dropped from depth, a climbed below c, which is not
+  // in the cycle, and no node was left at depth 0.
+  const l = G.layout(pairBesideBranch());
+  assert.equal(l.pos.a.y, Math.min(...Object.values(l.pos).map(p => p.y)));
+  assert.ok(l.pos.b.y > l.pos.a.y);
+  assert.equal(l.pos.c.y, l.pos.b.y);
+  assert.ok(l.pos.d.y > l.pos.c.y);
+  for (const e of l.edges.filter(e => !e.back)) assert.ok(l.pos[e.to].y > l.pos[e.from].y, `${e.from}>${e.to} runs upward`);
+});
+
+/* An orthogonal wire as its points, read off the M and L commands the layout
+ * writes. Nothing else appears in a wire's path. */
+const points = d => [...d.matchAll(/[ML](-?[\d.]+),(-?[\d.]+)/g)].map(m => ({ x: +m[1], y: +m[2] }));
+const inside = (p, box, w) => p.x > box.x && p.x < box.x + w && p.y > box.y && p.y < box.y + box.h;
+
+/* Whether one straight leg of a wire enters a box's interior. A leg may end
+ * on the box's edge — that is how a wire attaches — but never cross into it. */
+const legCrosses = (p, q, box, w) => {
+  const x0 = Math.min(p.x, q.x), x1 = Math.max(p.x, q.x), y0 = Math.min(p.y, q.y), y1 = Math.max(p.y, q.y);
+  return x0 < box.x + w && x1 > box.x && y0 < box.y + box.h && y1 > box.y;
+};
+
+test('a self call is a loop out of the left edge, low, and back into it, high', () => {
+  const l = G.layout(selfCall());
+  const e = edgeOf(l, 'scan', 'scan');
+  assert.equal(e.back, true);
+  assert.equal(e.self, true);
+  const box = l.pos.scan;
+  const pts = points(e.call);
+  const [first, last] = [pts[0], pts[pts.length - 1]];
+  assert.equal(first.x, box.x);
+  assert.equal(last.x, box.x);
+  assert.ok(first.y > last.y, 'it leaves lower than it comes back');
+  for (const y of [first.y, last.y]) assert.ok(y > box.y && y < box.y + box.h);
+  for (const p of pts) assert.ok(p.x <= box.x, 'no part of the loop lies inside the box');
+});
+
+test('a back edge between two nodes leaves the caller\'s right edge and enters the callee\'s', () => {
+  const l = G.layout(mutualPair());
+  const e = edgeOf(l, 'b', 'a');
+  assert.equal(e.back, true);
+  assert.equal(e.self, false);
+  const pts = points(e.call);
+  const [first, last] = [pts[0], pts[pts.length - 1]];
+  assert.equal(first.x, l.pos.b.x + l.width);
+  assert.ok(first.y > l.pos.b.y && first.y < l.pos.b.y + l.pos.b.h);
+  assert.equal(last.x, l.pos.a.x + l.width);
+  assert.ok(last.y > l.pos.a.y && last.y < l.pos.a.y + l.pos.a.h);
+  // The arrow points into the box: the last leg runs leftward onto its edge.
+  assert.ok(pts[pts.length - 2].x > last.x);
+  // The forward half of the pair is an ordinary wire.
+  const fwd = edgeOf(l, 'a', 'b');
+  assert.deepEqual(Object.keys(fwd).sort(), ['call', 'err', 'from', 'hasE', 'to']);
+});
+
+test('a back edge detours round a box beside it, and runs straight where there is none', () => {
+  // Nothing sits to the right of either end of the pair, so the wire is three
+  // legs: out to the lane, along it, and in. A detour there draws a jog that
+  // avoids nothing.
+  const pair = G.layout(mutualPair());
+  assert.equal(points(edgeOf(pair, 'b', 'a').call).length, 4);
+  assert.equal(points(edgeOf(pair, 'b', 'a').err).length, 4);
+  // Beside the branch, c sits right of b on b's row, so b's end detours round
+  // it through the gap above the row. Nothing sits right of a, so a's end
+  // still comes straight in off the lane.
+  const branch = G.layout(pairBesideBranch());
+  const pts = points(edgeOf(branch, 'b', 'a').call);
+  assert.equal(pts.length, 6);
+  assert.ok(pts[2].y < branch.pos.b.y, 'the detour runs above the caller\'s row');
+});
+
+test('a back edge climbs the nearest clear lane, not the drawing\'s far edge', () => {
+  // b calls a back, and c sits right of b on its row. Nothing sits right of a
+  // on the row above, so once the wire has gone round the top of c it can
+  // climb just past a: the lane runs over c's column, never down past c.
+  const l = G.layout(pairBesideBranch());
+  const pts = points(edgeOf(l, 'b', 'a').call);
+  // The lane is the upright leg that reaches a's height; the stub beside b is
+  // an upright leg too, and a short one.
+  const lane = pts.find((p, i) => i > 0 && p.x === pts[i - 1].x && p.y < l.pos.a.y + l.pos.a.h);
+  assert.ok(lane, 'the wire climbs to a');
+  assert.ok(lane.x < l.pos.c.x + l.width, `the lane at ${lane.x} swings out past c`);
+});
+
+test('a back edge\'s lane keeps clear of the forward wires it climbs beside', () => {
+  // The nearest lane right of a can land in the column where a's call into c
+  // comes down, between that call and its error wire. Eight is the least room
+  // that still reads as two lines.
+  const uprights = d => {
+    const pts = points(d);
+    return pts.slice(1).map((q, i) => [pts[i], q]).filter(([p, q]) => p.x === q.x)
+      .map(([p, q]) => ({ x: p.x, top: Math.min(p.y, q.y), bottom: Math.max(p.y, q.y) }));
+  };
+  for (const [name, make] of [['pair', mutualPair], ['pair beside a branch', pairBesideBranch], ['self and pair', selfAndPair]]) {
+    const l = G.layout(make());
+    const fwd = l.edges.filter(e => !e.back).flatMap(e => uprights(e.call).concat(uprights(e.err)));
+    for (const e of l.edges.filter(e => e.back && !e.self)) {
+      for (const u of uprights(e.call).concat(uprights(e.err))) {
+        for (const f of fwd) {
+          if (u.top >= f.bottom || u.bottom <= f.top) continue;
+          assert.ok(Math.abs(u.x - f.x) >= 8, `${name}: ${e.from}>${e.to} climbs ${Math.abs(u.x - f.x)} from a forward wire`);
+        }
+      }
+    }
+  }
+});
+
+test('no two back edges draw along the same line', () => {
+  // Four siblings each call the entry back. The first three have a box beside
+  // them, so they all detour through the one gap above their row — and each
+  // needs its own height there, or two wires collapse into one.
+  sameLineFree(G.layout(shaped('a', { a: ['b', 'c', 'd', 'e'], b: ['a'], c: ['a'], d: ['a'], e: ['a'] }, ['a'])));
+  // Two detours through that gap with two other back edges between them in
+  // the graph's order. A height counted over the whole graph gives these two
+  // the same one; it has to be counted per gap.
+  sameLineFree(G.layout(shaped('a', { a: ['b', 'c', 'e', 'f'], b: ['a'], c: ['x'], x: ['y', 'c'], y: ['c'], e: ['a'], f: [] }, ['a'])));
+});
+
+function sameLineFree(l) {
+  const legs = [];
+  for (const e of l.edges.filter(e => e.back)) {
+    for (const d of [e.call, e.err]) {
+      const pts = points(d);
+      for (let i = 1; i < pts.length; i++) legs.push({ p: pts[i - 1], q: pts[i], who: `${e.from}>${e.to}` });
+    }
+  }
+  const span = (a, b) => [Math.min(a, b), Math.max(a, b)];
+  for (let i = 0; i < legs.length; i++) {
+    for (let j = i + 1; j < legs.length; j++) {
+      const [s, t] = [legs[i], legs[j]];
+      if (s.who === t.who) continue;
+      const flat = s.p.y === s.q.y && t.p.y === t.q.y && s.p.y === t.p.y;
+      const upright = s.p.x === s.q.x && t.p.x === t.q.x && s.p.x === t.p.x;
+      if (!flat && !upright) continue;
+      const [a0, a1] = flat ? span(s.p.x, s.q.x) : span(s.p.y, s.q.y);
+      const [b0, b1] = flat ? span(t.p.x, t.q.x) : span(t.p.y, t.q.y);
+      assert.ok(Math.min(a1, b1) <= Math.max(a0, b0), `${s.who} and ${t.who} share a line`);
+    }
+  }
+}
+
+test('no back-edge wire, or its error wire, crosses a box', () => {
+  for (const [name, make] of [['self', selfCall], ['pair', mutualPair], ['pair beside a branch', pairBesideBranch], ['self and pair', selfAndPair]]) {
+    const l = G.layout(make());
+    const backs = l.edges.filter(e => e.back);
+    assert.ok(backs.length > 0, name);
+    for (const e of backs) {
+      for (const d of [e.call, e.err]) {
+        const pts = points(d);
+        for (let i = 1; i < pts.length; i++) {
+          for (const [id, box] of Object.entries(l.pos)) {
+            assert.ok(!legCrosses(pts[i - 1], pts[i], box, l.width), `${name}: ${e.from}>${e.to} crosses ${id}`);
+          }
+        }
+      }
+      // And the canvas holds it.
+      for (const p of points(e.call).concat(points(e.err))) assert.ok(p.x >= 0 && p.x <= l.canvasW && p.y >= 0 && p.y <= l.canvasH, name);
+    }
+  }
+});
+
+test('a back edge draws an error wire exactly when its callee declares an error channel', () => {
+  // a declares one and b does not, so b's call back into a has an error wire
+  // to return along and a's call into b has none.
+  const l = G.layout(mutualPair());
+  assert.equal(edgeOf(l, 'b', 'a').hasE, true);
+  assert.equal(edgeOf(l, 'a', 'b').hasE, false);
+  const quiet = G.layout(shaped('a', { a: ['b'], b: ['a'] }, []));
+  assert.equal(edgeOf(quiet, 'b', 'a').hasE, false);
+  // A self call's error wire runs inside its loop, clear of the box.
+  const self = edgeOf(G.layout(selfCall()), 'scan', 'scan');
+  assert.equal(self.hasE, true);
+});
+
+/* a calls b, b calls a back, and both return. */
+const pairWalk = () => {
+  const prog = mutualPair();
+  return {
+    prog,
+    states: G.fold(prog, {
+      steps: [
+        { k: 'call', at: 0, to: 'b', next: 1 },
+        { k: 'call', at: 0, to: 'a', next: 1 },
+        { k: 'return', at: 1 },
+        { k: 'return', at: 1 },
+      ],
+    }),
+  };
+};
+
+test('a back edge is live only while its caller\'s frame sits directly under its callee\'s', () => {
+  const { prog, states } = pairWalk();
+  const l = G.layout(prog);
+  const [ab, ba] = [edgeOf(l, 'a', 'b'), edgeOf(l, 'b', 'a')];
+  // a, b: both on the stack, but no frame of a sits above a frame of b.
+  assert.equal(G.wireLive(states[1], ab), true);
+  assert.equal(G.wireLive(states[1], ba), false);
+  // a, b, a: now one does.
+  assert.equal(G.wireLive(states[2], ba), true);
+  assert.equal(G.wireLive(states[2], ab), true);
+  // a, b again, after the inner a returned.
+  assert.equal(G.wireLive(states[3], ba), false);
+  assert.equal(G.wireLive(states[4], ab), false);
+});
+
+test('a move animates exactly one wire of a mutual pair, in the direction it moved', () => {
+  const { prog, states } = pairWalk();
+  const l = G.layout(prog);
+  const [ab, ba] = [edgeOf(l, 'a', 'b'), edgeOf(l, 'b', 'a')];
+  // Forward over the inner a's return: back along b's call into a.
+  const ret = states[3].moved;
+  assert.deepEqual([G.wireFlow(ret, ba), G.wireFlow(ret, ab)], ['flow-rev', null]);
+  // Back over the same move: the same wire, the other way.
+  const undo = G.back(states, 3).redraw;
+  assert.deepEqual([G.wireFlow(undo, ba), G.wireFlow(undo, ab)], ['flow', null]);
+  // The calls, forward and back.
+  assert.deepEqual([G.wireFlow(states[1].moved, ab), G.wireFlow(states[1].moved, ba)], ['flow', null]);
+  assert.deepEqual([G.wireFlow(G.back(states, 2).redraw, ba), G.wireFlow(G.back(states, 2).redraw, ab)], ['flow-rev', null]);
+  assert.equal(G.wireFlow(null, ab), null);
+});
+
+test('an error propagating up a wire animates it callee to caller, as a return does', () => {
+  const { prog } = pairWalk();
+  const l = G.layout(prog);
+  const up = { from: 'b', to: 'a', dir: 'propagate' };
+  assert.deepEqual([G.wireFlow(up, edgeOf(l, 'a', 'b')), G.wireFlow(up, edgeOf(l, 'b', 'a'))], ['flow-rev', null]);
+});
+
+test('a self call\'s one wire animates in the direction of the move', () => {
+  const prog = selfCall();
+  const l = G.layout(prog);
+  const e = edgeOf(l, 'scan', 'scan');
+  const states = G.fold(prog, prog.presets[1].trace);
+  assert.equal(G.wireFlow(states[1].moved, e), 'flow');
+  assert.equal(G.wireFlow(states[4].moved, e), 'flow-rev');
+  assert.equal(G.wireFlow(G.back(states, 1).redraw, e), 'flow-rev');
+});
+
+test('three frames deep in a self call, the count beside its loop reads ×3, and goes when they return', () => {
+  const prog = selfCall();
+  const l = G.layout(prog);
+  const loop = edgeOf(l, 'scan', 'scan').count;
+  const states = G.fold(prog, {
+    steps: [
+      { k: 'call', at: 0, to: 'scan', next: 1 },
+      { k: 'call', at: 0, to: 'scan', next: 1 },
+      { k: 'effect', at: 1, kind: 'db.put', desc: 'record the row', next: 2, result: { ok: true } },
+      { k: 'return', at: 2 },
+      { k: 'effect', at: 1, kind: 'db.put', desc: 'record the row', next: 2, result: { ok: true } },
+      { k: 'return', at: 2 },
+      { k: 'effect', at: 1, kind: 'db.put', desc: 'record the row', next: 2, result: { ok: true } },
+      { k: 'return', at: 2 },
+    ],
+  });
+  assert.equal(G.countMark(l, states[0], 'scan'), null, 'one frame is no recursion');
+  assert.deepEqual(G.countMark(l, states[1], 'scan'), { text: '×2', at: { x: loop.x, y: loop.y } });
+  assert.deepEqual(G.countMark(l, states[2], 'scan'), { text: '×3', at: { x: loop.x, y: loop.y } });
+  assert.deepEqual(G.countMark(l, states[4], 'scan').text, '×2');
+  assert.equal(G.countMark(l, states[6], 'scan'), null);
+  assert.equal(G.countMark(l, states[8], 'scan'), null, 'no frame at all');
+  // The count sits in the loop's own corner, outside the box.
+  assert.ok(loop.x < l.pos.scan.x && loop.x > l.pos.scan.x - 26);
+});
+
+test('a count too wide for the loop\'s corner moves into the box\'s top row', () => {
+  const prog = selfCall();
+  const l = G.layout(prog);
+  const deep = { frames: Array.from({ length: 1000 }, () => ({ nodeId: 'scan' })) };
+  assert.deepEqual(G.countMark(l, deep, 'scan'), { text: '×1000', at: null });
+  // A node that does not call itself shows no count, however many frames.
+  const pair = pairWalk();
+  assert.equal(G.countMark(G.layout(pair.prog), { frames: [{ nodeId: 'a' }, { nodeId: 'b' }, { nodeId: 'a' }] }, 'a'), null);
 });
 
 /* -- the files tab -------------------------------------------------------- */

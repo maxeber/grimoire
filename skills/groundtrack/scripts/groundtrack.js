@@ -611,9 +611,31 @@ const Groundtrack = (() => {
       throw new Error('layout needs a graph view: a file lists graphs and has no entry of its own');
     }
     const ids = [...reachable(prog, prog.entry)];
+
+    /* A BACK EDGE is a call into a node still on the depth-first walk from
+     * the entry, callees visited in call order. A call from a node to itself
+     * is always one. Depth is longest-path over every other edge, so a cycle
+     * cannot climb it: the entry stays at depth 0 and a mutual pair's entry
+     * sits above its callee. An acyclic graph has no back edge, and lays out
+     * exactly as it did before there was a rule for one. */
+    const backs = new Set();
+    const onWalk = new Set(), done = new Set();
+    (function walk(id) {
+      onWalk.add(id);
+      for (const c of calleesOf(prog, id)) {
+        if (onWalk.has(c)) backs.add(`${id}>${c}`);
+        else if (!done.has(c)) walk(c);
+      }
+      onWalk.delete(id);
+      done.add(id);
+    })(prog.entry);
+    const isBack = (from, to) => backs.has(`${from}>${to}`);
+
     const depth = bareFrom(ids.map(i => [i, 0]));
     for (let k = 0; k < ids.length; k++) {
-      for (const id of ids) for (const c of calleesOf(prog, id)) if (depth[c] < depth[id] + 1) depth[c] = depth[id] + 1;
+      for (const id of ids) {
+        for (const c of calleesOf(prog, id)) if (!isBack(id, c) && depth[c] < depth[id] + 1) depth[c] = depth[id] + 1;
+      }
     }
 
     const order = [], seen = new Set();
@@ -646,10 +668,13 @@ const Groundtrack = (() => {
      * row's right edge. This is one pass with no search, not a layout engine,
      * and the first row is centred on the sheet as before. */
     const pos = bare();
+    const rowTop = bare(), rowBottom = bare();
     let y = PAD;
     let rightEdge = PAD;
     for (const d of Object.keys(rows).sort((a, b) => a - b)) {
       const row = rows[d];
+      rowTop[d] = y;
+      rowBottom[d] = y + Math.max(...row.map(id => H[id]));
       if (d === '0') {
         const rowW = row.length * W + (row.length - 1) * GAP_X;
         let x = PAD + (sheetW - rowW) / 2;
@@ -676,25 +701,235 @@ const Groundtrack = (() => {
       for (const id of row) rightEdge = Math.max(rightEdge, pos[id].x + W);
       y += Math.max(...row.map(id => H[id])) + GAP_Y;
     }
-    const canvasW = Math.max(sheetW + PAD * 2, rightEdge + PAD);
+    let canvasW = Math.max(sheetW + PAD * 2, rightEdge + PAD);
+
+    /* WHERE A BACK EDGE ATTACHES. Every back edge between two nodes leaves its
+     * caller's right side and enters its callee's, so a node in several takes
+     * several places down that side: the edges it makes first, then the ones
+     * it takes. Each place is a height on the box and a stub out into the gap
+     * beside it, and no two share either. A box is at least 163 tall and the
+     * gap 48 wide, so past four heights, or three stubs, they stack on the
+     * last. */
+    const pairs = [];
+    for (const from of ids) for (const to of calleesOf(prog, from)) if (isBack(from, to) && from !== to) pairs.push([from, to]);
+    const makes = bare(), takes = bare();
+    for (const [f, t] of pairs) {
+      (makes[f] = makes[f] || []).push(t);
+      (takes[t] = takes[t] || []).push(f);
+    }
+    const place = (id, j) => ({ y: pos[id].y + 40 + Math.min(j, 3) * 28, stub: pos[id].x + W + 16 + Math.min(j, 2) * 12 });
+
+    /* A back edge between two nodes: out of the caller's right side, up a
+     * lane, and into the callee's right side.
+     *
+     * THE LANE is the nearest upright line right of both boxes that clears
+     * everything its climb passes: every box in the rows it spans, with room
+     * for a self-calling box's loop on that box's left, and every lane an
+     * earlier back edge took. Nearest, because the drawing's far edge — which
+     * also clears all of it — sends a wire the whole width of the sheet to
+     * join two boxes that sit one above the other. The canvas grows when a
+     * lane lands past its edge.
+     *
+     * AN END with a box between it and the lane on its row cannot run
+     * straight to the lane: it would cut through that box. That end detours
+     * instead: out into the gap beside its box, into the gap between rows,
+     * and along it to the lane. An end with nothing in the way runs straight,
+     * because a detour there draws a jog that avoids nothing. Which ends
+     * detour depends on where the lane is, and how far the lane climbs
+     * depends on which ends detour, so the two are settled together: try the
+     * nearest lane, and step past whatever it hits.
+     *
+     * The error wire runs the same route the other way, eight inside it, and
+     * crosses its own call nowhere. */
+    const LOOP = 26;
+    const selfCalls = id => isBack(id, id);
+    const lanes = [];
+
+    /* A forward wire: down from the caller's bottom, across the gap, down
+     * into the callee's top, with its error wire twenty to the right. */
+    const forward = (from, to) => {
+      const a = pos[from], b = pos[to];
+      const sx = a.x + W / 2 - 10, sy = a.y + a.h;
+      const ex = b.x + W / 2 - 10, ey = b.y;
+      return { sx, sy, ex, ey, my: (sy + ey) / 2 - 6 };
+    };
+
+    /* Every upright leg a forward wire draws. A lane that climbs within eight
+     * of one reads as the same line, so these are in the way too. */
+    const flows = [];
+    for (const from of ids) {
+      for (const to of calleesOf(prog, from)) {
+        if (isBack(from, to)) continue;
+        const { sx, sy, ex, ey, my } = forward(from, to);
+        flows.push({ x: sx, top: sy, bottom: my }, { x: sx + 20, top: sy, bottom: my + 12 });
+        flows.push({ x: ex, top: my, bottom: ey }, { x: ex + 20, top: my + 12, bottom: ey });
+      }
+    }
+
+    /* The first box a horizontal at `y`, from `id`'s right edge to `x`, would
+     * enter, if any. Only a box in `id`'s row spans that height. */
+    const inTheWay = (id, y, x) =>
+      ids.find(k => k !== id && pos[k].y < y && y < pos[k].y + pos[k].h && pos[k].x - (selfCalls(k) ? LOOP + 8 : 0) < x && pos[k].x > pos[id].x);
+
+    /* The right edge of the first thing an upright at `x`, with its error
+     * wire eight left of it, would run into between `top` and `bottom`; or
+     * nothing, when that lane is clear. A box counts from the left of its
+     * loop, if it calls itself, to the right of its stubs, if another back
+     * edge can bend out of it — `from` and `to` aside, whose stubs this wire
+     * leaves by. An earlier lane counts twenty wide, and a forward wire's
+     * upright leg sixteen: eight clear of the call on one side and of its
+     * error wire on the other. */
+    const laneBlock = (x, top, bottom, from, to) => {
+      for (const k of ids) {
+        const p = pos[k];
+        const left = p.x - (selfCalls(k) ? LOOP + 8 : 8);
+        const right = p.x + W + (k !== from && k !== to && (makes[k] || takes[k]) ? 44 : 0);
+        if (x - 16 < right && x + 8 > left && top < p.y + p.h && bottom > p.y) return right;
+      }
+      for (const l of lanes) if (Math.abs(x - l.x) < 20 && top < l.bottom && bottom > l.top) return l.x - 4;
+      for (const f of flows) if (f.x > x - 16 && f.x < x + 8 && top < f.bottom && bottom > f.top) return f.x - 8;
+      return null;
+    };
+
+    /* How far into a gap between rows a detour runs, counted per side of
+     * each gap: a caller's end detours along the top of the gap above its
+     * row, a callee's along the bottom of the gap below its. Three heights,
+     * 12 apart, so three detours along one side keep three lines with their
+     * error wires between; a fourth shares the first's. Past 36 the two sides
+     * of one gap would cross. */
+    const detours = bare();
+    const lift = side => 12 + ((detours[side] || 0) % 3) * 12;
+
+    const backWire = (from, to) => {
+      const a = pos[from], b = pos[to];
+      const out = place(from, makes[from].indexOf(to));
+      const into = place(to, (makes[to] || []).length + takes[to].indexOf(from));
+      const ay = out.y + 14, by = into.y, sa = out.stub, sb = into.stub;
+      const above = `above ${depth[from]}`, below = `below ${depth[to]}`;
+      const ya = rowTop[depth[from]] - lift(above), yb = rowBottom[depth[to]] + lift(below);
+
+      /* The caller's end reaches the lane at `ay`, or by the gap above its
+       * row at `ya`; the callee's end leaves it at `by`, or by the gap below
+       * its row at `yb`. The callee is always on a higher row. */
+      let lane = Math.max(a.x, b.x) + W + 24;
+      let outBent, inBent;
+      for (;;) {
+        outBent = !!(inTheWay(from, ay, lane) || inTheWay(from, ay - 14, lane));
+        inBent = !!(inTheWay(to, by, lane) || inTheWay(to, by + 14, lane));
+        /* The climb runs from where the callee's end leaves the lane to where
+         * the caller's reaches it, and its error wire eight inside, so this
+         * span covers both. */
+        const top = inBent ? yb : by, bottom = outBent ? ya : ay;
+        const hit = laneBlock(lane, top, bottom, from, to);
+        if (hit === null) {
+          lanes.push({ x: lane, top: top - 16, bottom: bottom + 16 });
+          break;
+        }
+        lane = Math.max(hit + 24, lane + 1);
+      }
+      canvasW = Math.max(canvasW, lane + PAD);
+
+      const call = [[a.x + W, ay]];
+      const err = [[a.x + W, ay - 14]];
+      if (outBent) {
+        detours[above] = (detours[above] || 0) + 1;
+        call.push([sa, ay], [sa, ya], [lane, ya]);
+        err.push([sa - 8, ay - 14], [sa - 8, ya - 8], [lane - 8, ya - 8]);
+      } else {
+        call.push([lane, ay]);
+        err.push([lane - 8, ay - 14]);
+      }
+      if (inBent) {
+        detours[below] = (detours[below] || 0) + 1;
+        call.push([lane, yb], [sb, yb], [sb, by]);
+        err.push([lane - 8, yb + 8], [sb - 8, yb + 8], [sb - 8, by + 14]);
+      } else {
+        call.push([lane, by]);
+        err.push([lane - 8, by + 14]);
+      }
+      call.push([b.x + W, by]);
+      err.push([b.x + W, by + 14]);
+      const d = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
+      return { call: d(call), err: d(err.reverse()) };
+    };
+
+    /* A self call: a loop on the box's left side, out low and back in high.
+     * Left, so it never shares the right-hand side a back edge between two
+     * nodes uses. Its error wire runs inside the loop, high to low. `count` is
+     * where the page writes how many of the node's frames are open: in the
+     * loop's own corner, above where it comes back in, and `room` wide. */
+    const selfWire = id => {
+      const { x, y, h } = pos[id];
+      return {
+        call: `M${x},${y + h - 44} L${x - LOOP},${y + h - 44} L${x - LOOP},${y + 44} L${x},${y + 44}`,
+        err: `M${x},${y + 58} L${x - 12},${y + 58} L${x - 12},${y + h - 58} L${x},${y + h - 58}`,
+        count: { x: x - LOOP / 2, y: y + 38, room: LOOP },
+      };
+    };
 
     const edges = [];
     for (const from of ids) {
       for (const to of calleesOf(prog, from)) {
-        const a = pos[from], b = pos[to];
-        const sx = a.x + W / 2 - 10, sy = a.y + a.h;
-        const ex = b.x + W / 2 - 10, ey = b.y;
-        const my = (sy + ey) / 2 - 6;
+        const hasE = ((prog.nodes[to].channels || {}).error || []).length > 0;
+        if (isBack(from, to)) {
+          const self = from === to;
+          const wire = self ? selfWire(from) : backWire(from, to);
+          edges.push({ from, to, back: true, self, ...wire, hasE });
+          continue;
+        }
+        const { sx, sy, ex, ey, my } = forward(from, to);
         edges.push({
           from, to,
           call: `M${sx},${sy} L${sx},${my} L${ex},${my} L${ex},${ey}`,
           err: `M${ex + 20},${ey} L${ex + 20},${my + 12} L${sx + 20},${my + 12} L${sx + 20},${sy}`,
-          hasE: ((prog.nodes[to].channels || {}).error || []).length > 0,
+          hasE,
         });
       }
     }
 
     return { pos, edges, order, width: W, canvasW, canvasH: y - GAP_Y + PAD };
+  }
+
+  /* The three rules the page draws a wire and a box by, here rather than in
+   * the page so a test can reach them. The page calls these and keeps none of
+   * its own. */
+
+  /** Whether a wire is open now. A forward wire is, while both its ends are
+   *  on the stack. A back edge is only while its caller's frame sits directly
+   *  under its callee's: under recursion both ends are on the stack for the
+   *  whole descent, and most of that time the walk is not crossing this wire. */
+  function wireLive(state, edge) {
+    const f = state.frames;
+    if (edge.back) return f.some((top, i) => i > 0 && f[i - 1].nodeId === edge.from && top.nodeId === edge.to);
+    return f.some(x => x.nodeId === edge.from) && f.some(x => x.nodeId === edge.to);
+  }
+
+  /** How the last move animates one wire: `flow` caller to callee, `flow-rev`
+   *  callee to caller, or null. A call, and stepping back over a return, run
+   *  caller to callee; a return, a propagate and stepping back over a call run
+   *  the other way. The redraw names its two ends in the order it moved, so
+   *  the direction says which end is the caller — and a mutual pair's two
+   *  wires, which join the same two nodes, never animate together. */
+  const DOWN = new Set(['call', 'unreturn']);
+  function wireFlow(redraw, edge) {
+    if (!redraw) return null;
+    if (DOWN.has(redraw.dir)) return redraw.from === edge.from && redraw.to === edge.to ? 'flow' : null;
+    return redraw.to === edge.from && redraw.from === edge.to ? 'flow-rev' : null;
+  }
+
+  /** How deep a self-calling node is: `×3` while three of its frames are
+   *  open, and nothing for one or none. It goes in the corner of the node's
+   *  loop wire, unless it is too wide for it, when `at` is null and the page
+   *  puts it in the box's top row. The width is the mono face's advance, 0.6
+   *  of its size, at the page's micro size of 12px — a figure the page cannot
+   *  hand this module without a DOM, so it moves when that size does. */
+  const COUNT_ADVANCE = 7.2;
+  function countMark(lay, state, id) {
+    const loop = lay.edges.find(e => e.self && e.from === id);
+    const n = state.frames.filter(f => f.nodeId === id).length;
+    if (!loop || n < 2) return null;
+    const text = '×' + n;
+    return { text, at: text.length * COUNT_ADVANCE <= loop.count.room ? { x: loop.count.x, y: loop.count.y } : null };
   }
 
   /* -- the tree ------------------------------------------------------------
@@ -1099,6 +1334,6 @@ const Groundtrack = (() => {
     return best;
   }
 
-  return { esc, ID, bare, hardenKeys, KINDS, ERROR_POSITION, graphView, sheetState, sheetPickerMarkup, sheetFactsMarkup, reachable, labelsOf, callSites, calleesOf, effectsOf, failureKinds, tagFate, complexityOf, fold, back, tipAt, cutEdges, layout, callCounts, treeRows, unaccountedFiles, filesOf, fileTree, filesMarkup, suggestRun, renamedToken };
+  return { esc, ID, bare, hardenKeys, KINDS, ERROR_POSITION, graphView, sheetState, sheetPickerMarkup, sheetFactsMarkup, reachable, labelsOf, callSites, calleesOf, effectsOf, failureKinds, tagFate, complexityOf, fold, back, tipAt, cutEdges, layout, wireLive, wireFlow, countMark, callCounts, treeRows, unaccountedFiles, filesOf, fileTree, filesMarkup, suggestRun, renamedToken };
 })();
 if (typeof module !== 'undefined') module.exports = Groundtrack;

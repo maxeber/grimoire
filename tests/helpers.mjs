@@ -311,6 +311,45 @@ export function selfRecursive(prog) {
   return prog;
 }
 
+/**
+ * Replace a parsed copy of the small example with a call graph of the given
+ * shape, entered at `entry`.
+ *
+ * `calls` maps each node to the nodes it calls, in call order. `errors` names
+ * the nodes that declare an error channel; the rest declare none. The graph
+ * carries one run with no moves, because the drawing reads the graph and not
+ * the walk.
+ *
+ * For the recursive shapes the drawing has to lay out, and which no shipped
+ * example holds. Derived, never shipped, and read only through the module.
+ * Mutates and returns the program it is given.
+ */
+export function callGraph(prog, entry, calls, errors = []) {
+  prog.nodes = {};
+  for (const [id, callees] of Object.entries(calls)) {
+    prog.nodes[id] = {
+      name: id,
+      role: 'service',
+      loc: `src/${id}.ts:1`,
+      params: [],
+      channels: { success: 'a value', error: errors.includes(id) ? ['Failed'] : [], requirements: [] },
+      touches: [`src/${id}.ts`],
+      enteredBy: [],
+      steps: [...callees.map(target => ({ op: 'call', target, args: {} })), { op: 'return', expr: 'value' }],
+    };
+  }
+  prog.graphs = [
+    {
+      id: entry,
+      title: `enter at ${entry}`,
+      blurb: `Enters at ${entry}.`,
+      entry,
+      presets: [{ name: 'no moves', blurb: 'The walk has not started.', input: {}, trace: { provenance: 'authored', steps: [] } }],
+    },
+  ];
+  return prog;
+}
+
 // Run a node script and report both streams and the exit code, rather than
 // throwing. A test about a gate that fails needs the failure, not an exception.
 // Every script under test says the interesting part on stderr and the answer

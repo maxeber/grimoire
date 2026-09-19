@@ -1046,6 +1046,23 @@ test('the page seeds a sheet from the module rather than keeping its own copy', 
   assert.match(body, /G\.sheetState\(/);
 });
 
+test('the page draws a wire and a recursion count by the module\'s rules, not its own', () => {
+  // The same limit as the test above: nothing here runs the page. Which wire
+  // is live, which one a move animates and what count a node shows are held in
+  // the fold tests, against the module. What this holds is that the page asks
+  // the module, so a mutual pair cannot animate both its wires on the page
+  // while the module says one — and that stepping back hands the module the
+  // move's direction, which is the half the page used to drop.
+  const template = readFileSync(join(groundtrack, '..', '..', 'assets', 'template.html'), 'utf8');
+  const body = template.slice(template.indexOf('function start()'));
+  assert.match(body, /G\.wireLive\(/);
+  assert.match(body, /G\.wireFlow\(/);
+  assert.match(body, /G\.countMark\(/);
+  assert.match(body, /S\.redraw = G\.back\(S\.states, S\.at\)\.redraw/);
+  // No second copy of the old rule, which matched a move in both directions.
+  assert.doesNotMatch(body, /S\.redraw\.from === e\.to/);
+});
+
 test('the page reads its graph through an accessor, not off the file root', () => {
   // The prefactor the sheets ticket needs: which graph is on the sheet is one
   // place to change, not fifteen reads scattered through the template. The

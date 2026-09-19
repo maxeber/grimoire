@@ -264,6 +264,10 @@ input[type=checkbox] { accent-color: var(--av-ink); margin: 0 var(--av-s1) 0 0; 
 @keyframes flow-rev { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 24; } }
 .wire--flow { stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
 .wire--flow-rev { stroke-dasharray: 6 6; animation: flow-rev 1.2s linear infinite; }
+/* How many frames of a self-calling node are open, beside its loop wire. A
+   figure, not a picture, and it never moves. */
+.wire-count { fill: var(--av-ink); font-size: var(--av-t-micro); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nd-count { font-size: var(--av-t-micro); font-weight: 600; margin-left: var(--av-s1); }
 
 /* A node is a part on the drawing. Its states are line weights: the open one
    carries an outline set off the box, one on the stack a hairline outside it,
@@ -875,7 +879,6 @@ function start() {
 
   /* -- the drawing -------------------------------------------------------- */
   function drawWires(st, reach) {
-    const onStack = new Set(st.frames.map(f => f.nodeId));
     const taken = new Set(st.edges);
     const parts = [];
     parts.push(
@@ -888,16 +891,22 @@ function start() {
     );
     for (const e of LAYOUT.edges) {
       const key = e.from + '>' + e.to;
-      const live = onStack.has(e.from) && onStack.has(e.to);
+      const live = G.wireLive(st, e);
       const walked = taken.has(key);
       const cut = CUTS.some(c => c.layer === S.layer && c.from === e.from && c.to === e.to);
       const cold = cut || !reach.has(e.to);
       const inked = !cold && (live || walked);
       let cls = 'wire' + (cold ? '' : live ? ' wire--live' : walked ? ' wire--walked' : '') + (cut ? ' wire--cut' : '');
-      if (S.redraw && S.redraw.from === e.from && S.redraw.to === e.to) cls += ' wire--flow';
-      if (S.redraw && S.redraw.from === e.to && S.redraw.to === e.from) cls += ' wire--flow-rev';
+      const flow = G.wireFlow(S.redraw, e);
+      if (flow) cls += ' wire--' + flow;
       parts.push('<path class="' + cls + '" d="' + e.call + '" marker-end="url(#' + (inked ? 'ar-ink' : 'ar-cold') + ')"></path>');
       if (e.hasE) parts.push('<path class="wire wire--err" d="' + e.err + '" marker-end="url(#ar-cold)"></path>');
+      /* How deep a self call is, beside its loop. Static: it changes when the
+         cursor moves and never on its own. */
+      const count = e.self ? G.countMark(LAYOUT, st, e.from) : null;
+      if (count && count.at) {
+        parts.push('<text class="wire-count" x="' + count.at.x + '" y="' + count.at.y + '" text-anchor="middle">' + count.text + '</text>');
+      }
     }
     parts.push('</g>');
     return (
@@ -958,10 +967,16 @@ function start() {
     const cutNote = CUTS.filter(c => c.layer === S.layer && c.to === id).length
       ? '<div class="nd-cut">cut under ' + esc(S.layer) + '</div>'
       : '';
+    /* The recursion count sits beside the loop wire. Only when it is too wide
+       for the loop's corner does it come into the box, here. */
+    const count = G.countMark(LAYOUT, st, id);
+    const countChip = count && !count.at
+      ? '<span class="nd-count chip-help" data-help="Frames of this node open now">' + count.text + '</span>'
+      : '';
     return (
       '<div class="' + cls + '" data-node="' + id + '" style="left:' + p.x + 'px;top:' + p.y +
       'px;width:' + LAYOUT.width + 'px">' +
-      '<div class="nd-top"><span class="av-label chip-help" data-help="' + HELP.role + '">' + esc(n.role) + '</span>' + chip + '</div>' +
+      '<div class="nd-top"><span class="av-label chip-help" data-help="' + HELP.role + '">' + esc(n.role) + '</span>' + countChip + chip + '</div>' +
       '<div class="nd-name">' + esc(n.name) + '</div>' +
       '<div class="nd-loc">' + esc(n.loc) + '</div>' +
       '<div class="nd-ch">' + channelKey('success') + '<span>' + esc(ch.success || '—') + '</span>' +
@@ -1368,9 +1383,9 @@ function start() {
       S.redraw = S.states[to].moved;
     } else {
       /* Stepping back over a call redraws it callee to caller, so unwinding
-         reads as unwinding. */
-      const b = G.back(S.states, S.at);
-      S.redraw = b.redraw ? { from: b.redraw.from, to: b.redraw.to } : null;
+         reads as unwinding. The redraw keeps its direction: that is what
+         tells a mutual pair's two wires apart. */
+      S.redraw = G.back(S.states, S.at).redraw;
     }
     S.at = to;
     follow();
