@@ -77,9 +77,58 @@ rows. A cell that closes half the box is usually a position, not an option.
    `argued` (your reasoning). No edge without a why. An edge inside a row is a
    swap, not an edge.
 4. **Audit.** Check every `argued` edge against the eight weakness patterns
-   (see `reference/writing-edges.md`). Rewrite it, or move it to `suspected`,
-   where it is listed but colours nothing. Name the pattern at the front of the
-   `suspected` string. That string is the only record after the session ends.
+   (see `reference/writing-edges.md`). Flag each edge that fails the check. A
+   flag tells you which edge to reread first. It is not a verdict.
+
+   **A tool can rank the argued edges first.** `audit.mjs` sits next to this
+   file, in the skill base directory. Before you offer it, ask it whether a
+   key is in the environment:
+
+   ```bash
+   node <skill base directory>/audit.mjs --probe
+   ```
+
+   The probe prints `yes` or `no`, and it sends nothing. Treat any other output
+   as `no`. On `no`, or with no `audit.mjs`, say nothing about the audit.
+   When the user asks for the audit and the probe says `no`, run the audit. It
+   sends nothing. It prints the steps to set a key, and you give those steps to
+   the user. Never ask for the key. Never write it into a file.
+
+   On `yes`, run the audit with `--dry-run` first. It sends nothing. It prints
+   how many requests a real run sends, and their rough size. Then say one
+   sentence to the user. It states three facts: the audit is available, it
+   sends this box's text to the model provider, and the number of requests.
+   Never state a price, because the provider sets it and can change it. Offer
+   the audit once in a conversation. Run it only when the user
+   says yes. Skip the question only when the user already said yes in this
+   conversation. Your instructions can also give that yes.
+
+   ```bash
+   node <skill base directory>/audit.mjs <scratch>/<topic>.box.json
+   ```
+
+   The tool compares each argued edge with controls that it builds from the
+   sourced and measured edges in the box. It flags an edge that scores among
+   those controls. A box with too few such edges gets a ranking with no flags,
+   and the tool says so. A score never changes a tier. Never write a score into
+   the box file. A second run sends only the edges that changed.
+
+   Give each flagged edge one disposition, and say it in chat:
+
+   - **Rewrite** the `why` so the link is explicit.
+   - **Suspect** it: move it to `suspected`, with the pattern named at the
+     front.
+   - **Keep** it, and give the reason.
+
+   A rewrite that adds a factual claim names a `src`, or the edge stays
+   `argued`. Audit the rewritten edges again, and only those. Stop after two
+   rounds. The audit stops when every flagged edge has a disposition. It never
+   stops on a score.
+
+   A `suspected` edge is listed on the page but colours nothing. Its string
+   keeps the pattern, the edge, the reason, and the rejected `why` word for
+   word. That string is the only record after the session ends. A later test of
+   the audit needs the rejected `why`, and the reason alone cannot rebuild it.
 
    The renderer walks the **chains** for you. The *chain* finding names the
    longest run of edges that compose, the relation it derives, and whether the
@@ -125,6 +174,14 @@ rows. A cell that closes half the box is usually a position, not an option.
    ```bash
    node <skill base directory>/render.mjs <box.json> --sel "eagle-eye: opt-a, opt-b"
    ```
+
+   **When a set does not hold, check its edges before you change it.** The
+   user often asks how to make a set hold. `--sel` prints each conflict and
+   each requirement not met, with the edge's `why` and tier. Check each of
+   those edges against the eight weakness patterns first. A wrong edge makes a
+   good set look broken, and it is the cheapest fix. Give each weak edge one
+   disposition, as in step 4. Then propose a change to an option for what
+   still fails.
 9. **Debrief.** When the user accepts a set, close the loop in chat. Three
    things, in three or four sentences:
 
@@ -449,6 +506,9 @@ not format** — the block above is unchanged, and Copy still copies all of it.
 - **Acting on a restore code without echoing it.** The user pastes ids they
   cannot check by reading. Say the set back in words first, or a misread
   becomes the record.
+- **Changing the set before you check the edge that blocks it.** An argued
+  edge can be wrong, and then the set holds as it is. Check the edges behind
+  each conflict first. See step 8.
 - **Reading each edge and never the chain.** Sound edges can join into an
   unsound argument. The *chain* finding names the join. Read it. Then say
   whether the box states the relation it derives.

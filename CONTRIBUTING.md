@@ -42,8 +42,15 @@ not take, and `SECURITY.md` explains why that matters more than it looks.
 run only the suite while you work on it:
 
 ```bash
-node --test tests/esc.test.mjs tests/render.test.mjs tests/check.test.mjs tests/build-pages.test.mjs tests/skillspector-gate.test.mjs tests/groundtrack-fold.test.mjs tests/groundtrack-render.test.mjs tests/registry.test.mjs
+node --test tests/esc.test.mjs tests/render.test.mjs tests/check.test.mjs tests/build-pages.test.mjs tests/skillspector-gate.test.mjs tests/groundtrack-fold.test.mjs tests/groundtrack-render.test.mjs tests/registry.test.mjs tests/audit.test.mjs
 ```
+
+**The suite never reaches the network.** eagle-eye's edge audit is the one
+script in the tree that sends anything, and `tests/audit.test.mjs` runs it
+against a fake service bound to `127.0.0.1` inside the test process. It clears
+any real key from the child's environment first, so a key in your shell is
+never used. CI never calls the provider. A test that did would spend money and
+hand a key to a runner. A new test that needs the service uses the fake.
 
 Two rules about what goes in there:
 

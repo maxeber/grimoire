@@ -362,7 +362,7 @@
         [
           "data-json",
           "req",
-          "Reading an export back as overrides needs a file to diff against, in a format the renderer reads.",
+          "The round trip reads the separate box file with JSON.parse. A YAML file fails that parse, and Embedded in page has no separate file.",
           "argued"
         ]
       ],
@@ -389,12 +389,6 @@
           "audit-argued",
           "conf",
           "The audit is the agent checking edges it drew; a generator that does no reasoning has nothing to audit.",
-          "argued"
-        ],
-        [
-          "moves-six",
-          "conf",
-          "The moves are the panel reasoning about the set; a pure generator draws the grid and stops.",
           "argued"
         ]
       ],
@@ -476,14 +470,12 @@
     },
     "trig-name": {
       "why": "Only when you call it.",
-      "rel": [],
       "notes": [
         "No edges: a human-pulled trigger constrains nothing else. Zero false fires, zero reach."
       ]
     },
     "edge-tiered": {
       "why": "Chosen. Every edge says what it rests on; the verdict says what tier it rests on.",
-      "rel": [],
       "notes": [
         "This option and Argued edges required each other. The cycle finding named the pair as one decision drawn twice.",
         "The box now keeps one direction. The audit needs a tier to select on. A tier needs no audit."
@@ -495,7 +487,7 @@
         [
           "moves-six",
           "conf",
-          "On a fresh decision almost nothing is cited — this very box would have two edges — so most moves have nothing to read.",
+          "Evidence required keeps only cited edges. This box has three, so most moves have almost nothing to read.",
           "argued"
         ]
       ],
@@ -555,41 +547,23 @@
     },
     "moves-verdict": {
       "why": "Strawman: the verdict and nothing else — the earlier artifact as it stands.",
-      "rel": [],
       "notes": [
         "This is the artifact you already have. If it survives the box, the six moves are decoration."
       ]
     },
     "coach-optin": {
       "why": "Chosen. Predict which rows an override breaks, then reveal. Retrieval practice, borrowed from the tutoring skill.",
-      "rel": [
-        [
-          "build-renderer",
-          "req",
-          "Withhold-then-reveal is page state; prompt-only re-implements it on every page.",
-          "argued"
-        ]
-      ],
       "notes": [
         "Try it: the toggle above. Then decide whether it is the strongest move or a quiz nobody asked for.",
-        "The chain finding names one derived relation here. This option needs Skill + renderer, and Skill + renderer rules out Embedded in page. So this option rules out Embedded in page. The path says it. A direct edge would repeat it."
+        "The chain finding once named a relation here, through Skill + renderer. That edge is now in suspected, so the path is gone."
       ]
     },
     "coach-none": {
       "why": "No coaching layer.",
-      "rel": [],
       "notes": []
     },
     "coach-always": {
       "why": "Strawman: every override is a quiz.",
-      "rel": [
-        [
-          "depth-rows",
-          "conf",
-          "A three-row chat table with a withheld verdict is a quiz nobody asked for.",
-          "argued"
-        ]
-      ],
       "notes": []
     },
     "audit-argued": {
@@ -606,21 +580,18 @@
     },
     "audit-none": {
       "why": "Edges go in as drawn.",
-      "rel": [],
       "notes": [
         "A plausible wrong edge then looks identical to a right one — the failure the tiers were meant to make visible."
       ]
     },
     "audit-all": {
       "why": "Audit every edge, every tier.",
-      "rel": [],
       "notes": [
         "Auditing a measured edge against “is it vague?” is re-running the measurement in prose. Cost, no catch."
       ]
     },
     "home-user": {
       "why": "Chosen. A thinking tool is yours, not the project’s; and you plan to share it from your own skill repo.",
-      "rel": [],
       "notes": []
     },
     "home-repo": {
@@ -638,21 +609,12 @@
     },
     "home-both": {
       "why": "Build here, promote later.",
-      "rel": [],
       "notes": [
         "Two copies to keep in step; the promotion is a chore nobody schedules."
       ]
     },
     "persist-scratch": {
       "why": "Chosen. The box is the working surface for one conversation. The decision it produces belongs in the project's records, not the grid that found it.",
-      "rel": [
-        [
-          "data-json",
-          "req",
-          "A file needs a format the renderer reads with nothing installed.",
-          "argued"
-        ]
-      ],
       "notes": [
         "Disposable is not ephemeral. The file exists for the whole session, because --sel and the round trip both read it.",
         "A committed box asks every later reader to learn a grid to read one choice."
@@ -660,14 +622,6 @@
     },
     "persist-decision": {
       "why": "One file per coupled decision, written where the project keeps its records. The user asks for this; it is never the default.",
-      "rel": [
-        [
-          "data-json",
-          "req",
-          "A file needs a format the renderer reads with nothing installed.",
-          "argued"
-        ]
-      ],
       "notes": []
     },
     "build-renderer": {
@@ -705,14 +659,12 @@
     },
     "build-tool": {
       "why": "A command-line tool with validate / render / diff / moves.",
-      "rel": [],
       "notes": [
         "A product, not a skill. Nothing here rules it out — that is worth noticing. It is “too early”, which is a preference, not an edge."
       ]
     },
     "page-local": {
       "why": "Chosen. Works anywhere Node runs; a hosted page when one is there.",
-      "rel": [],
       "notes": []
     },
     "page-artifact": {
@@ -749,7 +701,6 @@
     },
     "data-json": {
       "why": "Chosen. Node parses it with nothing installed.",
-      "rel": [],
       "notes": []
     },
     "data-yaml": {
@@ -767,59 +718,46 @@
     },
     "data-embedded": {
       "why": "Data inside the page, as the artifact does today.",
-      "rel": [
-        [
-          "persist-scratch",
-          "conf",
-          "The page is the file, so regenerating the page overwrites the data.",
-          "argued"
-        ],
-        [
-          "persist-decision",
-          "conf",
-          "The page is the file, so a kept box has no separate record to keep.",
-          "argued"
-        ]
-      ],
       "notes": []
     },
     "depth-rows": {
       "why": "Chosen. Depth follows the row count, not a flag.",
-      "rel": [],
       "notes": []
     },
     "depth-flag": {
       "why": "You pass --deep or --quick.",
-      "rel": [],
       "notes": []
     },
     "depth-always": {
       "why": "Strawman: no tuning at all; every box is the full page.",
-      "rel": [],
       "notes": [
         "You asked for tuning so it “doesn’t go too deep on easy decisions”. Nothing structural enforces that — watch whether this strawman survives."
       ]
     },
     "name-eagle": {
       "why": "Chosen: your sentence.",
-      "rel": [],
       "notes": []
     },
     "name-morph": {
       "why": "The method’s name.",
-      "rel": [],
       "notes": []
     },
     "name-box": {
       "why": "Shortest.",
-      "rel": [],
       "notes": []
     }
   },
   "eyebrow": "Sheet E-01 · the skill, boxed on itself · 2026-08-23",
   "suspected": [
     "biased: Depth control → Coach layer: a three-row chat table with a withheld verdict may be a quiz nobody asked for. Argued once, not tested; not drawn as an edge because the depth row is a preference, not a constraint.",
-    "wrong: driver-both req persist-decision — the round trip needs a file, and both cells of that row write one. The edge named the wrong requirement. It is now a requirement on the file format, not on where the file lives. Retired 2026-08-30 when the row changed to scratch or kept."
+    "wrong: driver-both req persist-decision — the round trip needs a file, and both cells of that row write one. The edge named the wrong requirement. It is now a requirement on the file format, not on where the file lives. Retired 2026-08-30 when the row changed to scratch or kept.",
+    "weakly connected: driver-gen conf moves-six — the box places the six moves on the page's panel, and a generator still emits the page; nothing in the box says that page lacks the panel. Why: \"The moves are the panel reasoning about the set; a pure generator draws the grid and stops.\"",
+    "insufficient: coach-optin req build-renderer — the why argues only against Prompt-only, yet the requirement also rules out Full command-line tool, which nothing else rules out. Why: \"Withhold-then-reveal is page state; prompt-only re-implements it on every page.\"",
+    "biased: coach-always conf depth-rows — the entry above already rejects this reason as a preference, not a constraint; By row count still gives a page at four rows or more, where the quiz runs. Why: \"A three-row chat table with a withheld verdict is a quiz nobody asked for.\"",
+    "weakly connected: persist-scratch req data-json — where the file is written does not pick its format; the renderer does, and Skill + renderer already rules out YAML and Embedded in page with sourced edges. Why: \"A file needs a format the renderer reads with nothing installed.\"",
+    "weakly connected: persist-decision req data-json — where the file is written does not pick its format; the renderer does, and Skill + renderer already rules out YAML and Embedded in page with sourced edges. Why: \"A file needs a format the renderer reads with nothing installed.\"",
+    "weakly connected: data-embedded conf persist-scratch — the page itself can be the one file in scratch; the real loss is the round trip, which the data row problem names and which belongs to another row. Why: \"The page is the file, so regenerating the page overwrites the data.\"",
+    "weakly connected: data-embedded conf persist-decision — a project can keep the page as its one file, so the missing separate record does not stop a kept box; the real loss is the round trip. Why: \"The page is the file, so a kept box has no separate record to keep.\""
   ],
   "presets": [
     {

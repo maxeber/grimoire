@@ -1,11 +1,17 @@
 # SkillSpector baseline for this skill.
 #
 # You are reading this because you scanned this directory before installing
-# what is in it, which is the right thing to do with a skill. Three of
-# SkillSpector's rules have fired on the files here, and this file says why each
-# one is wrong, so you can disagree with a reason rather than with silence.
+# what is in it, which is the right thing to do with a skill. Seven of
+# SkillSpector's rules have fired on the files here, and this file says why for
+# each one, so you can disagree with a reason rather than with silence.
 #
-# Which of the three fire on any given scan depends on the prose, and the prose
+# Five are wrong. Two are not, and are accepted on purpose: this skill ships an
+# optional edge audit that sends a box's text to a model provider, but only
+# when you run it with a key and say yes. E1 names that transmission, and LP3
+# names that the skill declares no permission list. Read those two reasons
+# before you install.
+#
+# Which of the seven fire on any given scan depends on the prose, and the prose
 # is edited constantly. An entry matching nothing today is an argument that was
 # made once and kept.
 #
@@ -22,7 +28,7 @@
 # Nothing here was reworded to satisfy a pattern matcher.
 #
 # The repository this skill comes from carries the same file at its root,
-# covering four more rules that fire outside this directory. Its check refuses
+# covering three more rules that fire outside this directory. Its check refuses
 # a change that makes the two disagree.
 
 version: 2
@@ -33,5 +39,13 @@ rules:
     reason: "False positive. SKILL.md tells the agent that a preview pane may render the page without script, so do not judge it from one. That adds a caveat; it does not suppress one."
   - rule_id: "EA2"
     reason: "False positive. The why text on an edge in the example box file. It is content the renderer prints for a reader, not an instruction the agent acts on alone."
+  - rule_id: "EA3"
+    reason: "False positive. The phrase NOT LIMITED TO, in the warranty disclaimer of the SIL Open Font Licence that ships beside the vendored font faces. It is a legal text the licence requires us to carry verbatim, not an instruction an agent obeys, and its wording is not ours to change."
+  - rule_id: "LP3"
+    reason: "Accepted. The skill declares no permission list, because a permission list is one host's format and this skill's text runs in agents that read none. Its one script that reaches the network runs only after the user says yes, and SKILL.md and SECURITY.md say what it sends."
   - rule_id: "MP3"
     reason: "False positive. A comment in the page template describing how Reset discards the reader's overrides and Undo offers them back. It documents a button, not an agent's memory."
+  - rule_id: "PE3"
+    reason: "False positive. The string .env in the edge audit's setup message and in its test, which tell a user that a project .env file is not read. The script reads its key from the environment only and opens no credential file."
+  - rule_id: "E1"
+    reason: "Not a false positive, and accepted. The edge audit posts a box's text to the model provider's endpoint by design, and only when a user runs it with a key after saying yes. SECURITY.md, What the edge audit sends, states what leaves the machine and when."

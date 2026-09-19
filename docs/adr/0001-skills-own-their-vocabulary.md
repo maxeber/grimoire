@@ -62,6 +62,20 @@ forbade it there would forbid citation itself — and the renderer refuses a
 resolve to use the skill. A citation is a pointer for somebody checking a
 claim, and the `why` it sits beside still obeys the rule.
 
+**Code that calls a service names it, and prose still does not.** eagle-eye's
+edge audit, `skills/eagle-eye/audit.mjs`, posts a box's text to one model
+service, and it names that service twice: in the endpoint it posts to, and in
+the environment variable it reads the key from. Both names carry weight. A
+reader auditing the script must see where the box text goes, and a user setting
+the key must know which variable to set. A generic name for either would hide
+the one fact the person checking the code came for. The prose that tells the
+agent when to run it says *the model provider*, and the test above holds for it
+unchanged: the sentence stays true for a reader who has only this repository,
+and it stays true if the service changes. `tests/audit.test.mjs` fails if any
+other file under `skills/` names the provider. That is not the denylist argued
+against above. It does not guess at the next borrowed noun; it holds one
+name this record allowed to the one file this record allowed it in.
+
 **Some provenance is lost, and that is accepted.** `eagle-eye`'s own boxed
 design recorded three named tools as candidate host flows for its trigger. The
 labels now say *another host flow*. The argument survives in full — the row

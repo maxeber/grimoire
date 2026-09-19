@@ -2,11 +2,13 @@
 #
 # SkillSpector scans a skill the way this project describes the risk in
 # SECURITY.md: a skill is prose an agent obeys on somebody else's computer.
-# Scanned at the repository root it reports findings from six rules, and every
-# one of them is wrong. Seven are listed below: one of them fires nowhere at the
-# root today and is kept because a scan rooted at the skill may still see it.
-# This file says which seven and why, so a stranger reading it can disagree with
-# a named reason rather than with silence.
+# Scanned at the repository root it reports findings from eight rules. Seven of
+# them are wrong. One, E1, is right and accepted: eagle-eye's optional edge
+# audit sends a box's text to a model provider, by design, after the user says
+# yes. Ten are listed below: two fire nowhere at the root today and are kept
+# because a scan rooted at the skill sees them. This file says which ten and
+# why, so a stranger reading it can disagree with a named reason rather than
+# with silence.
 #
 # Every entry is keyed by rule identifier and nothing else. Two consequences,
 # both deliberate:
@@ -51,3 +53,9 @@ rules:
     reason: "False positive. The CONTRIBUTING.md rule forbidding a fixed path inside a skill, and the test proving that rule fires. A guard and its test, both reported as the risk they exist to prevent."
   - rule_id: "RP1"
     reason: "False positive. The README install command and quotations of it. skills is the Vercel Labs installer run through npx, not an MCP server, so there is no server version to pin."
+  - rule_id: "PE3"
+    reason: "False positive. The string .env in the edge audit's setup message and in its test, which tell a user that a project .env file is not read. The script reads its key from the environment only and opens no credential file."
+  - rule_id: "E1"
+    reason: "Not a false positive, and accepted. The edge audit posts a box's text to the model provider's endpoint by design, and only when a user runs it with a key after saying yes. SECURITY.md, What the edge audit sends, states what leaves the machine and when."
+  - rule_id: "LP3"
+    reason: "Accepted. The skill declares no permission list, because a permission list is one host's format and this skill's text runs in agents that read none. Its one script that reaches the network runs only after the user says yes, and SKILL.md and SECURITY.md say what it sends."

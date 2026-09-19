@@ -77,9 +77,9 @@ audit above reads one edge at a time. The *chain* finding reads the join.
 | `req` | `conf` | yes | The source **rules out** the far option. |
 | `conf` | anything | no | The source removes the target from the set. The target's own edges never fire. |
 
-That last row is the one that misleads. Count every option that is both a
-source and a target, and the example box — 34 edges — reports 28 chains. Apply
-the rule, and it reports one.
+That last row is the one that misleads. Count every pair where one edge's
+target is the next edge's source, and the example box — 27 edges — reports 15
+chains. Apply the rule, and it reports none.
 
 A chain can hold more than two edges. Each `req` edge carries the run forward,
 and one `conf` edge closes it. A run of `req` edges derives *requires*. A run
@@ -120,11 +120,16 @@ An edge that fails the audit goes to `suspected`. **Name the pattern first, so
 the debrief can count it:**
 
 ```text
-weakly connected: coh-step req deb-chat — a manual check does not force a manual record.
+weakly connected: coh-step req deb-chat — a manual check does not force a manual record. Why: "The check is manual, so the record is manual too."
 ```
 
-The pattern name, then the edge, then the why. The box file keeps this after
-the session ends, so it is the only record of what the audit rejected.
+The pattern name, then the edge, then the reason. Then `Why:` and the rejected
+`why`, word for word, in quotes. The box file keeps this after the session
+ends, so it is the only record of what the audit rejected.
+
+**Keep the rejected `why`.** A reason says what was wrong. It does not say
+what the edge said. A later test of the audit compares its scores against real
+rejected edges, and only the original sentence gives it one.
 
 ## Strawmen
 

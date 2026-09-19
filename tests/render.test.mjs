@@ -86,10 +86,10 @@ test('--check writes no page', () => {
 test('--sel reads a configuration back and reports the conflict it creates', () => {
   // This is the round trip the skill is built on: the page writes a restore
   // code, and the renderer reads the same code back to the same verdict.
-  const r = run(renderer, [exampleBox, '--sel', 'eagle-eye: coach-always']);
+  const r = run(renderer, [exampleBox, '--sel', 'eagle-eye: build-prompt']);
   assert.equal(r.code, 0);
   assert.match(r.stdout, /^verdict: does not hold \(1 change/m);
-  assert.match(r.stdout, /conflict: Coach layer: Always a quiz vs Depth control/);
+  assert.match(r.stdout, /conflict: Who drives it: Round-tripped vs How it is built: Prompt-only/);
 });
 
 test('--sel with no change returns the chosen verdict, not a changed one', () => {
@@ -120,7 +120,7 @@ test('the evidence finding counts the rows instead of naming them when the list 
   // can be read.
   const r = run(renderer, [exampleBox, '--check']);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /evidence for the verdict: .*The active edges at 10 of 13 rows are all argued./);
+  assert.match(r.stdout, /evidence for the verdict: .*The active edges at 7 of 13 rows are all argued./);
   assert.equal(r.stdout.includes('Measure those rows first'), false);
 });
 
@@ -268,9 +268,14 @@ test('a derived relation the box already states is reported as stated', () => {
   assert.match(out, /The box states this relation/);
 });
 
-test('the shipped example box reports its chain and holds no cycle', () => {
+// The example's one chain ran through "Opt-in predict requires Skill +
+// renderer". The #96 audit moved that edge to suspected as insufficient: it
+// also rules out the full command-line tool, and nothing in the box says why.
+// No req-first join is left, so the example reports no chain. The synthetic
+// boxes above still drive every chain rule.
+test('the shipped example box reports no chain and no cycle', () => {
   const out = run(renderer, [exampleBox, '--check']).stdout;
-  assert.match(out, /chain: Coach layer: Opt-in predict rules out Box file format: Embedded in page/);
+  assert.equal(/chain:/.test(out), false, out);
   assert.equal(/cycle:/.test(out), false, out);
 });
 

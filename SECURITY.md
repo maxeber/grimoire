@@ -4,9 +4,16 @@
 
 `grimoire` is a marketplace of Claude Code skills. A skill is prose plus, in
 eagle-eye's case, a renderer: `render.mjs` reads a box file — JSON — and writes
-one self-contained HTML page. There is no server, no account, no database, and
-nothing is uploaded anywhere. Node runs the renderer locally, and the reader
-opens the page in a browser.
+one self-contained HTML page. There is no server, no account and no database.
+Node runs the renderer locally, the reader opens the page in a browser, and
+neither the renderer nor the page makes a network request.
+
+**One script does send something, and only when somebody runs it.** eagle-eye
+ships an optional edge audit, `skills/eagle-eye/audit.mjs`. It posts a box's
+text to a model provider, with a key it reads from the environment. What it
+sends, when, to whom, and what guards the key are in
+[What the edge audit sends](#what-the-edge-audit-sends). Until version 0.20.0
+this paragraph said nothing was uploaded anywhere, and that was true.
 
 So the realistic risks are narrow, and worth naming precisely:
 
@@ -20,6 +27,11 @@ So the realistic risks are narrow, and worth naming precisely:
 - **A dependency reaching a reader.** The renderer imports node built-in
   modules only, so there is no dependency tree to poison today. That is a fact
   about now, not a guarantee about later.
+- **A credential in the environment that a script in the tree reads.**
+  `audit.mjs` reads `TYPESAFE_API_KEY` and sends it as a bearer token. A change
+  to that script, or to the endpoint it posts to, is a change that could send
+  the key somewhere else. A reviewer should read any diff to that file as a
+  change to this one.
 
 ## What the renderer actually does with box text
 
@@ -177,6 +189,68 @@ parses one. What is machine-checked is the narrower shape: no `esc(...)` call
 appears inside an attribute value in the template. The full claim is still read
 by a reviewer, and a new `="${` there is a change to this file.
 
+## What the edge audit sends
+
+eagle-eye's step 4 checks every `argued` edge against eight weakness patterns.
+`skills/eagle-eye/audit.mjs` can do a first pass: it asks a small decision
+model, Jev from TypeSafe, eight yes/no questions per edge, and ranks the edges
+for rereading. It is the only file in this repository that opens a connection,
+and it is opt-in twice over.
+
+- **When.** Only when somebody runs it with a box path and a key in the
+  environment. The skill tells the agent to probe for a key, offer the audit in
+  one sentence that says the box's text leaves the machine, and run it only on
+  a yes. Nothing else in the tree calls it: not the renderer, not the page, not
+  `scripts/check.mjs`, not CI. **The test suite never reaches the network.** It
+  runs the script against a fake bound to `127.0.0.1` in the test process, and
+  clears any real key from the child's environment first.
+- **What.** One `POST` per argued edge, and one per shuffled control, to
+  `https://api.typesafe.ai/v1/systemone`. Each body carries the box's
+  `problem`; the edge's `why` and the relation it claims; and, for both of its
+  options, the label, the row name and question, the option's own `why`,
+  `notes` and `src`. Nothing else from the disk is read into a request.
+  `--dry-run` prints one body and sends nothing, so a reader can see exactly
+  this before any of it leaves. It also states how many requests a real run
+  sends and their rough size, and the skill's offer repeats that count. It
+  names no price: the provider sets the price and can change it, and a count
+  stays true.
+- **To whom.** TypeSafe. What the provider does with the text is its policy,
+  not this repository's. A box holds whatever its author wrote into it, so do
+  not audit a box whose text you would not send.
+- **The key.** Read from `TYPESAFE_API_KEY` and nowhere else: not a flag, not a
+  file. It is never printed and never written. With no key the script sends
+  nothing, exits `3` and prints how to set one: the variable, the two places a
+  key persists across sessions, that a project `.env` is not read, and never
+  to paste the key into a chat. The skill tells the agent to pass those steps
+  on, only when the user asks for the audit, and never to ask for the key or
+  write it into a file. A key typed into a chat lands in the transcript. `--probe` answers
+  `yes` or `no`, never the value, and opens no connection. The tests hold all
+  four, with a fake key they look for in every stream and every cache file.
+- **The override.** `EAGLE_EYE_AUDIT_ENDPOINT` exists so the tests can point
+  the script at the fake. Whatever URL it names receives the key and the box
+  text, so it accepts only an address in `127.0.0.0/8`, or `::1`. Not the name
+  `localhost`, which a hosts file can point anywhere. It is checked before the
+  key is read. Anything else exits `5` with nothing read and
+  nothing sent.
+- **The cache.** Responses are cached under the system temporary directory,
+  keyed by a hash of the endpoint and the body, so a second run costs nothing.
+  A cache file holds the eight probabilities and nothing else: no box text, no
+  key. `EAGLE_EYE_AUDIT_CACHE` moves it, which is how each test starts from an
+  empty one.
+- **What it cannot change.** It never writes the box file, and a test compares
+  the bytes before and after. A score never moves a tier, because `measured`
+  means somebody ran something and a probability ran nothing.
+- **What it refuses.** The request and response shapes are pinned in the
+  script against the provider's documented HTTP contract. A response without
+  an `answers` field, or with an answer that is not a probability, is refused
+  with a message and exit `4`, never guessed at. A network error or a `5xx` is
+  retried once; a second one fails the same way.
+
+**The provider's name appears in that script and nowhere else under
+`skills/`.** The prose says *the model provider*. Why code may name a service
+and prose may not is argued in
+[`docs/adr/0001-skills-own-their-vocabulary.md`](docs/adr/0001-skills-own-their-vocabulary.md).
+
 ## Reporting a vulnerability
 
 Please use GitHub's **private vulnerability reporting** — the "Report a
@@ -193,7 +267,8 @@ fix and a line in this file that records it.
 ## Scope
 
 **In scope:** anything in this repository — both manifests, every `SKILL.md`,
-the renderer, the template, the check scripts, and the CI workflows.
+the renderer, the template, the edge audit, the check scripts, and the CI
+workflows.
 
 **Out of scope:** Claude Code itself, your own box files and what you choose to
 put in them, and wherever you host a page the renderer wrote.
@@ -327,7 +402,7 @@ compares a skill's behaviour against its stated purpose, and is arguably the
 failure this repository could actually ship — needs a provider credential and
 is a separate decision nobody has taken.
 
-**Seven rules are baselined, and every finding from them is wrong.** The numbers
+**Seven rules were baselined first, and every finding from them is wrong.** The numbers
 move, and watching them move is the point. Triage counted fifteen findings from
 six rules at an earlier commit. The first run of this workflow counted
 twenty-two from five, on a tree that had grown a workflow, two baselines, a gate
@@ -356,6 +431,22 @@ writing:
 by rule: AR2×7, AS3×5, EA3×2, MP3×1, RA2×2, RP1×6
 ```
 
+**Then the edge audit brought three more, and two of them are right.** A
+script that reads a key and posts a box's text to a model provider is exactly
+what this scanner exists to see, and it saw it. `E1` fires on the endpoint in
+`audit.mjs` and on its quotation in this file: data does leave for that URL, on
+purpose, after a yes, as [What the edge audit sends](#what-the-edge-audit-sends)
+states. `LP3` fires only when the skill directory is scanned on its own: the
+skill declares no permission list, and a permission list is one host's format
+that the portable skill text does not carry. Both are **accepted rather than
+reasoned away**, and their reasons say so. The third, `PE3`, is wrong: it reads
+the string `.env` in the setup message that tells a user a project `.env` is
+*not* read. Measured with the pinned scanner on this branch, at the root:
+
+```text
+by rule: AR2×7, AS3×7, E1×2, EA3×5, MP3×1, PE3×4, RA2×2, RP1×6
+```
+
 So: **the counts drift as prose is edited, and the rule identifiers do not.**
 That is the whole case for keying the baseline on the rule rather than on the
 text a fingerprint would bind to. A new rule cannot appear quietly — it fails
@@ -363,9 +454,9 @@ the build, and costs one more entry below with a written reason, never a
 rewording. The gate prints the tally on every run, so drift is visible in the
 log rather than discovered later.
 [`.skillspector-baseline.yaml`](.skillspector-baseline.yaml) suppresses the
-seven by rule identifier, with a reason per entry:
+ten by rule identifier, with a reason per entry:
 
-| Rule | | Why it is a false positive |
+| Rule | | Why it is suppressed |
 | --- | --- | --- |
 | `AR2` | Anti-Refusal Statement | `SKILL.md` tells the agent that a preview pane may render the page without script, so do not judge it from one. It adds a caveat; it does not suppress one. |
 | `AS3` | Skill Enumeration | A `README.md` line naming the one skill this repository ships, and the decision records quoting it. Naming your own product is not enumerating somebody else's. |
@@ -374,6 +465,9 @@ seven by rule identifier, with a reason per entry:
 | `MP3` | Memory Manipulation | A comment in the page template describing how **Reset** discards the reader's overrides and **Undo** offers them back. It documents a button. |
 | `RA2` | Session Persistence | The `CONTRIBUTING.md` rule forbidding a fixed path inside a skill, and the test proving that rule fires. A guard and its test, reported as the risk they prevent. |
 | `RP1` | Unpinned MCP server | The `README.md` install command and quotations of it. `skills` is the Vercel Labs installer run through `npx`, not an MCP server. |
+| `PE3` | Credential Access | The string `.env` in the edge audit's setup message and its test, which tell a user a project `.env` is **not** read. The script reads its key from the environment only. |
+| `E1` | External Transmission | **Not a false positive; accepted.** The edge audit posts a box's text to the model provider's endpoint, only when run with a key after a yes. See [What the edge audit sends](#what-the-edge-audit-sends). |
+| `LP3` | MCP Least Privilege | **Accepted.** The skill declares no permission list, because that list is one host's format and the skill text runs in agents that read none. Fires only on a scan of the skill directory. |
 
 **Keyed by rule identifier and not by fingerprint**, which is a trade stated
 rather than hidden. A fingerprint is bound to the text it was taken from and
@@ -390,7 +484,7 @@ Letting a regex edit that prose is the trap, and refusing it is a decision.
 finds a baseline only at the top of the directory it was pointed at, and a
 reader scanning a skill is pointed at the skill. So
 [`skills/eagle-eye/.skillspector-baseline.yaml`](skills/eagle-eye/.skillspector-baseline.yaml)
-repeats the three rules that fire inside it, and
+repeats the seven rules that fire inside it, and
 [`skills/groundtrack/.skillspector-baseline.yaml`](skills/groundtrack/.skillspector-baseline.yaml)
 the one that fires inside it. `node scripts/check.mjs` fails when a skill file
 disagrees with the root — same rule, same words, same scope — so a suppression
@@ -595,6 +689,15 @@ a threat model:
 - **A skill you chose to install.** Installing a plugin means an agent reads its
   prose and acts on it. That is the product working as intended. Read a skill
   before you install it, here or anywhere.
+- **What the provider does with a box you chose to audit.** The audit sends the
+  text listed above, and only after a yes. Past that point the text is under
+  the provider's policy. This repository cannot see or change it.
+- **Another account on the same machine.** The default cache sits under the
+  system temporary directory, and on some systems other local accounts can
+  write there. The script creates its folder readable by its owner only, but it
+  does not check a folder that already exists. A planted answer changes a
+  ranking and nothing else: a score moves no tier and writes no box. Set
+  `EAGLE_EYE_AUDIT_CACHE` to a folder you own if that matters to you.
 - **A malicious maintainer account.** Branch protection raises the cost of a bad
   commit. It does not survive a stolen account with admin rights.
 - ~~**The one request the page makes when you open it.**~~ **Closed.** This

@@ -1,11 +1,12 @@
 // Shared paths and one process runner for the test files.
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const root = join(fileURLToPath(import.meta.url), '..', '..');
 export const renderer = join(root, 'skills', 'eagle-eye', 'render.mjs');
+export const audit = join(root, 'skills', 'eagle-eye', 'audit.mjs');
 export const check = join(root, 'scripts', 'check.mjs');
 export const exampleBox = join(root, 'skills', 'eagle-eye', 'examples', 'eagle-eye-skill.box.json');
 export const buildPages = join(root, 'scripts', 'build-pages.mjs');
@@ -363,7 +364,33 @@ export function callGraph(prog, entry, calls, errors = []) {
 // reaches the test step itself. Only do that against a copied tree that has no
 // tests/ directory; against this one it recurses.
 export function run(script, args = [], opts = {}) {
-  const env = { ...process.env, GRIMOIRE_IN_TEST: '1', ...opts.env };
+  const env = childEnv(opts.env);
+  const r = spawnSync(process.execPath, [script, ...args], {
+    cwd: opts.cwd || root,
+    env,
+    encoding: 'utf8',
+  });
+  if (r.error) throw r.error;
+  return { code: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
+}
+
+// The same run, without blocking. A test that serves the script from this
+// process — the fake the audit talks to — cannot use `run`: spawnSync holds
+// the event loop, so the server never answers and the child waits forever.
+export function runAsync(script, args = [], opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [script, ...args], { cwd: opts.cwd || root, env: childEnv(opts.env) });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', d => (stdout += d));
+    child.stderr.setEncoding('utf8').on('data', d => (stderr += d));
+    child.on('error', reject);
+    child.on('close', code => resolve({ code, stdout, stderr }));
+  });
+}
+
+function childEnv(extra) {
+  const env = { ...process.env, GRIMOIRE_IN_TEST: '1', ...extra };
   for (const [k, v] of Object.entries(env)) if (v === null) delete env[k];
   // Node sets NODE_TEST_CONTEXT for anything a test file spawns, and a
   // `node --test` that sees it refuses to run: "run() is being called
@@ -372,11 +399,5 @@ export function run(script, args = [], opts = {}) {
   // which is how the test for a failing suite first went green. The scripts
   // spawned here are not test files, so the variable does not belong to them.
   delete env.NODE_TEST_CONTEXT;
-  const r = spawnSync(process.execPath, [script, ...args], {
-    cwd: opts.cwd || root,
-    env,
-    encoding: 'utf8',
-  });
-  if (r.error) throw r.error;
-  return { code: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
+  return env;
 }

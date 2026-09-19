@@ -1,6 +1,6 @@
 {
   "title": "Publish eagle-eye as a public repo",
-  "eyebrow": "2026-08-26 · rev D · scope row still holds, with a note",
+  "eyebrow": "2026-09-19 · rev E · argued edges audited, nine moved to suspected (#96)",
   "problem": "The skill works on one machine, and nobody else can get it. A public repository makes strangers the readers. They install it, run it, trust it, and report a flaw to a person they have never met. This box decides the install route, the shape of the repository, and the licence. It also decides the support the author promises and the guard between reports.",
   "who": "The author, and any stranger who installs the skill or reports a flaw in it.",
   "when": "Before the first public commit, and the author settled it on 2026-08-26.",
@@ -325,14 +325,6 @@
     },
     "inst-npm": {
       "why": "npm gives a registry name, a version number, and one familiar command.",
-      "rel": [
-        [
-          "path-npx",
-          "req",
-          "The package publishes a command. The skill must call that command, not a file path.",
-          "argued"
-        ]
-      ],
       "notes": [
         "The renderer imports only node built-in modules. Verified: no external import in render.mjs or lib/eagle-eye.js.",
         "So npm adds a name and a version, and nothing more. It still cannot place SKILL.md where Claude Code reads it."
@@ -354,21 +346,7 @@
       ]
     },
     "inst-readme": {
-      "why": "The none answer. The repo shows the files and says nothing about the install.",
-      "rel": [
-        [
-          "sup-issues",
-          "conf",
-          "Every reader asks the same install question, so the tracker fills with one question.",
-          "argued"
-        ],
-        [
-          "sup-open",
-          "conf",
-          "A contributor cannot patch a skill they failed to install.",
-          "argued"
-        ]
-      ]
+      "why": "The none answer. The repo shows the files and says nothing about the install."
     },
     "path-hard": {
       "why": "The command in SKILL.md today. It is correct for the author's own machine.",
@@ -410,12 +388,6 @@
           "The check command is the renderer, so CI has nothing left to run.",
           "sourced",
           "render.mjs:4-6 — --check validates and prints the findings, and writes nothing"
-        ],
-        [
-          "proof-pages",
-          "conf",
-          "With no renderer there is no example page to host.",
-          "argued"
         ]
       ],
       "notes": [
@@ -430,14 +402,6 @@
     },
     "scope-bundle": {
       "why": "The author holds three skills. One repo publishes all of them at once.",
-      "rel": [
-        [
-          "rel-tags",
-          "conf",
-          "Three skills change on three schedules, so one version number describes none of them.",
-          "argued"
-        ]
-      ],
       "notes": [
         "The other two skills are english-please and explaining-technical-work.",
         "A reader who wants one skill gets three."
@@ -469,7 +433,7 @@
         [
           "proof-pages",
           "conf",
-          "You cannot publish Pages from a repo you do not own.",
+          "Under this option the author publishes no repository, so there is no repository to serve Pages from.",
           "argued"
         ]
       ]
@@ -498,13 +462,7 @@
         [
           "inst-plugin",
           "conf",
-          "An install copies the files to another machine, and no licence permits that copy.",
-          "argued"
-        ],
-        [
-          "sup-open",
-          "conf",
-          "A contributor cannot grant rights to a project that states no terms.",
+          "With no licence the work stays all rights reserved. A plugin install copies it to the reader without that permission.",
           "argued"
         ]
       ]
@@ -528,15 +486,7 @@
       ]
     },
     "proof-thin": {
-      "why": "The none answer. One paragraph, and the files speak for themselves.",
-      "rel": [
-        [
-          "sup-open",
-          "conf",
-          "A contributor cannot match a style that the repo never states.",
-          "argued"
-        ]
-      ]
+      "why": "The none answer. One paragraph, and the files speak for themselves."
     },
     "sup-open": {
       "why": "An open door. Issues and patches both welcome, with written rules.",
@@ -557,15 +507,7 @@
       ]
     },
     "sup-archive": {
-      "why": "The none answer. Publish once, then set the repo read-only.",
-      "rel": [
-        [
-          "rel-ci",
-          "conf",
-          "An archived repo accepts no commits, so a check on push never runs.",
-          "argued"
-        ]
-      ]
+      "why": "The none answer. Publish once, then set the repo read-only."
     },
     "rel-main": {
       "why": "The later answer. Ship now, and add discipline when somebody else uses the tool.",
@@ -587,15 +529,7 @@
       ]
     },
     "sec-none": {
-      "why": "The none answer. Publish the code and name no channel.",
-      "rel": [
-        [
-          "sup-open",
-          "conf",
-          "An open door with no private channel sends the first flaw to a public issue.",
-          "argued"
-        ]
-      ]
+      "why": "The none answer. Publish the code and name no channel."
     },
     "sec-report": {
       "why": "GitHub private vulnerability reporting gives a maintainer-only channel. A short file names it and states the scope.",
@@ -647,7 +581,16 @@
   },
   "suspected": [
     "disconnected from context: proof-shots conf rel-main — stale screenshots are a maintenance cost, not a rule that either option breaks.",
-    "weakly connected: inst-plugin req rel-ci — a plugin install does not need a check on push. The two are independent."
+    "weakly connected: inst-plugin req rel-ci — a plugin install does not need a check on push. The two are independent.",
+    "wrong: inst-npm req path-npx — the npm command copies the skill files into place, so the renderer sits in the skill base directory. Why: \"The package publishes a command. The skill must call that command, not a file path.\"",
+    "weakly connected: inst-readme conf sup-issues — a tracker full of one question is a cost, not a rule that breaks the set. Why: \"Every reader asks the same install question, so the tracker fills with one question.\"",
+    "weakly connected: inst-readme conf sup-open — a contributor clones the repository to patch it, and needs no install. Why: \"A contributor cannot patch a skill they failed to install.\"",
+    "wrong: path-inline conf proof-pages — with no renderer the agent writes the page itself, so a page still exists to host. Why: \"With no renderer there is no example page to host.\"",
+    "weakly connected: scope-bundle conf rel-tags — the chosen marketplace repo also ships several skills under one version, and it carries no such edge. Why: \"Three skills change on three schedules, so one version number describes none of them.\"",
+    "weakly connected: lic-none conf sup-open — nothing in the box stops a project with no licence from merging patches. The gap is a cost, not a rule. Why: \"A contributor cannot grant rights to a project that states no terms.\"",
+    "wrong: proof-thin conf sup-open — the open door already ships a contributing file that states the rules. Why: \"A contributor cannot match a style that the repo never states.\"",
+    "weakly connected: sup-archive conf rel-ci — the option publishes first and archives after, so CI runs until the archive. An idle check is a cost, not a rule. Why: \"An archived repo accepts no commits, so a check on push never runs.\"",
+    "weakly connected: sec-none conf sup-open — a first flaw in a public issue is a risk, not a set that fails. Issues only has the same tracker and no edge. Why: \"An open door with no private channel sends the first flaw to a public issue.\""
   ],
   "presets": [
     {
@@ -748,7 +691,7 @@
     },
     {
       "title": "Publish with no licence",
-      "text": "The strawman run. Two edges reject it, and both are argued, not measured.",
+      "text": "The strawman run. One edge rejects it, and it is argued, not measured.",
       "steps": [
         {
           "label": "Drop the licence file",

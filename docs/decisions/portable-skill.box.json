@@ -1,6 +1,6 @@
 {
   "title": "What is left after npx skills add",
-  "eyebrow": "2026-08-26 · rev C · layout row reopened; a false constraint removed",
+  "eyebrow": "2026-09-19 · rev D · argued edges audited, four moved to suspected (#96)",
   "problem": "The skills installer copies a skill into agents that are not Claude Code. The skill text names a slash command, a preview pane, and a Windows command that another agent does not have. The renderer is a Node script inside the skill. A reader without the skill cannot render a box. This box decides what the text says, what the repository ships, and what the README tells a stranger first.",
   "who": "A reader who installs the skill into an agent that is not Claude Code.",
   "when": "Before the README told a stranger what to run, and the author settled it on 2026-08-26.",
@@ -168,13 +168,7 @@
         [
           "lead-skills",
           "conf",
-          "A route sold to every agent cannot open with text that tells them to type a Claude Code slash command.",
-          "argued"
-        ],
-        [
-          "pkg-bin",
-          "conf",
-          "A reader running the package outside any agent cannot act on advice about an in-app preview pane.",
+          "The installer serves every agent, and the kept lines tell those readers to type a slash command their agent lacks.",
           "argued"
         ]
       ]
@@ -196,14 +190,6 @@
     },
     "pkg-none": {
       "why": "The none answer. The installer already delivers the renderer to every agent that installs the skill.",
-      "rel": [
-        [
-          "lead-split",
-          "conf",
-          "A table by agent needs a row for the reader who wants only the renderer, and without a package that row has no command.",
-          "argued"
-        ]
-      ],
       "notes": [
         "The author picked this strawman. The skill says to give the reason to reject a strawman, or to pick it.",
         "The reason it survives: the installer already delivers the renderer to every agent that installs the skill.",
@@ -230,15 +216,7 @@
       ]
     },
     "lead-none": {
-      "why": "The none answer. Describe three routes and let the reader choose.",
-      "rel": [
-        [
-          "voice-neutral",
-          "conf",
-          "Neutral text assumes the reader arrived by a route the project did not name, so the README must name one.",
-          "argued"
-        ]
-      ]
+      "why": "The none answer. Describe three routes and let the reader choose."
     },
     "layout-nested": {
       "why": "Both install routes find the skill where it is. Links in the README fix the part the measurement does not cover.",
@@ -264,14 +242,6 @@
     },
     "layout-later": {
       "why": "The later answer. No move, no links, and no cost until somebody is actually lost.",
-      "rel": [
-        [
-          "lead-skills",
-          "conf",
-          "The first route sends a reader to this repository, so the README must show where the skill is.",
-          "argued"
-        ]
-      ],
       "notes": [
         "Nobody reports a repository they gave up on. The signal this waits for does not arrive."
       ]
@@ -289,7 +259,11 @@
   "suspected": [
     "layout-single conf scope-market — the target sits in box 1, so this box cannot draw the edge. It is the strongest argument against layout-single and it is recorded here instead.",
     "pkg-bin conf layout-nested — a package root and a nested skill are unrelated; the package reads the renderer by path either way.",
-    "layout-single conf scope-market — recorded earlier as the strongest argument against a root layout. It was false: one plugin holds many skills, so growth never required the nesting."
+    "layout-single conf scope-market — recorded earlier as the strongest argument against a root layout. It was false: one plugin holds many skills, so growth never required the nesting.",
+    "weakly connected: voice-keep conf pkg-bin — the package reader runs the renderer with no agent and no skill involved, so the kept skill lines never reach them. Why: \"A reader running the package outside any agent cannot act on advice about an in-app preview pane.\"",
+    "weakly connected: pkg-none conf lead-split — a table by agent has no row for a reader with no agent, and the pkg-none notes give that reader a route: clone the repository. Why: \"A table by agent needs a row for the reader who wants only the renderer, and without a package that row has no command.\"",
+    "weakly connected: lead-none conf voice-neutral — neutral wording changes how the skill is used, not how the reader installed it, and lead-none still names all three routes. Why: \"Neutral text assumes the reader arrived by a route the project did not name, so the README must name one.\"",
+    "weakly connected: layout-later conf lead-skills — the installer finds the skill four directories down, as measured, so the installer route does not need the README to show where the skill is. Why: \"The first route sends a reader to this repository, so the README must show where the skill is.\""
   ],
   "presets": [
     {
@@ -317,7 +291,7 @@
     },
     {
       "title": "Leave the Claude wording",
-      "text": "The strawman run. Two edges reject it, and both are argued, not measured.",
+      "text": "The strawman run. One edge rejects it, and it is argued, not measured.",
       "steps": [
         {
           "label": "Keep the four lines",
