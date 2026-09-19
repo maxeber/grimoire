@@ -31,12 +31,13 @@
 // The skill prose says "the model provider" and never this name; see
 // docs/adr/0001-skills-own-their-vocabulary.md for why code may and prose may not.
 //
-// What was measured, and what that allows (issue #96): the model can rank a
-// box's argued edges by how well each `why` produces its relation, when it sees
-// rich state and when the ranking is calibrated per box. A fixed cut-off did
-// not transfer between two boxes, so every run scores the box's own shuffled
-// controls and flags an argued edge that scores among them. A score is a place
-// to reread first. It never moves a tier, and this file never writes a box.
+// What it is for (issue #96): a ranking of a box's argued edges, by how well
+// each `why` produces its relation, so the agent knows which to reread first.
+// It calibrates against the box's own shuffled controls rather than a fixed
+// cut-off. With MIN_CONTROLS or more, an argued edge that scores at or above
+// the lowest control is flagged, including one above the highest. With fewer,
+// the ranking prints as uncalibrated and flags nothing. A score is a place to
+// reread first. It never moves a tier, and this file never writes a box.
 //
 // Environment:
 //
@@ -67,18 +68,15 @@ const MIN_CONTROLS = 4;
 
 // The pattern the controls are built to show, and so the one the ranking and
 // the flag read. A shuffled edge keeps a true `why` and points it at the wrong
-// target, which is the definition of weakly connected. It is also the one
-// pattern the measurement separated: the other seven either sat in noise or
-// only caught planted rude edges.
+// target, which is the definition of weakly connected. The other seven
+// patterns have no control built for them, so they print unflagged.
 const CALIBRATED = 'weakly connected';
 
 const RETRY_DELAY_MS = 250;
 
 // A rough size for the dry run's estimate, not a tokenizer. It is labelled as
-// an estimate wherever it prints. Three, not the usual four: the #96 study's
-// service counted about 1,400 input tokens a request, and four characters a
-// token put these bodies near 1,000. An estimate that errs high is the safe
-// one to show before a yes.
+// an estimate wherever it prints. Three, not the usual four, so the estimate
+// errs high: that is the safe one to show before a yes.
 const CHARS_PER_TOKEN = 3;
 
 const EXIT = { ok: 0, box: 1, usage: 2, noKey: 3, service: 4, endpoint: 5 };
