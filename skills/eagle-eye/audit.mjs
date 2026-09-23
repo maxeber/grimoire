@@ -20,7 +20,8 @@
 //   1  the box file cannot be read as a box
 //   2  a usage error
 //   3  no key in the environment. Nothing was sent.
-//   4  the service failed or refused, or its answer did not have the pinned shape
+//   4  the service failed or refused, its answer did not have the pinned shape,
+//      or two answers in one run named different models
 //   5  the endpoint override is not a loopback address. Nothing was read or sent.
 //
 // **This is the one file under skills/ that names the service it calls.** The
@@ -43,9 +44,13 @@
 // **Every request is charged to the user's key** (issue #106). So the dry run
 // says so before a yes, and a real run ends by saying how many it sent and
 // which model version answered. Nothing is cached: each run asks for every
-// edge and every control anew. The alias can still move mid-run, and the
-// closing line names both versions when it does. Whether a cache should come
-// back is issue #107.
+// edge and every control anew. Whether a cache should come back is issue #107.
+//
+// **One run, one model** (issue #104). `jev-latest` is an alias, and every
+// answer must name the model that gave it. The report names that model. The
+// alias can move mid-run, and then the calibration would compare one model's
+// edges with another's controls. So the first answer that names a second
+// model stops the run with exit 4, and no ranking prints.
 //
 // Environment:
 //
@@ -369,7 +374,12 @@ const key = process.env[KEY_VAR].trim();
 // --- the service -------------------------------------------------------------
 
 // The pinned response shape: `answers`, holding every pattern asked, each a
-// Noul with a probability. Returns the scores or a reason it is refused.
+// Noul with a probability, and `model`, naming the version that answered.
+// The service documents `model` as required. Returns the scores, or a reason
+// it is refused. `post` records the model, so a refused answer still names it.
+// A model name the report can print: a string with something besides spaces.
+const named = model => typeof model === 'string' && model.trim() !== '';
+
 function scoresFrom(json) {
   if (!json || typeof json !== 'object' || !json.answers || typeof json.answers !== 'object') {
     return { refused: 'the response has no answers field' };
@@ -382,14 +392,18 @@ function scoresFrom(json) {
     }
     scores[n] = a.noul;
   }
+  if (!named(json.model)) {
+    return { refused: 'the response names no model, so the report could not say what scored it' };
+  }
   return { scores };
 }
 
 // What the run has spent, for the closing line. A request counts once the
 // service answered it with any status, because that is a request it received.
-// A connection that never reached the service counts for nothing. `model` is
-// the version the service says answered, when it says one: `jev-latest` is an
-// alias, and the answer is the only place the real version shows.
+// A connection that never reached the service counts for nothing. `models`
+// holds each version the service said answered, in the order it said them:
+// `jev-latest` is an alias, and the answer is the only place the real version
+// shows. A run that ranks holds exactly one.
 let sent = 0;
 const models = new Set();
 
@@ -432,7 +446,7 @@ async function post(body) {
     } catch {
       return { refused: 'the response is not JSON' };
     }
-    if (json && typeof json.model === 'string' && json.model) models.add(json.model);
+    if (json && named(json.model)) models.add(json.model);
     return scoresFrom(json);
   }
 }
@@ -440,21 +454,18 @@ async function post(body) {
 async function score(e) {
   const { scores, refused } = await post(bodyFor(e));
   if (refused) throw new Refused(refused);
+  if (models.size > 1) {
+    throw new Refused(`the service answered with ${[...models].join(' and ')}, so the scores do not compare`);
+  }
   return scores;
 }
 
 // The closing line, on standard error beside any refusal, so it prints whether
 // the run ranked or stopped partway. The agent passes it to the user: it is
-// what the run spent. Two versions in one run mean the alias moved mid-run,
-// and the calibration compared one model's edges with another's controls.
+// what the run spent.
 function spent() {
   if (!sent) return;
-  const by = [...models];
-  const answered = !by.length
-    ? ''
-    : by.length === 1
-      ? ` Answered by ${by[0]}.`
-      : ` Answered by ${by.join(' and ')}: the version changed during the run, so the scores may not compare.`;
+  const answered = models.size ? ` Answered by ${[...models].join(' and ')}.` : '';
   console.error(`Sent ${requests(sent)} to TypeSafe, charged to your key.${answered}`);
 }
 
@@ -493,7 +504,8 @@ function report() {
   // out, and an id names nothing to the user. The --json sidecar keeps ids.
   const f2 = p => p.toFixed(2);
   const verb = { conf: 'rules out', req: 'requires' };
-  const lines = [box.title ?? boxPath, `${ranked.length} argued edges, ranked by the ${CALIBRATED} score.`];
+  const [model] = models;
+  const lines = [box.title ?? boxPath, `${ranked.length} argued edges, ranked by the ${CALIBRATED} score.`, `Scored by ${model}.`];
   if (calibrated) {
     lines.push(
       `Calibrated: ${scoredControls.length} shuffled controls score ${f2(threshold)} to ${f2(Math.max(...controlScores))} on ${CALIBRATED}. An edge at ${f2(threshold)} or above is flagged. The floor is ${MIN_CONTROLS} controls.`,
@@ -519,6 +531,7 @@ function report() {
     const edge = e => ({ source: e.source, kind: e.kind, target: e.target, why: e.why, scores: e.scores });
     const out = {
       box: boxPath,
+      model,
       pattern: CALIBRATED,
       calibrated,
       floor: MIN_CONTROLS,

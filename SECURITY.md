@@ -243,9 +243,11 @@ and it is opt-in twice over.
   means somebody ran something and a probability ran nothing.
 - **What it refuses.** The request and response shapes are pinned in the
   script against the provider's documented HTTP contract. A response without
-  an `answers` field, or with an answer that is not a probability, is refused
-  with a message and exit `4`, never guessed at. A network error or a `5xx` is
-  retried once; a second one fails the same way.
+  an `answers` field, with an answer that is not a probability, or naming no
+  model, is refused with a message and exit `4`, never guessed at. So is a
+  run whose answers name two models, because its scores do not compare
+  (#104). A network error or a `5xx` is retried once; a second one fails the
+  same way.
 
 **The provider's name appears in that script and nowhere else under
 `skills/`.** The prose says *the model provider*. Why code may name a service

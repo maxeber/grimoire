@@ -239,6 +239,8 @@ test('the kept decisions box ranks, calibrates on six shuffled controls, and fla
     // The run ends by saying what it spent and which version answered.
     assert.match(r.stderr, /^Sent 11 requests to TypeSafe, charged to your key\. Answered by fake\.$/m);
 
+    // The report names the one model that scored every edge and every control.
+    assert.match(r.stdout, /^Scored by fake\.$/m);
     assert.match(r.stdout, /Calibrated: 6 shuffled controls score 0\.60 to 0\.80 on weakly connected/);
     assert.match(r.stdout, /The floor is 4 controls\./);
     assert.match(r.stdout, /It is not a verdict/);
@@ -256,6 +258,7 @@ test('the kept decisions box ranks, calibrates on six shuffled controls, and fla
     assert.ok(all[1].startsWith('    ') && all[1].includes(UNDER));
 
     const json = JSON.parse(readFileSync(sidecar, 'utf8'));
+    assert.equal(json.model, 'fake');
     assert.equal(json.calibrated, true);
     assert.equal(json.floor, 4);
     assert.equal(json.edges.length, 5);
@@ -287,42 +290,67 @@ test('a box with no sourced edge gets an uncalibrated ranking, and says so in on
   }
 });
 
-test('nothing is cached: a second run asks for every edge and every control again', async () => {
+test('nothing is cached: a second run asks for every edge and every control again, and names the model that answered it', async () => {
   // A cache served one model's answers after the alias had moved on (#106).
-  // Every run now asks the service for every edge and every control anew.
-  const svc = await fake(decisionsReply());
+  // Every run now asks the service for every edge and every control anew, so
+  // a run after the alias moves is scored by the new model alone (#104).
+  let model = 'jev-1.13.0';
+  const reply = decisionsReply();
+  const svc = await fake(body => {
+    const r = reply(body);
+    r.body.model = model;
+    return r;
+  });
   try {
     const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY };
     const first = await runAudit([decisions], env);
     assert.equal(first.code, 0, first.stderr);
+    assert.match(first.stdout, /^Scored by jev-1\.13\.0\.$/m);
+    model = 'jev-1.14.0';
     const second = await runAudit([decisions], env);
     assert.equal(second.code, 0, second.stderr);
     assert.equal(svc.seen.length, 22, 'the second run was answered from somewhere other than the service');
-    assert.equal(second.stdout, first.stdout);
-    assert.match(second.stderr, /^Sent 11 requests to TypeSafe/m);
+    assert.match(second.stdout, /^Scored by jev-1\.14\.0\.$/m);
+    assert.doesNotMatch(second.stdout, /jev-1\.13\.0/);
+    assert.equal(second.stdout.replace('jev-1.14.0', 'jev-1.13.0'), first.stdout);
+    assert.match(second.stderr, /^Sent 11 requests to TypeSafe, charged to your key\. Answered by jev-1\.14\.0\.$/m);
   } finally {
     await svc.close();
   }
 });
 
-test('the closing line names both versions when the alias moved mid-run, and none when the service names none', async () => {
+test('answers from two models in one run are refused with exit 4, and nothing more is sent', async () => {
+  // The alias moved mid-run. Ranking would compare one model's edges with
+  // another model's controls, so the run stops at the first answer that
+  // disagrees. Every later request would be charged for nothing.
   const moved = await fake((body, n) => ({ body: { model: n <= 3 ? 'jev-1.13.0' : 'jev-1.14.0', answers: flat(body, 0.2) } }));
+  const sidecar = join(work, 'moved.json');
   try {
-    const r = await runAudit([decisions], { EAGLE_EYE_AUDIT_ENDPOINT: moved.url, TYPESAFE_API_KEY: KEY });
-    assert.equal(r.code, 0, r.stderr);
-    assert.match(r.stderr, /Answered by jev-1\.13\.0 and jev-1\.14\.0: the version changed during the run, so the scores may not compare\./);
+    const r = await runAudit([decisions, '--json', sidecar], { EAGLE_EYE_AUDIT_ENDPOINT: moved.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 4, r.stderr);
+    assert.equal(r.stdout, '', 'a ranking was printed');
+    assert.throws(() => readFileSync(sidecar), 'a ranking was written');
+    assert.equal(moved.seen.length, 4);
+    assert.match(r.stderr, /^Refused: .*jev-1\.13\.0.*jev-1\.14\.0.*no ranking is printed\.$/m);
+    assert.match(r.stderr, /^Sent 4 requests to TypeSafe, charged to your key\. Answered by jev-1\.13\.0 and jev-1\.14\.0\.$/m);
+    assertNoKey(r);
   } finally {
     await moved.close();
   }
+});
 
-  // The version is reported, not required: the ranking does not read it.
-  const silent = await fake(body => ({ body: { answers: flat(body, 0.2) } }));
-  try {
-    const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: silent.url, TYPESAFE_API_KEY: KEY });
-    assert.equal(r.code, 0, r.stderr);
-    assert.match(r.stderr, /^Sent 1 request to TypeSafe, charged to your key\.$/m);
-  } finally {
-    await silent.close();
+test('an answer that names no model is refused, because the report could not say what scored it', async () => {
+  for (const model of [undefined, '', '   ', 42]) {
+    const svc = await fake(body => ({ body: { model, answers: flat(body, 0.2) } }));
+    try {
+      const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
+      assert.equal(r.code, 4, `${model}: ${r.stderr}`);
+      assert.match(r.stderr, /names no model/);
+      assert.equal(r.stdout, '');
+      assert.match(r.stderr, /^Sent 1 request to TypeSafe, charged to your key\.$/m);
+    } finally {
+      await svc.close();
+    }
   }
 });
 
@@ -346,7 +374,7 @@ test('an answer that is not a Noul probability is refused', async () => {
   const svc = await fake(body => {
     const answers = flat(body, 0.2);
     answers.vague = { type: 'noul', noul: 1.7 };
-    return { body: { answers } };
+    return { body: { model: 'fake', answers } };
   });
   try {
     const r = await runAudit([decisions], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
@@ -358,7 +386,7 @@ test('an answer that is not a Noul probability is refused', async () => {
 });
 
 test('a first 5xx is retried once, and a second one fails', async () => {
-  const once = await fake((body, n) => (n === 1 ? { status: 503, body: 'busy' } : { body: { answers: flat(body, 0.2) } }));
+  const once = await fake((body, n) => (n === 1 ? { status: 503, body: 'busy' } : { body: { model: 'fake', answers: flat(body, 0.2) } }));
   try {
     const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: once.url, TYPESAFE_API_KEY: KEY });
     assert.equal(r.code, 0, r.stderr);
