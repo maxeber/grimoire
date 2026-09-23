@@ -572,6 +572,37 @@ test('an E tag nothing beneath the node can produce is a finding', () => {
   assert.match(r.stdout, /greet declares error tag "NeverRaised", and nothing beneath it produces that tag/);
 });
 
+test('a pure node that runs an effect is a finding naming the node and its first effect step', () => {
+  // lookupName's effect is its step 0. A second effect after it must not
+  // move the finding, and must not print a second one.
+  const file = derive(prog => {
+    prog.nodes.lookupName.role = 'pure';
+    prog.nodes.lookupName.steps.push({ op: 'effect', kind: 'log.write', desc: 'note the lookup', label: 'late' });
+  });
+  const r = check(file);
+  assert.equal(r.code, 0, r.stderr);
+  const lines = r.stdout.split('\n').filter(l => /is marked pure/.test(l));
+  assert.deepEqual(lines, ['lookupName is marked pure, which claims no effects, and lookupName[0] runs one: db.get "read the name row"']);
+});
+
+test('a pure node with no effect step, and an effect under any other role, are no finding', () => {
+  // greet runs an effect as a handler, lookupName as io. Neither is pure.
+  assert.doesNotMatch(check(exampleFlightpath).stdout, /is marked pure/);
+
+  // Pure and effect-free: the claim holds, so there is nothing to say. The
+  // pull-request example has four such nodes and effects under io.
+  const layered = JSON.parse(readFileSync(layeredFlightpath, 'utf8'));
+  const pure = Object.values(layered.nodes).filter(x => x.role === 'pure');
+  assert.ok(pure.length && pure.every(x => !x.steps.some(s => s.op === 'effect')), 'the fixture still has effect-free pure nodes');
+  const r = check(layeredFlightpath);
+  assert.equal(r.code, 0, r.stderr);
+  assert.doesNotMatch(r.stdout, /is marked pure/);
+
+  // The rule reads the exact word and no other.
+  const near = check(derive(prog => { prog.nodes.lookupName.role = 'Pure'; }));
+  assert.doesNotMatch(near.stdout, /is marked pure/);
+});
+
 /* -- the text output ------------------------------------------------------ */
 
 // The shipped pull-request example states two graphs, so every reading of it

@@ -131,8 +131,13 @@ numbers. `why` says in one sentence why the change touches this file.
 
 ### role
 
-Any word. The page prints it and nothing branches on it. The words in use are
-`pure`, `io`, `handler`, `agent` and `prototype`. Add one when none fits.
+Any word. The page prints it and nothing branches on it except the
+pure-with-effect finding. The words in use are `pure`, `io`, `handler`,
+`agent` and `prototype`. Add one when none fits.
+
+**`pure` claims the node runs no effect.** `--check` reports a node whose role
+is exactly `pure` and whose steps include an `effect` step. See
+[Findings](#findings).
 
 ### channels
 
@@ -412,3 +417,6 @@ exits zero. Each one is a thing you may have meant.
   have written and not yet connected is a work in progress.
 - **A call edge a layer cuts.**
 - **A handler for a tag the file throws as a die.** Legal, and it should be on purpose.
+- **A `pure` node that runs an effect.** The finding names the node and its
+  first `effect` step. Fix the role or the step, or write one line that says
+  why the role stands.

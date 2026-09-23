@@ -592,6 +592,20 @@ export function findings(prog) {
     });
   }
 
+  /* A node whose role is exactly `pure` and whose steps run an effect. The
+   * one role word anything branches on, and only here: the word claims no
+   * effects, the steps say otherwise, and a reader cannot tell which is
+   * wrong. The first effect is named, because one is enough to break the
+   * claim. */
+  for (const [id, n] of Object.entries(prog.nodes)) {
+    if (n.role !== 'pure') continue;
+    const at = (n.steps || []).findIndex(s => s.op === 'effect');
+    if (at >= 0) {
+      const s = n.steps[at];
+      out.push(`${id} is marked pure, which claims no effects, and ${id}[${at}] runs one: ${s.kind} "${s.desc}"`);
+    }
+  }
+
   /* Files in the change that no node accounts for, by name. A
    * documentation-only or config-only part of a change is not silently
    * dropped. */

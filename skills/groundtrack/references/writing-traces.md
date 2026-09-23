@@ -104,8 +104,9 @@ The rest is on you. Before you call the file done:
 - Read every `onError` you wrote and find the line in the material that catches
   that tag. If there is no such line, delete the handler.
 - Read every `error` list and find what throws each tag.
-- Read every `role` and check the node does what the word says. A node marked
-  pure that runs an effect is a claim the page prints and nothing tests.
+- Read every `role` and check the node does what the word says. `--check`
+  reports a node marked `pure` that runs an effect. No check reads any other
+  role word.
 
 ## Provenance is not decoration
 
