@@ -203,10 +203,10 @@ input,textarea{font:inherit;color:inherit;background:var(--av-paper);border:1px 
    is in front of the reader who opens the page, and out of the way of the reader who went deeper. */
 .brief{display:flex;flex-direction:column;gap:var(--sp-1);margin:var(--sp-3) 0 0}
 .brief p{margin:0;font-size:14px;line-height:1.6;color:var(--av-ink-80);max-width:78ch}
-/* Row gap tight, column gap wide: who and when read as one line when they fit, and as two close
-   lines when they wrap. One gap for both made the wrapped pair look like two separate blocks. */
-.brief .facts{display:flex;gap:2px var(--sp-4);flex-wrap:wrap;font-size:13px;line-height:1.6;color:var(--av-ink-55)}
-.brief .facts b{font-weight:500;color:var(--av-ink-80)}
+/* Who and when take a line each, in the problem's own ink and size. Set smaller and paler, they read as
+   a caption and the reader skipped them. The bold lead-in is what the eye catches. */
+.brief .facts{display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.6;color:var(--av-ink-80)}
+.brief .facts b{font-weight:600;color:var(--av-ink)}
 /* The reframe is the author speaking about this configuration, so it is marked as an aside and not as
    more of the problem. It shows only while the preset that wrote it owns the grid. */
 .brief .reframe{border-left:2px solid var(--av-caution);padding-left:var(--sp-2);font-size:13px;color:var(--av-ink-80)}
@@ -222,6 +222,9 @@ input,textarea{font:inherit;color:inherit;background:var(--av-paper);border:1px 
 .find .txt{font-size:15px;line-height:1.6}
 .h2{font-size:30px;text-transform:uppercase;letter-spacing:.12em;font-weight:600;line-height:1.15;margin:0}
 .annot{font-size:13px;line-height:1.6;color:var(--av-ink-80);max-width:68ch}
+/* The row's question, under its name. It is the thing the row asks the reader to decide, so it reads as
+   a heading and not as a caption: set as .annot, it was the easiest line on the view to miss. */
+.h3{font-size:19px;font-weight:500;line-height:1.4;color:var(--av-ink);max-width:68ch;margin:0}
 details{border-top:1px solid var(--av-ink-12);padding-top:var(--sp-2);margin-top:var(--sp-1)}
 summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:var(--sp-2);padding:2px 0;transition:color .16s var(--ease)}
 summary:hover{color:var(--av-caution)}
@@ -234,6 +237,8 @@ details[open] > :not(summary){animation:ee-unfold .22s var(--ease) both}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-min),1fr));gap:var(--sp-4)}
 .card{position:relative;border:1px solid var(--av-ink-30);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2);font-size:13px;line-height:1.6;
   transition:border-color .2s var(--ease),background-color .2s var(--ease),color .2s var(--ease),opacity .25s var(--ease)}
+.card:not(.chosen):not(.over){cursor:pointer}
+.card:not(.chosen):not(.over):hover{border-color:var(--av-ink)}
 .card.chosen{border:2px solid var(--av-ink)}
 .card.over{background:var(--av-ink);color:var(--av-paper);border-color:var(--av-ink)}
 .card.over .muted,.card.over .label,.card.over .tier{color:rgb(from var(--av-paper) r g b / .6)}
@@ -548,7 +553,7 @@ function renderRowDetail(r, d){
     const line = e => `<div><span class="dot ${e.kind === 'conf' ? 'caution' : 'normal'}" style="margin-top:8px"></span><span>${e.kind === 'conf' ? 'Rules out' : 'Requires'} ${nm(e.to)}${r.selected.has(e.to) ? (e.kind === 'conf' ? ' <b>— that option is selected: conflict.</b>' : ' — that option is selected.') : (e.kind === 'req' ? ' <b>— that option is not selected.</b>' : '.')} ${esc(e.why)} ${tierTag(e.tier)}</span></div>`;
     const inl = e => `<div><span class="dot ${e.kind === 'conf' ? 'caution' : 'normal'}" style="margin-top:8px"></span><span>${nm(e.from)} ${e.kind === 'conf' ? 'rules this option out' : 'requires this option'}. ${esc(e.why)} ${tierTag(e.tier)}</span></div>`;
     const cls = ['card', isSel ? (isChosen ? 'chosen' : 'over') : '', o.strawman ? 'straw' : '', st.includes('out') ? 'closed' : ''].join(' ');
-    return `<div class="${cls}"><span class="tab label">${o.strawman ? 'strawman' : isChosen ? 'chosen' : isSel ? 'your change' : 'option'}${o.src ? ' · ' + esc(o.src) : ''}</span>
+    return `<div class="${cls}" data-card="${id}"><span class="tab label">${o.strawman ? 'strawman' : isChosen ? 'chosen' : isSel ? 'your change' : 'option'}${o.src ? ' · ' + esc(o.src) : ''}</span>
       <div class="ttl">${esc(o.label)}</div>
       <div class="muted">${esc(BOX.rel[id]?.why || '')}</div>
       ${(BOX.rel[id]?.notes || []).map(n => `<div class="muted" style="border-left:1.5px solid var(--av-ink-30);padding-left:8px">${esc(n)}</div>`).join('')}
@@ -557,7 +562,7 @@ function renderRowDetail(r, d){
   }).join('');
   // The summary sits inside the header column, directly under the question: same subject, so a
   // full body gap between them would read as two separate things.
-  return `<div class="body"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-4);flex-wrap:wrap"><div style="flex:1;min-width:0"><div class="label">Row ${ref(d)} · ${d.opts.length} options${d.opts.some(o => o.strawman) ? ' · ' + d.opts.filter(o => o.strawman).length + ' strawman' : ''}</div><div class="h2" style="margin-top:6px">${esc(d.name)}</div>${d.question ? `<p class="annot" style="margin:8px 0 0">${esc(d.question)}</p>` : ''}${rowSummary(r, d)}</div><button class="chip ghost" data-back>← Findings</button></div><div class="cards">${cards}</div></div>`;
+  return `<div class="body"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-4);flex-wrap:wrap"><div style="flex:1;min-width:0"><div class="label">Row ${ref(d)} · ${d.opts.length} options${d.opts.some(o => o.strawman) ? ' · ' + d.opts.filter(o => o.strawman).length + ' strawman' : ''}</div><div class="h2" style="margin-top:6px">${esc(d.name)}</div>${d.question ? `<p class="h3" style="margin:10px 0 0">${esc(d.question)}</p>` : ''}${rowSummary(r, d)}</div><button class="chip ghost" data-back>← Findings</button></div><div class="cards">${cards}</div></div>`;
 }
 
 // ---- sheet view ----
@@ -627,6 +632,14 @@ function decodeHash(){ const m = /sel=([^&]*)/.exec(location.hash); if (m) loadC
 
 function wire(){
   $('view').querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { const o = optById[b.dataset.pick]; override(o.dim, o); }));
+  // The whole card picks its option, and the button stays for the keyboard. A click on the card only
+  // ever selects: undoing a change stays on the button, so a stray click cannot throw a change away.
+  // A click that ends a text selection is the reader copying a reason, not choosing.
+  $('view').querySelectorAll('[data-card]').forEach(c => c.addEventListener('click', e => {
+    if (e.target.closest('button, a, summary') || getSelection().toString()) return;
+    const o = optById[c.dataset.card];
+    if (sel[o.dim.id] !== o.id) override(o.dim, o);
+  }));
   $('view').querySelector('[data-back]')?.addEventListener('click', () => { openRow = null; update(); });
   $('reveal')?.addEventListener('click', () => { pending.revealed = true; update(); });
   $('skipPredict')?.addEventListener('click', () => { pending = null; update(); });
