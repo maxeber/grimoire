@@ -28,6 +28,8 @@ const portable = join(root, 'docs', 'decisions', 'portable-skill.box.json');
 // A value nobody would type by accident, so finding it in any output is proof
 // of a leak and not a coincidence.
 const KEY = 'fake-key-3b7e91d0-never-print-me';
+// The shape of an OpenRouter key: its prefix, then 64 hex characters.
+const OR_KEY = `sk-or-v1-${'5eed'.repeat(16)}`;
 
 // Every child starts with no key and no endpoint. A key in the developer's
 // shell must never reach a test that did not ask for one.
@@ -35,6 +37,7 @@ function runAudit(args, env = {}) {
   return runAsync(audit, args, {
     env: {
       TYPESAFE_API_KEY: null,
+      OPENROUTER_API_KEY: null,
       EAGLE_EYE_AUDIT_ENDPOINT: null,
       ...env,
     },
@@ -74,8 +77,10 @@ function flat(body, p) {
 }
 
 function assertNoKey(r) {
-  assert.ok(!r.stdout.includes(KEY), 'the key reached standard output');
-  assert.ok(!r.stderr.includes(KEY), 'the key reached standard error');
+  for (const k of [KEY, OR_KEY]) {
+    assert.ok(!r.stdout.includes(k), 'a key reached standard output');
+    assert.ok(!r.stderr.includes(k), 'a key reached standard error');
+  }
 }
 
 test('with no key it sends nothing, exits 3, and names the variable it looked for', async () => {
@@ -98,8 +103,112 @@ test('with no key it sends nothing, exits 3, and names the variable it looked fo
     // A user decides here whether to get a key, so this is where they learn
     // that the audit is paid for with it.
     assert.match(r.stderr, /Each request it sends is charged to your key/);
+    // The guide names the second route too: its variable, which key wins, that
+    // the route is alpha, and that the account decides whether it logs.
+    assert.match(r.stderr, /OPENROUTER_API_KEY/);
+    assert.match(r.stderr, /both are set, TYPESAFE_API_KEY is used/);
+    assert.match(r.stderr, /alpha/);
+    assert.match(r.stderr, /logging/);
     // Standard output stays empty, so nothing on it reads as a ranking.
     assert.equal(r.stdout, '');
+  } finally {
+    await svc.close();
+  }
+});
+
+// ---- the OpenRouter route (#117) ----
+
+test('with only an OpenRouter key, the run sends OpenRouter\'s request shape, pinned to one upstream, and ranks', async () => {
+  const svc = await fake(body => ({ body: { model: 'typesafe/jev-1.13-20260917', answers: flat(body, 0.2), usage: { cost: 0.00002 } } }));
+  try {
+    const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, OPENROUTER_API_KEY: OR_KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assertNoKey(r);
+    assert.equal(svc.seen.length, 1);
+    const [s] = svc.seen;
+    assert.equal(s.auth, `Bearer ${OR_KEY}`);
+    assert.equal(s.body.model, '~typesafe/jev-latest');
+    assert.deepEqual(s.body.provider, { only: ['typesafe'], allow_fallbacks: false });
+    assert.equal(Object.keys(s.body.questions).length, 8);
+    // The provider's own model string, not rewritten, and no cost.
+    assert.match(r.stdout, /^Scored by typesafe\/jev-1\.13-20260917\.$/m);
+    assert.match(r.stderr, /^Sent 1 request to OpenRouter, charged to your key\. Answered by typesafe\/jev-1\.13-20260917\.$/m);
+    assert.doesNotMatch(r.stdout + r.stderr, /0\.00002|cost/);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('with both keys set, TypeSafe is used and OpenRouter\'s key is never sent', async () => {
+  const svc = await fake();
+  try {
+    const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY, OPENROUTER_API_KEY: OR_KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assertNoKey(r);
+    assert.equal(svc.seen.length, 1);
+    assert.equal(svc.seen[0].auth, `Bearer ${KEY}`);
+    assert.equal(svc.seen[0].body.model, 'jev-latest');
+    assert.equal(svc.seen[0].body.provider, undefined);
+    assert.match(r.stderr, /^Sent 1 request to TypeSafe/m);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('an OpenRouter key in TYPESAFE_API_KEY is refused with exit 3 before any request, in every mode', async () => {
+  const svc = await fake();
+  try {
+    for (const env of [{ TYPESAFE_API_KEY: OR_KEY }, { TYPESAFE_API_KEY: OR_KEY, OPENROUTER_API_KEY: OR_KEY }]) {
+      const e = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, ...env };
+      for (const args of [[portable], [portable, '--dry-run']]) {
+        const r = await runAudit(args, e);
+        assert.equal(r.code, 3, `${args.join(' ')}: ${r.stderr}`);
+        assert.match(r.stderr, /TYPESAFE_API_KEY holds an OpenRouter key/);
+        assert.match(r.stderr, /OPENROUTER_API_KEY/);
+        assert.match(r.stderr, /Nothing was sent/);
+        assert.equal(r.stdout, '');
+        assertNoKey(r);
+      }
+      // The probe says no, so the skill never offers a run that would be refused.
+      const probe = await runAudit(['--probe'], e);
+      assert.equal(probe.stdout.trim(), 'no');
+      assertNoKey(probe);
+    }
+    assert.equal(svc.seen.length, 0);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--dry-run and --provider name the provider a run would use, and say when its route is alpha', async () => {
+  const svc = await fake();
+  try {
+    const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, OPENROUTER_API_KEY: OR_KEY };
+    const dry = await runAudit([decisions, '--dry-run'], env);
+    assert.equal(dry.code, 0, dry.stderr);
+    // Both companies the text reaches, named before the user says yes.
+    assert.match(dry.stderr, /A real run sends 11 requests to OpenRouter, which passes them on to TypeSafe: 5 argued edges and 6 controls\./);
+    assert.match(dry.stderr, /at OpenRouter's price/);
+    assert.match(dry.stderr, /alpha/);
+    assert.equal(JSON.parse(dry.stdout).model, '~typesafe/jev-latest');
+    assertNoKey(dry);
+
+    const cases = [
+      [{ OPENROUTER_API_KEY: OR_KEY }, 'OpenRouter'],
+      [{ TYPESAFE_API_KEY: KEY, OPENROUTER_API_KEY: OR_KEY }, 'TypeSafe'],
+      [{ TYPESAFE_API_KEY: OR_KEY }, 'none'],
+      [{}, 'none'],
+    ];
+    for (const [keys, want] of cases) {
+      const r = await runAudit(['--provider'], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, ...keys });
+      assert.equal(r.code, 0, r.stderr);
+      assert.equal(r.stdout.trim(), want);
+      assertNoKey(r);
+    }
+    // The probe keeps its contract: one word, yes or no.
+    const probe = await runAudit(['--probe'], env);
+    assert.equal(probe.stdout, 'yes\n');
+    assert.equal(svc.seen.length, 0);
   } finally {
     await svc.close();
   }
@@ -618,13 +727,13 @@ test('an unreachable service is retried once, then fails', async () => {
 // vocabulary denylist — docs/adr/0001 argues against those — but the other
 // half of the paragraph that ADR gained with this tool: code that calls a
 // service names it, and prose does not.
-test('under skills/, only the audit script names the provider', () => {
+test('under skills/, only the audit script names a provider', () => {
   const hits = [];
   const walk = dir => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (!/\.woff2$/.test(e.name) && /typesafe|\bjev\b/i.test(readFileSync(p, 'utf8'))) hits.push(p);
+      else if (!/\.woff2$/.test(e.name) && /typesafe|openrouter|\bjev\b/i.test(readFileSync(p, 'utf8'))) hits.push(p);
     }
   };
   walk(join(root, 'skills'));

@@ -28,9 +28,10 @@ So the realistic risks are narrow, and worth naming precisely:
   modules only, so there is no dependency tree to poison today. That is a fact
   about now, not a guarantee about later.
 - **A credential in the environment that a script in the tree reads.**
-  `audit.mjs` reads `TYPESAFE_API_KEY` and sends it as a bearer token. A change
-  to that script, or to the endpoint it posts to, is a change that could send
-  the key somewhere else. A reviewer should read any diff to that file as a
+  `audit.mjs` reads `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` and sends it as
+  a bearer token. A change to that script, to the endpoints it posts to, or to
+  the rule that pairs a key with an endpoint, is a change that could send a
+  key somewhere else. A reviewer should read any diff to that file as a
   change to this one.
 
 ## What the renderer actually does with box text
@@ -204,8 +205,10 @@ and it is opt-in twice over.
   `scripts/check.mjs`, not CI. **The test suite never reaches the network.** It
   runs the script against a fake bound to `127.0.0.1` in the test process, and
   clears any real key from the child's environment first.
-- **What.** One `POST` per argued edge, and one per shuffled control, to
-  `https://api.typesafe.ai/v1/systemone`. With `--sel`, only the argued edges
+- **What.** One `POST` per argued edge, and one per shuffled control, to one
+  of two endpoints, picked by the key (see *The key*):
+  `https://api.typesafe.ai/v1/systemone`, or
+  `https://openrouter.ai/api/alpha/decisions`. With `--sel`, only the argued edges
   that make that configuration fail, plus every control; a set that holds sends
   nothing, and a sourced or measured edge is never sent. Each body carries the box's
   `problem`; the edge's `why` and the relation it claims; and, for both of its
@@ -216,19 +219,46 @@ and it is opt-in twice over.
   sends, their rough size, and that each is charged to the key; the skill's
   offer repeats all three. It names no price: the provider sets the price and
   can change it, and a count stays true. A real run ends by saying how many
-  requests the service received and which model version answered them.
-- **To whom.** TypeSafe. What the provider does with the text is its policy,
-  not this repository's. A box holds whatever its author wrote into it, so do
-  not audit a box whose text you would not send.
-- **The key.** Read from `TYPESAFE_API_KEY` and nowhere else: not a flag, not a
-  file. It is never printed and never written. With no key the script sends
-  nothing, exits `3` and prints how to set one: the variable, the two places a
-  key persists across sessions, that a project `.env` is not read, and never
-  to paste the key into a chat. The skill tells the agent to pass those steps
-  on, only when the user asks for the audit, and never to ask for the key or
-  write it into a file. A key typed into a chat lands in the transcript. `--probe` answers
-  `yes` or `no`, never the value, and opens no connection. The tests hold all
-  four, with a fake key they look for in every stream.
+  requests the service received, which provider received them, and which
+  model version answered them. The dry run and that closing line name the
+  provider the run actually uses.
+- **To whom.** TypeSafe, or OpenRouter, never both in one run. There is no
+  fallback from one to the other. What a provider does with the text is its
+  policy, not this repository's. A box holds whatever its author wrote into
+  it, so do not audit a box whose text you would not send.
+  - **OpenRouter is a middleman.** It passes the request on to TypeSafe, so
+    the text reaches two companies. The request pins TypeSafe as the only
+    upstream, with no fallback to another. The dry run names both companies.
+    OpenRouter keeps no request text unless the account opts in
+    ([its policy](https://openrouter.ai/docs/guides/privacy/data-collection)).
+    It has two separate opt-ins, both off by default. *Input & Output
+    Logging* stores prompts and completions for the account to review.
+    *Use of Inputs/Outputs* lets OpenRouter use them to improve its product.
+    An account with either one on applies it to every box it audits.
+  - **The OpenRouter endpoint is alpha.** OpenRouter documents it as an alpha
+    feature, with no stability promise. The dry run and the setup text say so.
+    The script refuses an answer of the wrong shape, as it does on either
+    route.
+- **The key.** Read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` and
+  nowhere else: not a flag, not a file. When both are set, `TYPESAFE_API_KEY`
+  is used, because that route has a documented contract and no middleman. A
+  key is never printed and never written. With no key the script sends
+  nothing, exits `3` and prints how to set one: both variables, which one
+  wins, the two places a key persists across sessions, that a project `.env`
+  is not read, and never to paste the key into a chat.
+- **A key in the wrong variable.** An OpenRouter key starts with `sk-or-v1-`.
+  One in `TYPESAFE_API_KEY` is refused before anything is sent: the script
+  exits `3` and names `OPENROUTER_API_KEY`. `--probe` answers `no` for it. This
+  exists because it happened (#117): the key reached TypeSafe as a bearer token,
+  and its owner had to revoke it. TypeSafe documents no shape for its own keys,
+  so this is the only shape the script can check.
+- **The skill's side.** The skill tells the agent to mention the audit once
+  when the probe says `no`. It passes the setup steps on only when the user
+  asks for the audit, and never asks for the key or writes it into a file. A key typed into a chat lands in the transcript. `--probe` answers
+  `yes` or `no`, never the value, and opens no connection. `--provider` names
+  the provider a run would use, or `none`, and opens no connection. The tests
+  hold all of this, with a fake key of each shape they look for in every
+  stream.
 - **The override.** `EAGLE_EYE_AUDIT_ENDPOINT` exists so the tests can point
   the script at the fake. Whatever URL it names receives the key and the box
   text, so it accepts only an address in `127.0.0.0/8`, or `::1`. Not the name
@@ -251,7 +281,7 @@ and it is opt-in twice over.
   (#104). A network error or a `5xx` is retried once; a second one fails the
   same way.
 
-**The provider's name appears in that script and nowhere else under
+**The providers' names appear in that script and nowhere else under
 `skills/`.** The prose says *the model provider*. Why code may name a service
 and prose may not is argued in
 [`docs/adr/0001-skills-own-their-vocabulary.md`](docs/adr/0001-skills-own-their-vocabulary.md).

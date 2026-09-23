@@ -4,20 +4,23 @@
 //
 //   node audit.mjs <box.json> [--sel <restore code>] [--json <path>] [--dry-run]
 //   node audit.mjs --probe
+//   node audit.mjs --provider
 //
-//   --sel      audit one configuration ("eagle-eye: opt-id, opt-id"), read the
+//   --sel     audit one configuration ("eagle-eye: opt-id, opt-id"), read the
 //              way the renderer's --sel reads it. Only the edges that make it
 //              fail are active: its conflicts and its requirements not met.
 //              The argued ones are scored against the full run's controls and
 //              flagged by the full run's rule. A sourced or measured one is
 //              listed and never sent. A set that holds sends nothing.
-//   --probe    print `yes` when a key is in the environment and `no` when it is
-//              not. Reads no box and opens no connection. The skill's offer to
-//              run the audit hangs on this answer.
+//   --probe    print `yes` when a usable key is in the environment and `no`
+//              when none is. A key in the wrong variable is not usable. Reads no box and opens no connection. The skill's offer to
+//              run the audit hangs on this answer, so it stays one word.
+//   --provider print the provider a run would use, or `none`. Reads no box and
+//              opens no connection.
 //   --dry-run  print the request body for the first argued edge, and send it
 //              nowhere. On standard error, state how many requests a real run
-//              sends, that each is charged to the key, and their rough size.
-//              Needs no key.
+//              sends, to which provider, that each is charged to the key, and
+//              their rough size. Needs no key.
 //   --json     also write the ranking to <path>. The box file is never written.
 //
 // Exit codes, each one tested in tests/audit.test.mjs:
@@ -25,19 +28,31 @@
 //   0  a ranking, a probe answer, a dry run, or a --sel set with nothing to send
 //   1  the box file cannot be read as a box
 //   2  a usage error, including an unknown option id in --sel
-//   3  no key in the environment. Nothing was sent.
+//   3  no usable key in the environment. Nothing was sent.
 //   4  the service failed or refused, its answer did not have the pinned shape,
 //      or two answers in one run named different models
 //   5  the endpoint override is not a loopback address. Nothing was read or sent.
 //
-// **This is the one file under skills/ that names the service it calls.** The
+// **This is the one file under skills/ that names the services it calls.** The
 // model is Jev, from TypeSafe: it takes a JSON `state` and typed questions and
 // returns probabilities rather than text. A Noul is its yes/no question type,
 // and the answer is the probability of yes. The request and response shapes
 // below are pinned against its documented HTTP contract
 // (docs.typesafe.ai/api), and anything else is refused rather than guessed at.
-// The skill prose says "the model provider" and never this name; see
+// The skill prose says "the model provider" and never these names; see
 // docs/adr/0001-skills-own-their-vocabulary.md for why code may and prose may not.
+//
+// **Two routes to one model** (issue #117). OpenRouter also serves Jev, on an
+// endpoint it labels alpha, with the same request and answer shapes. The key
+// picks the route: TYPESAFE_API_KEY first, because that route has the
+// documented contract and no middleman, then OPENROUTER_API_KEY. A run never
+// falls back from one route to the other: that would send one box to two
+// companies, and the two name the same model differently, so #104 would stop
+// it anyway. The OpenRouter request pins TypeSafe as its only upstream.
+//
+// An OpenRouter key in TYPESAFE_API_KEY is refused before anything is sent. One
+// was, on 2026-09-23: the service refused it, but the key had already reached
+// the wrong company as a bearer token. The probe says `no` for it.
 //
 // What it is for (issue #96): a ranking of a box's argued edges, by how well
 // each `why` produces its relation, so the agent knows which to reread first.
@@ -60,10 +75,14 @@
 // edges with another's controls. So the first answer that names a second
 // model stops the run with exit 4, and no ranking prints.
 //
+// OpenRouter's answer also carries `usage.cost`. It is read nowhere: its unit
+// is not documented for this endpoint, and only one route returns it.
+//
 // Environment:
 //
-//   TYPESAFE_API_KEY           the key. Read from here only, and never printed
-//                              or written.
+//   TYPESAFE_API_KEY           a TypeSafe key. Never printed or written.
+//   OPENROUTER_API_KEY         an OpenRouter key, used when TYPESAFE_API_KEY is
+//                              not set. Never printed or written.
 //   EAGLE_EYE_AUDIT_ENDPOINT   an endpoint override, for tests. Loopback only,
 //                              because the URL it names receives the key and
 //                              the box text.
@@ -78,10 +97,35 @@ import { fileURLToPath } from 'node:url';
 // the audit's active edges are the renderer's conflicts and unmet requirements.
 const EagleEye = createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), 'lib/eagle-eye.js'));
 
-const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
-const MODEL = 'jev-latest';
-const KEY_VAR = 'TYPESAFE_API_KEY';
+// The two routes, in the order a key picks them. `extra` joins every request
+// body. OpenRouter names its upstreams by slug, and `typesafe` is TypeSafe's in
+// its public provider list (openrouter.ai/api/v1/providers).
+const PROVIDERS = [
+  {
+    name: 'TypeSafe',
+    keyVar: 'TYPESAFE_API_KEY',
+    endpoint: 'https://api.typesafe.ai/v1/systemone',
+    model: 'jev-latest',
+    extra: {},
+  },
+  {
+    name: 'OpenRouter',
+    keyVar: 'OPENROUTER_API_KEY',
+    endpoint: 'https://openrouter.ai/api/alpha/decisions',
+    model: '~typesafe/jev-latest',
+    extra: { provider: { only: ['typesafe'], allow_fallbacks: false } },
+    alpha: true,
+    // The company the box text reaches after this one. A user agrees to send
+    // it to both, so the dry run names both.
+    upstream: 'TypeSafe',
+  },
+];
+const [TYPESAFE, OPENROUTER] = PROVIDERS;
 const ENDPOINT_VAR = 'EAGLE_EYE_AUDIT_ENDPOINT';
+
+// Every OpenRouter key begins with this. TypeSafe documents no shape for its
+// keys, so a check can only say what a TypeSafe key is not.
+const OPENROUTER_PREFIX = 'sk-or-v1-';
 
 // Fewer shuffled controls than this and the box is not calibrated. The kept
 // decisions box builds six and the example box three; the example is thin, and
@@ -185,9 +229,9 @@ const args = process.argv.slice(2);
 const usage = () =>
   stop(
     EXIT.usage,
-    'usage: node audit.mjs <box.json> [--sel "eagle-eye: ids"] [--json <path>] [--dry-run]\n       node audit.mjs --probe',
+    'usage: node audit.mjs <box.json> [--sel "eagle-eye: ids"] [--json <path>] [--dry-run]\n       node audit.mjs --probe\n       node audit.mjs --provider',
   );
-const KNOWN = new Set(['--json', '--dry-run', '--probe', '--sel']);
+const KNOWN = new Set(['--json', '--dry-run', '--probe', '--provider', '--sel']);
 let boxPath;
 let jsonPath;
 let selCode;
@@ -213,6 +257,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 const probe = args.includes('--probe');
+const which = args.includes('--provider');
 const dryRun = args.includes('--dry-run');
 
 // --- the endpoint, before anything else is read ------------------------------
@@ -237,11 +282,10 @@ function loopback(raw) {
   return null;
 }
 
-let endpoint = ENDPOINT;
-const override = process.env[ENDPOINT_VAR];
+let override = process.env[ENDPOINT_VAR];
 if (override !== undefined && override !== '') {
-  endpoint = loopback(override);
-  if (!endpoint) {
+  override = loopback(override);
+  if (!override) {
     stop(
       EXIT.endpoint,
       `${ENDPOINT_VAR} names an address that is not loopback. Only an address in 127.0.0.0/8, or ::1, is accepted, because that URL would receive the key and the box text. Nothing was read or sent.`,
@@ -249,16 +293,44 @@ if (override !== undefined && override !== '') {
   }
 }
 
-// --- the probe ---------------------------------------------------------------
+// --- the provider, from the key -----------------------------------------------
 
-const hasKey = () => typeof process.env[KEY_VAR] === 'string' && process.env[KEY_VAR].trim() !== '';
+const keyIn = p => (typeof process.env[p.keyVar] === 'string' ? process.env[p.keyVar].trim() : '');
+
+// An OpenRouter key where the TypeSafe key belongs. It wins over everything,
+// even a correct OPENROUTER_API_KEY beside it: the user has made a mistake,
+// and a run that quietly worked around it would leave the mistake in place.
+const misplaced = keyIn(TYPESAFE).startsWith(OPENROUTER_PREFIX);
+
+// The route this run uses, or undefined when no usable key is set.
+const provider = misplaced ? undefined : PROVIDERS.find(p => keyIn(p) !== '');
 
 if (probe) {
-  console.log(hasKey() ? 'yes' : 'no');
+  console.log(provider ? 'yes' : 'no');
+  process.exit(EXIT.ok);
+}
+if (which) {
+  console.log(provider ? provider.name : 'none');
   process.exit(EXIT.ok);
 }
 
 if (!boxPath) usage();
+
+// Before the box is read and before the dry run: a dry run would name a
+// provider this key can never reach.
+if (misplaced) {
+  stop(
+    EXIT.noKey,
+    `${TYPESAFE.keyVar} holds an OpenRouter key: it starts with ${OPENROUTER_PREFIX}. Nothing was sent.\n\n` +
+      `Set that key as ${OPENROUTER.keyVar} instead, and unset ${TYPESAFE.keyVar}. ` +
+      'Then start a new session. Never paste the key into a chat.',
+  );
+}
+
+// The route named in every line a user reads. With no key, the one a first key
+// would most likely pick: the dry run needs no key, and still names a recipient.
+const route = provider ?? TYPESAFE;
+const endpoint = override || route.endpoint;
 
 // --- the box -----------------------------------------------------------------
 //
@@ -365,7 +437,8 @@ function shuffle() {
 
 function bodyFor(e) {
   return {
-    model: MODEL,
+    model: route.model,
+    ...route.extra,
     state: {
       box: { problem: box.problem },
       edge: {
@@ -458,8 +531,11 @@ if (dryRun) {
   const tokens = bodies.reduce((n, b) => n + Math.ceil(JSON.stringify(b).length / CHARS_PER_TOKEN), 0);
   console.log(JSON.stringify(bodies[0], null, 2));
   console.error(
-    `A real run sends ${requests(bodies.length)} to TypeSafe: ${argued.length} argued edges and ${controls.length} controls. ` +
-      `Each request is charged to your key, at TypeSafe's price. ` +
+    `A real run sends ${requests(bodies.length)} to ${route.name}` +
+      (route.upstream ? `, which passes them on to ${route.upstream}` : '') +
+      `: ${argued.length} argued edges and ${controls.length} controls. ` +
+      `Each request is charged to your key, at ${route.name}'s price. ` +
+      (route.alpha ? `${route.name} serves this model on an endpoint it labels alpha, so its shape can change. ` : '') +
       `That is about ${tokens.toLocaleString('en-US')} input tokens, estimated at ${CHARS_PER_TOKEN} characters a token. Nothing was sent.`,
   );
   process.exit(EXIT.ok);
@@ -473,26 +549,33 @@ if (!argued.length) {
 // --- the key -----------------------------------------------------------------
 
 // The absent-key message doubles as the setup guide. The skill prose may not
-// name the provider or this variable, so this is the one place a user can
-// learn them. The agent passes it on; the user sets the key. An agent that
-// took the key in chat would put it in a transcript, so the guide says not to.
+// name a provider or a variable, so this is the one place a user can learn
+// them. The agent passes it on; the user sets the key. An agent that took the
+// key in chat would put it in a transcript, so the guide says not to.
 const SETUP = [
-  `No ${KEY_VAR} in the environment. Nothing was sent.`,
+  `No ${TYPESAFE.keyVar} or ${OPENROUTER.keyVar} in the environment. Nothing was sent.`,
   '',
-  'The audit is optional. It sends a box\'s text to TypeSafe, the provider of the Jev model.',
-  'Each request it sends is charged to your key, at TypeSafe\'s price.',
-  'To turn it on, get a key from TypeSafe (docs.typesafe.ai) and set it yourself, once,',
-  'where every new session reads it:',
+  'The audit is optional. It sends a box\'s text to a provider of the Jev model, which',
+  'scores each argued edge. Each request it sends is charged to your key, at that provider\'s price.',
+  'Set one of two keys:',
+  '',
+  `  - ${TYPESAFE.keyVar}: a key from TypeSafe, which makes Jev (docs.typesafe.ai).`,
+  `  - ${OPENROUTER.keyVar}: a key from OpenRouter, which passes requests on to TypeSafe.`,
+  '    OpenRouter serves Jev on an endpoint it labels alpha, so its shape can change.',
+  '    OpenRouter keeps no request text unless your account opts in to logging, or to',
+  '    letting OpenRouter use your inputs and outputs.',
+  '',
+  `When both are set, ${TYPESAFE.keyVar} is used. Set the key yourself, once, where every new session reads it:`,
   '',
   `  - your agent's settings, if it can set environment variables for every session`,
-  `  - your shell profile: setx ${KEY_VAR} <key> on Windows, or an export line in ~/.zshrc or ~/.bashrc`,
+  `  - your shell profile: setx <NAME> <key> on Windows, or an export line in ~/.zshrc or ~/.bashrc`,
   '',
-  `A key in a project .env is not read. Start a new session after you set ${KEY_VAR}.`,
+  'A key in a project .env is not read. Start a new session after you set the key.',
   'Never paste the key into a chat. The agent does not need to see it.',
 ].join('\n');
 
-if (!hasKey()) stop(EXIT.noKey, SETUP);
-const key = process.env[KEY_VAR].trim();
+if (!provider) stop(EXIT.noKey, SETUP);
+const key = keyIn(provider);
 
 // --- the service -------------------------------------------------------------
 
@@ -589,7 +672,7 @@ async function score(e) {
 function spent() {
   if (!sent) return;
   const answered = models.size ? ` Answered by ${[...models].join(' and ')}.` : '';
-  console.error(`Sent ${requests(sent)} to TypeSafe, charged to your key.${answered}`);
+  console.error(`Sent ${requests(sent)} to ${provider.name}, charged to your key.${answered}`);
 }
 
 // Thrown once a request has gone out. From there on the process ends by

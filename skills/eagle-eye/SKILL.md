@@ -89,17 +89,21 @@ rows. A cell that closes half the box is usually a position, not an option.
    ```
 
    The probe prints `yes` or `no`, and it sends nothing. Treat any other output
-   as `no`. On `no`, or with no `audit.mjs`, say nothing about the audit.
-   When the user asks for the audit and the probe says `no`, run the audit. It
-   sends nothing. It prints the steps to set a key, and you give those steps to
-   the user. Never ask for the key. Never write it into a file.
+   as `no`. With no `audit.mjs`, say nothing about the audit.
+
+   On `no`, tell the user once in a conversation that an optional audit
+   exists. Say that it needs the user's own key from a model provider. When
+   the user asks for the audit and the probe says `no`, run the audit. It
+   sends nothing. It prints the steps to set a key, or the fix for a key in
+   the wrong place. Give those steps to the user. Never ask for the key.
+   Never write it into a file.
 
    On `yes`, run the audit with `--dry-run` first. It sends nothing. It prints
    how many requests a real run sends, and their rough size. Then tell the
    user four facts:
 
    - The audit is available.
-   - It sends this box's text to the model provider.
+   - It sends this box's text to each company that the dry run names.
    - It sends this number of requests, of about this size.
    - The provider charges each request to the user's key.
 
