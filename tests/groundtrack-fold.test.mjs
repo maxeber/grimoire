@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
@@ -937,6 +937,157 @@ test('a call step sums its copies, because the listing shows a node and not a pa
   assert.deepEqual(G.callCounts(end, 'greet', 1), { entered: 1, returned: 0, open: true });
   // A step no walk reached carries nothing rather than answering for another.
   assert.deepEqual(G.callCounts(end, 'lookupName', 0), { entered: 0, returned: 0, open: false });
+});
+
+/* -- a frame that threw ------------------------------------------------------
+ *
+ * A frame leaves by returning or by throwing. The walk state names both, and
+ * reads which one from the call site's own counts: entered more times than it
+ * returned, with no frame open, is a frame that left by throwing. Never from
+ * the error path, which holds where an error is NOW — and which is empty once
+ * a handler caught the error and the walk ran on past it (#83). */
+
+/** The word each row reads at the cursor, as [node, walk state]. */
+const stateRows = (prog, walk, at) =>
+  G.treeRows(prog, walk, null, at, G.fold(prog, walk)).map(r => [r.id, r.state]);
+
+test('a frame that left by throwing reads threw, not returned', () => {
+  // The shipped example's own case: greet raises SendFailed and nothing
+  // catches it. Its row sat beside its own thrown error reading `returned`.
+  assert.deepEqual(stateRows(greet, runNamed(greet, 'the post fails').trace), [
+    ['greet', 'threw'],
+    ['lookupName', 'returned'],
+  ]);
+});
+
+test('a frame whose error was caught above it still reads threw — the case the error path cannot reach', () => {
+  // lookupName throws and greet catches it, then greet runs on and returns.
+  // At the end the error path is EMPTY: nothing is travelling. So the word has
+  // to come from the counts, and it is scoped to the frame — lookupName threw,
+  // whatever caught it; greet caught and returned, so greet returned.
+  const walk = runNamed(greet, 'no such user').trace;
+  const end = G.fold(greet, walk).pop();
+  assert.deepEqual(end.errorPath, [], 'the error path says nothing at the end');
+  assert.deepEqual(stateRows(greet, walk), [
+    ['greet', 'returned'],
+    ['lookupName', 'threw'],
+  ]);
+});
+
+test('a site entered twice and returned once, with no frame open, reads threw', () => {
+  // One call step reached twice by a loop. The first call returns; the second
+  // throws, and the caller catches it and returns.
+  const prog = {
+    entry: 'a',
+    graphs: [],
+    nodes: {
+      a: {
+        name: 'a',
+        role: 'handler',
+        steps: [
+          { op: 'call', target: 'b', label: 'again', onError: [{ tag: 'Gone', goto: 'out' }] },
+          { op: 'goto', target: 'again' },
+          { op: 'return', label: 'out', expr: 'null' },
+        ],
+      },
+      b: { name: 'b', role: 'io', steps: [{ op: 'return', expr: '1' }] },
+    },
+  };
+  const walk = {
+    steps: [
+      { k: 'call', at: 0, to: 'b', next: 1 },
+      { k: 'return', at: 0, value: '1' },
+      { k: 'goto', at: 1, next: 0 },
+      { k: 'call', at: 0, to: 'b', next: 1 },
+      { k: 'throw', at: 0, tag: 'Gone', message: 'no row', cause: 'fail' },
+      { k: 'propagate' },
+      { k: 'catch', at: 0, goto: 'out', next: 2 },
+      { k: 'return', at: 2, value: 'null' },
+    ],
+  };
+  assert.deepEqual(G.callCounts(G.fold(prog, walk).pop(), 'a', 0), { entered: 2, returned: 1, open: false });
+  assert.deepEqual(stateRows(prog, walk), [['a', 'returned'], ['b', 'threw']]);
+});
+
+test('the other four states are unchanged by threw', () => {
+  // Equal counts still read returned; never entered still reads not called;
+  // an open frame still reads running or waiting, whatever its counts say.
+  const walk = runNamed(greet, 'a known user').trace;
+  assert.deepEqual(stateRows(greet, walk), [['greet', 'returned'], ['lookupName', 'returned']]);
+  assert.deepEqual(stateRows(greet, walk, 0), [['greet', 'running'], ['lookupName', 'not called']]);
+  const inLookup = walk.steps.findIndex(m => m.k === 'call') + 1;
+  assert.deepEqual(stateRows(greet, walk, inLookup), [['greet', 'waiting'], ['lookupName', 'running']]);
+  const post = runNamed(greet, 'the post fails').trace;
+  // The cursor just past the raise: greet threw, but its frame is still open.
+  const raisedAt = post.steps.findIndex(m => m.raised) + 1;
+  assert.deepEqual(stateRows(greet, post, raisedAt), [['greet', 'running'], ['lookupName', 'returned']]);
+});
+
+test('the word is derived once, from the counts, for every view', () => {
+  assert.equal(G.walkState({ entered: 0, returned: 0, open: false }, false), 'not called');
+  assert.equal(G.walkState({ entered: 1, returned: 0, open: true }, true), 'running');
+  assert.equal(G.walkState({ entered: 1, returned: 0, open: true }, false), 'waiting');
+  assert.equal(G.walkState({ entered: 2, returned: 2, open: false }, false), 'returned');
+  assert.equal(G.walkState({ entered: 2, returned: 1, open: false }, false), 'threw');
+  // Open wins over the counts: a site that threw once and is in again is in.
+  assert.equal(G.walkState({ entered: 2, returned: 0, open: true }, true), 'running');
+});
+
+/** The second copy's failure, carried to the top: every frame it crossed is
+ *  closed, so each row's word comes from its counts alone. */
+const copiesToTheTop = () => {
+  const walk = JSON.parse(JSON.stringify(runNamed(twoCopies, 'the second copy fails').trace));
+  walk.steps.push({ k: 'propagate' }, { k: 'propagate' }, { k: 'propagate' }, { k: 'uncaught', tag: 'StoreDown', message: 'the name store timed out', cause: 'fail' });
+  return walk;
+};
+
+test('a node the tree draws twice takes the word per row, not summed', () => {
+  // One copy returned and one threw. Summed, both would read threw.
+  const walk = copiesToTheTop();
+  assert.deepEqual(stateRows(twoCopies, walk), [
+    ['greet', 'threw'],
+    ['loadProfile', 'returned'],
+    ['lookupName', 'returned'],
+    ['loadProfile', 'threw'],
+    ['lookupName', 'threw'],
+  ]);
+});
+
+test('the fold keeps the counts again by node, for the drawing', () => {
+  // The drawing is one box per node and has no chain in hand, so it reads the
+  // counts summed over every site that entered the node — the nodeEffects
+  // pattern, for the same reason.
+  const end = G.fold(twoCopies, copiesToTheTop()).pop();
+  const counts = id => [end.nodeCalls[id].entered, end.nodeCalls[id].returned];
+  assert.deepEqual(counts('greet'), [1, 0]);
+  assert.deepEqual(counts('loadProfile'), [2, 1]);
+  assert.deepEqual(counts('lookupName'), [2, 1]);
+  assert.equal(G.nodeState(end, 'lookupName'), 'threw', 'one box, and a frame of it threw');
+  // Keyed without a prototype: a node id is a stranger's string.
+  assert.equal(Object.getPrototypeOf(end.nodeCalls), null);
+  assert.equal(G.nodeState(end, 'constructor'), 'not called');
+});
+
+test('the tree, the drawing and the text agree on the word for every row of every shipped example', () => {
+  // A node the tree draws once is one box in the drawing, so the two must say
+  // the same thing at every cursor. A node drawn twice is two rows and one
+  // box, and the per-row rule above is what governs it.
+  for (const file of readdirSync(examples).filter(f => f.endsWith('.flightpath.json'))) {
+    const prog = JSON.parse(readFileSync(join(examples, file), 'utf8'));
+    prog.graphs.forEach((g, gi) => {
+      const v = G.graphView(prog, gi);
+      for (const run of g.presets) {
+        const states = G.fold(v, run.trace);
+        for (let at = 0; at < states.length; at++) {
+          const rows = G.treeRows(v, run.trace, null, at, states);
+          for (const row of rows) {
+            if (rows.filter(r => r.id === row.id).length > 1) continue;
+            assert.equal(G.nodeState(states[at], row.id), row.state, `${file} / ${g.id} / ${run.name} / cursor ${at} / ${row.id}`);
+          }
+        }
+      }
+    });
+  }
 });
 
 test('the tree carries the layer rename on the row', () => {

@@ -242,6 +242,10 @@ in a plain text fence.
   without it, the command lists the graphs and stops rather than picking for
   the reader.
 - **One row is a call site**, not a node. A node called twice appears twice.
+- **Each row ends with one word for what its frame did.** The words are
+  `not called`, `running`, `waiting`, `returned` and `threw`. `threw` says
+  that this frame left by throwing. It does not say whether a caller caught the error. A frame
+  whose error a caller caught still reads `threw`.
 - **A repeated node is marked and stopped**, or a cycle never terminates.
 - **An `error` tag carries its failure kind when the file states one**, `fail`
   or `die`.

@@ -656,8 +656,17 @@ Settled placements:
   waiting under it take
   the design system's state rule, which is ink 55 — a stroke that carries a
   signal is held to 3:1. Neither takes a hue: a position on the stack is not a
-  condition. The row's four states are `not called`, `running`, `waiting` and
-  `returned`, and `--text` prints the same four.
+  condition. The row's five states are `not called`, `running`, `waiting`,
+  `returned` and `threw`, and `--text` prints the same five. The drawing's
+  node chip prints the same word, summed over every site that entered the node.
+- **`returned` and `threw` are the two ways a frame leaves, and each is scoped
+  to the frame.** `threw` says this frame left by throwing. It says nothing
+  about whether a caller caught the error — that is the error path's job. A
+  frame whose error a caller caught still reads `threw`; the caller that caught
+  it and then returned reads `returned`. The word is read from the call site's
+  own counts — entered more times than it returned, with no frame open — and
+  never from the error path, which holds where an error is now and is empty
+  once a caught error has been run past.
 - **The sheet asks the design system for a role, never for a mark colour.** An
   error in flight and a failed effect are one condition and ask for the path;
   where the path stops and an effect that returned are resolved and ask for the

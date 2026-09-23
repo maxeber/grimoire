@@ -389,12 +389,23 @@ const Groundtrack = (() => {
      * node's effect marks the moment its frame returns, while the tree keeps
      * them — one graph seen two ways, disagreeing. */
     let nodeEffects = {};
+    /* The call counts again, keyed by node, for the same reason: the drawing's
+     * box has no chain in hand, so it reads what every site that entered the
+     * node did, summed. Keyed by a bare node id, which is a stranger's string,
+     * so the table has no prototype — and it is rebuilt on every change rather
+     * than cloned through JSON, which would give it one back. */
+    let nodeCalls = bare();
     let ended = null;
 
     const clone = () => frames.map(f => ({ ...f, chain: f.chain.slice() }));
     const touch = chain => (sites[chainKey(chain)] = sites[chainKey(chain)] || { entered: 0, returned: 0, effects: bare() });
+    const count = (id, field) => {
+      const was = nodeCalls[id] || { entered: 0, returned: 0 };
+      nodeCalls = Object.assign(bare(), nodeCalls, { [id]: { ...was, [field]: was[field] + 1 } });
+    };
 
     touch(['@entry']).entered = 1;
+    count(prog.entry, 'entered');
 
     const states = [
       {
@@ -407,6 +418,7 @@ const Groundtrack = (() => {
         errorPath: [],
         sites: JSON.parse(JSON.stringify(sites)),
         nodeEffects: {},
+        nodeCalls,
         ended: null,
         moved: null,
       },
@@ -456,6 +468,7 @@ const Groundtrack = (() => {
             const key = `${top.nodeId}#${m.at}`;
             const chain = top.chain.concat([key]);
             touch(chain).entered += 1;
+            count(m.to, 'entered');
             frames.push({ nodeId: m.to, pc: 0, callAt: undefined, site: key, chain });
             if (!visited.includes(m.to)) visited.push(m.to);
             edges = edges.concat([`${top.nodeId}>${m.to}`]);
@@ -494,7 +507,10 @@ const Groundtrack = (() => {
             break;
           case 'return': {
             const gone = frames.pop();
-            if (gone) touch(gone.chain).returned += 1;
+            if (gone) {
+              touch(gone.chain).returned += 1;
+              count(gone.nodeId, 'returned');
+            }
             if (frames.length) {
               frames[frames.length - 1].callAt = undefined;
               moved = { from: gone.nodeId, to: frames[frames.length - 1].nodeId, dir: 'return' };
@@ -517,6 +533,7 @@ const Groundtrack = (() => {
         errorPath: errorPath.slice(),
         sites: JSON.parse(JSON.stringify(sites)),
         nodeEffects,
+        nodeCalls,
         ended,
         moved,
       });
@@ -979,6 +996,37 @@ const Groundtrack = (() => {
     return out;
   }
 
+  /** THE WALK STATE: one word for what a frame did, from its counts.
+   *
+   *  `not called`, `running`, `waiting`, `returned`, `threw`. The last two are
+   *  the two ways a frame exits, and both are scoped to the frame: `threw`
+   *  says this frame left by throwing, and nothing about whether a caller
+   *  caught it. The error path says that.
+   *
+   *  Read from the counts and never from the error path, which holds where an
+   *  error is now. Once a caller catches and the walk runs on, the path is
+   *  empty, and the frame that threw is still a frame that threw (#83).
+   *  Entered more times than it returned, with nothing open, is that frame:
+   *  the only exits a frame has that are not a return are a propagate and an
+   *  error reaching the top, and neither counts one.
+   *
+   *  The tree asks per row and the drawing per node. Both ask here, so the two
+   *  cannot disagree about the rule — only about what they summed. */
+  function walkState(counts, top) {
+    if (!counts.entered) return 'not called';
+    if (counts.open) return top ? 'running' : 'waiting';
+    return counts.entered > counts.returned ? 'threw' : 'returned';
+  }
+
+  /** The walk state of one NODE, for the drawing's box. Summed over every
+   *  site that entered it, because a box is a node and not a path — the
+   *  tree, which is one row per path, answers per row instead. */
+  function nodeState(state, nodeId) {
+    const c = state.nodeCalls[nodeId] || { entered: 0, returned: 0 };
+    const top = state.frames.length > 0 && state.frames[state.frames.length - 1].nodeId === nodeId;
+    return walkState({ entered: c.entered, returned: c.returned, open: state.frames.some(f => f.nodeId === nodeId) }, top);
+  }
+
   function treeRows(prog, walk, layerName, atIndex, states) {
     const all = states || fold(prog, walk);
     const end = all[atIndex === undefined ? all.length - 1 : atIndex];
@@ -1128,7 +1176,7 @@ const Groundtrack = (() => {
         requirements: (ch.requirements || []).slice(),
         rename: rename ? rename.slice() : null,
         site: r.site ? { label: r.site.label, aside: r.site.aside } : null,
-        state: !reached ? 'not called' : r.open ? (i === topRow ? 'running' : 'waiting') : 'returned',
+        state: walkState(r, i === topRow),
         top: i === topRow,
         errorPath: error,
         path: pathOf(error),
@@ -1343,6 +1391,6 @@ const Groundtrack = (() => {
     return best;
   }
 
-  return { esc, ID, bare, hardenKeys, KINDS, ERROR_POSITION, graphView, sheetState, sheetPickerMarkup, sheetFactsMarkup, reachable, labelsOf, callSites, calleesOf, effectsOf, failureKinds, tagFate, complexityOf, fold, back, tipAt, cutEdges, layout, wireLive, wireFlow, countMark, callCounts, treeRows, unaccountedFiles, filesOf, fileTree, filesMarkup, suggestRun, renamedToken };
+  return { esc, ID, bare, hardenKeys, KINDS, ERROR_POSITION, graphView, sheetState, sheetPickerMarkup, sheetFactsMarkup, reachable, labelsOf, callSites, calleesOf, effectsOf, failureKinds, tagFate, complexityOf, fold, back, tipAt, cutEdges, layout, wireLive, wireFlow, countMark, callCounts, walkState, nodeState, treeRows, unaccountedFiles, filesOf, fileTree, filesMarkup, suggestRun, renamedToken };
 })();
 if (typeof module !== 'undefined') module.exports = Groundtrack;

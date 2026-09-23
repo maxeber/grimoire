@@ -935,20 +935,26 @@ function start() {
     const ch = n.channels || {};
     const p = LAYOUT.pos[id];
     const onStack = st.frames.some(f => f.nodeId === id);
-    const top = st.frames.length && st.frames[st.frames.length - 1].nodeId === id;
     const visited = st.visited.indexOf(id) >= 0;
     const erroring = st.errorPath.some(e => e.nodeId === id && e.how === 'thrown');
     const cold = !reach.has(id) || !visited;
     const cls =
       'nd' + (cold ? ' nd--cold' : '') + (onStack ? ' nd--active' : '') +
       (erroring ? ' nd--error' : '') + (S.open === id ? ' nd--sel' : '');
-    const chip = top
+    /* The module's word, summed over every site that entered this node: a box
+       is a node and not a path. `threw` asks for the path role, as an effect
+       that threw does — one condition, one role, and never caution directly,
+       which the site theme folds to ink. */
+    const state = G.nodeState(st, id);
+    const chip = state === 'running'
       ? '<span class="av-label chip-help" style="margin-left:auto" data-help="The frame the cursor is in">running</span>'
-      : onStack
+      : state === 'waiting'
         ? '<span class="av-label chip-help" style="margin-left:auto" data-help="On the stack, suspended at a call, waiting for the callee to return">waiting</span>'
-        : visited
+        : state === 'returned'
           ? '<span style="margin-left:auto"><span class="av-state av-state--normal chip-help" data-help="Entered and returned earlier in this run">returned</span></span>'
-          : '';
+          : state === 'threw'
+            ? '<span style="margin-left:auto"><span class="av-state caut chip-help" data-help="Entered earlier in this run, and a frame of it left by throwing. Whether a caller caught the error is the error path\'s to say">threw</span></span>'
+            : '';
     const E = (ch.error || []).length ? (ch.error || []).map(esc).join(' &middot; ') : '<span class="none">never</span>';
     const R = rOf(id).length ? esc(rOf(id).join(', ')) : '<span class="none">none</span>';
     // Keyed by node, not by call site. The drawing shows one box per node, so

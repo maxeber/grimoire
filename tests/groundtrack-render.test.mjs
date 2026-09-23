@@ -633,6 +633,21 @@ test('the run the reader names is the run that prints', () => {
   assert.match(r.stdout, /run "\?tune= flat"/);
 });
 
+test('the text says a frame that left by throwing threw, beside its own error', () => {
+  // It read `returned` on the line above `error path: thrown SendFailed` (#83).
+  const r = run(groundtrack, [exampleFlightpath, '--text', 'the post fails']);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /^greet {2}\[handler\] {2}threw$/m);
+  assert.match(r.stdout, /-> lookupName {2}\[io\] {2}returned$/m);
+});
+
+test('the text says threw for a frame whose error a caller caught', () => {
+  const r = run(groundtrack, [exampleFlightpath, '--text', 'no such user']);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /^greet {2}\[handler\] {2}returned$/m);
+  assert.match(r.stdout, /-> lookupName {2}\[io\] {2}threw$/m);
+});
+
 test('a run the file has not got is refused by name', () => {
   const r = run(groundtrack, [layeredFlightpath, '--text', 'no such run', ...firstPaint]);
   assert.equal(r.code, 1);
