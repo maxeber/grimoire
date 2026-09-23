@@ -14,7 +14,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { audit, root, runAsync } from './helpers.mjs';
@@ -29,17 +29,13 @@ const portable = join(root, 'docs', 'decisions', 'portable-skill.box.json');
 // of a leak and not a coincidence.
 const KEY = 'fake-key-3b7e91d0-never-print-me';
 
-let caches = 0;
-const freshCache = () => mkdtempSync(join(work, `cache-${caches++}-`));
-
-// Every child starts with no key, no endpoint and no cache of its own. A key
-// in the developer's shell must never reach a test that did not ask for one.
+// Every child starts with no key and no endpoint. A key in the developer's
+// shell must never reach a test that did not ask for one.
 function runAudit(args, env = {}) {
   return runAsync(audit, args, {
     env: {
       TYPESAFE_API_KEY: null,
       EAGLE_EYE_AUDIT_ENDPOINT: null,
-      EAGLE_EYE_AUDIT_CACHE: freshCache(),
       ...env,
     },
   });
@@ -99,6 +95,9 @@ test('with no key it sends nothing, exits 3, and names the variable it looked fo
     assert.match(r.stderr, /shell profile/);
     assert.match(r.stderr, /\.env is not read/);
     assert.match(r.stderr, /Never paste the key into a chat/);
+    // A user decides here whether to get a key, so this is where they learn
+    // that the audit is paid for with it.
+    assert.match(r.stderr, /Each request it sends is charged to your key/);
     // Standard output stays empty, so nothing on it reads as a ranking.
     assert.equal(r.stdout, '');
   } finally {
@@ -152,11 +151,13 @@ test('--dry-run prints one request body with the rich state, and sends nothing',
     assertNoKey(r);
 
     // The size, on standard error so standard output stays one parseable body.
-    // The skill's offer states this count rather than a price, because a
-    // price is the provider's to change. Five argued edges and six controls,
-    // none cached yet.
-    assert.match(r.stderr, /A real run sends 11 requests: 5 argued edges and 6 controls, none cached\./);
+    // The skill's offer repeats this line: a count and who pays, never a
+    // price, because a price is the provider's to change. Five argued edges
+    // and six controls.
+    assert.match(r.stderr, /A real run sends 11 requests to TypeSafe: 5 argued edges and 6 controls\./);
+    assert.match(r.stderr, /Each request is charged to your key, at TypeSafe's price\./);
     assert.match(r.stderr, /about [\d,]+ input tokens/);
+    assert.doesNotMatch(r.stderr, /[$€£]|\bUSD\b/);
 
     const body = JSON.parse(r.stdout);
     assert.equal(body.model, 'jev-latest');
@@ -235,6 +236,9 @@ test('the kept decisions box ranks, calibrates on six shuffled controls, and fla
     assert.equal(svc.seen.length, 11);
     for (const s of svc.seen) assert.equal(s.auth, `Bearer ${KEY}`);
 
+    // The run ends by saying what it spent and which version answered.
+    assert.match(r.stderr, /^Sent 11 requests to TypeSafe, charged to your key\. Answered by fake\.$/m);
+
     assert.match(r.stdout, /Calibrated: 6 shuffled controls score 0\.60 to 0\.80 on weakly connected/);
     assert.match(r.stdout, /The floor is 4 controls\./);
     assert.match(r.stdout, /It is not a verdict/);
@@ -283,45 +287,42 @@ test('a box with no sourced edge gets an uncalibrated ranking, and says so in on
   }
 });
 
-test('a second run against a warm cache sends nothing, and the cache holds answers only', async () => {
+test('nothing is cached: a second run asks for every edge and every control again', async () => {
+  // A cache served one model's answers after the alias had moved on (#106).
+  // Every run now asks the service for every edge and every control anew.
   const svc = await fake(decisionsReply());
-  const cache = freshCache();
   try {
-    const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY, EAGLE_EYE_AUDIT_CACHE: cache };
+    const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY };
     const first = await runAudit([decisions], env);
     assert.equal(first.code, 0, first.stderr);
-    assert.equal(svc.seen.length, 11);
     const second = await runAudit([decisions], env);
     assert.equal(second.code, 0, second.stderr);
-    assert.equal(svc.seen.length, 11, 'the second run asked again');
+    assert.equal(svc.seen.length, 22, 'the second run was answered from somewhere other than the service');
     assert.equal(second.stdout, first.stdout);
-
-    const files = readdirSync(cache);
-    assert.equal(files.length, 11);
-    for (const f of files) {
-      const text = readFileSync(join(cache, f), 'utf8');
-      assert.ok(!text.includes(KEY), `${f} holds the key`);
-      assert.deepEqual(Object.keys(JSON.parse(text)), ['answers'], `${f} holds more than answers`);
-    }
+    assert.match(second.stderr, /^Sent 11 requests to TypeSafe/m);
   } finally {
     await svc.close();
   }
 });
 
-test('a cache that cannot be written costs a request next time, and nothing else', async () => {
-  // Point the cache at a file, so creating the directory fails. The requests
-  // have already gone out by then, so the run must still print its ranking
-  // rather than die with exit 1, which means an unreadable box.
-  const notADir = join(work, 'cache-is-a-file');
-  writeFileSync(notADir, 'not a directory');
-  const svc = await fake();
+test('the closing line names both versions when the alias moved mid-run, and none when the service names none', async () => {
+  const moved = await fake((body, n) => ({ body: { model: n <= 3 ? 'jev-1.13.0' : 'jev-1.14.0', answers: flat(body, 0.2) } }));
   try {
-    const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY, EAGLE_EYE_AUDIT_CACHE: notADir });
+    const r = await runAudit([decisions], { EAGLE_EYE_AUDIT_ENDPOINT: moved.url, TYPESAFE_API_KEY: KEY });
     assert.equal(r.code, 0, r.stderr);
-    assert.equal(svc.seen.length, 1);
-    assert.match(r.stdout, /^Uncalibrated:/m);
+    assert.match(r.stderr, /Answered by jev-1\.13\.0 and jev-1\.14\.0: the version changed during the run, so the scores may not compare\./);
   } finally {
-    await svc.close();
+    await moved.close();
+  }
+
+  // The version is reported, not required: the ranking does not read it.
+  const silent = await fake(body => ({ body: { answers: flat(body, 0.2) } }));
+  try {
+    const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: silent.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assert.match(r.stderr, /^Sent 1 request to TypeSafe, charged to your key\.$/m);
+  } finally {
+    await silent.close();
   }
 });
 
@@ -333,6 +334,8 @@ test('a response without answers is refused with a message, never guessed at', a
     assert.match(r.stderr, /no answers field/);
     assert.equal(r.stdout, '');
     assert.equal(svc.seen.length, 1);
+    // A refused run still says what it spent before it stopped.
+    assert.match(r.stderr, /^Sent 1 request to TypeSafe, charged to your key\. Answered by fake\.$/m);
     assertNoKey(r);
   } finally {
     await svc.close();
@@ -371,6 +374,8 @@ test('a first 5xx is retried once, and a second one fails', async () => {
     assert.equal(r.code, 4);
     assert.match(r.stderr, /HTTP 529 twice/);
     assert.equal(always.seen.length, 2);
+    // The service received both, so the closing line counts both.
+    assert.match(r.stderr, /^Sent 2 requests to TypeSafe, charged to your key\.$/m);
     assertNoKey(r);
   } finally {
     await always.close();
@@ -397,6 +402,8 @@ test('an unreachable service is retried once, then fails', async () => {
   const r = await runAudit([portable], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
   assert.equal(r.code, 4);
   assert.match(r.stderr, /could not be reached twice/);
+  // Nothing reached the service, so nothing was charged and nothing is claimed.
+  assert.doesNotMatch(r.stderr, /Sent \d/);
   assertNoKey(r);
 });
 

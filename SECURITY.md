@@ -211,9 +211,10 @@ and it is opt-in twice over.
   `notes` and `src`. Nothing else from the disk is read into a request.
   `--dry-run` prints one body and sends nothing, so a reader can see exactly
   this before any of it leaves. It also states how many requests a real run
-  sends and their rough size, and the skill's offer repeats that count. It
-  names no price: the provider sets the price and can change it, and a count
-  stays true.
+  sends, their rough size, and that each is charged to the key; the skill's
+  offer repeats all three. It names no price: the provider sets the price and
+  can change it, and a count stays true. A real run ends by saying how many
+  requests the service received and which model version answered them.
 - **To whom.** TypeSafe. What the provider does with the text is its policy,
   not this repository's. A box holds whatever its author wrote into it, so do
   not audit a box whose text you would not send.
@@ -225,18 +226,18 @@ and it is opt-in twice over.
   on, only when the user asks for the audit, and never to ask for the key or
   write it into a file. A key typed into a chat lands in the transcript. `--probe` answers
   `yes` or `no`, never the value, and opens no connection. The tests hold all
-  four, with a fake key they look for in every stream and every cache file.
+  four, with a fake key they look for in every stream.
 - **The override.** `EAGLE_EYE_AUDIT_ENDPOINT` exists so the tests can point
   the script at the fake. Whatever URL it names receives the key and the box
   text, so it accepts only an address in `127.0.0.0/8`, or `::1`. Not the name
   `localhost`, which a hosts file can point anywhere. It is checked before the
   key is read. Anything else exits `5` with nothing read and
   nothing sent.
-- **The cache.** Responses are cached under the system temporary directory,
-  keyed by a hash of the endpoint and the body, so a second run costs nothing.
-  A cache file holds the eight probabilities and nothing else: no box text, no
-  key. `EAGLE_EYE_AUDIT_CACHE` moves it, which is how each test starts from an
-  empty one.
+- **No cache.** Nothing from a response is written to disk, except the
+  `--json` ranking a user asks for. Every run asks for every edge again, so a
+  second run is charged again. A cache used to live under the system temporary
+  directory; it went because the model alias it keyed on moves (#106). Whether
+  one should come back is #107.
 - **What it cannot change.** It never writes the box file, and a test compares
   the bytes before and after. A score never moves a tier, because `measured`
   means somebody ran something and a probability ran nothing.
@@ -692,12 +693,6 @@ a threat model:
 - **What the provider does with a box you chose to audit.** The audit sends the
   text listed above, and only after a yes. Past that point the text is under
   the provider's policy. This repository cannot see or change it.
-- **Another account on the same machine.** The default cache sits under the
-  system temporary directory, and on some systems other local accounts can
-  write there. The script creates its folder readable by its owner only, but it
-  does not check a folder that already exists. A planted answer changes a
-  ranking and nothing else: a score moves no tier and writes no box. Set
-  `EAGLE_EYE_AUDIT_CACHE` to a folder you own if that matters to you.
 - **A malicious maintainer account.** Branch protection raises the cost of a bad
   commit. It does not survive a stolen account with admin rights.
 - ~~**The one request the page makes when you open it.**~~ **Closed.** This

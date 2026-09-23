@@ -10,7 +10,8 @@
 //              run the audit hangs on this answer.
 //   --dry-run  print the request body for the first argued edge, and send it
 //              nowhere. On standard error, state how many requests a real run
-//              sends and their rough size. Needs no key.
+//              sends, that each is charged to the key, and their rough size.
+//              Needs no key.
 //   --json     also write the ranking to <path>. The box file is never written.
 //
 // Exit codes, each one tested in tests/audit.test.mjs:
@@ -39,6 +40,13 @@
 // the ranking prints as uncalibrated and flags nothing. A score is a place to
 // reread first. It never moves a tier, and this file never writes a box.
 //
+// **Every request is charged to the user's key** (issue #106). So the dry run
+// says so before a yes, and a real run ends by saying how many it sent and
+// which model version answered. Nothing is cached: each run asks for every
+// edge and every control anew. The alias can still move mid-run, and the
+// closing line names both versions when it does. Whether a cache should come
+// back is issue #107.
+//
 // Environment:
 //
 //   TYPESAFE_API_KEY           the key. Read from here only, and never printed
@@ -46,20 +54,14 @@
 //   EAGLE_EYE_AUDIT_ENDPOINT   an endpoint override, for tests. Loopback only,
 //                              because the URL it names receives the key and
 //                              the box text.
-//   EAGLE_EYE_AUDIT_CACHE      the cache directory. The default is a folder
-//                              under the system temporary directory.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { isIP } from 'node:net';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 const MODEL = 'jev-latest';
 const KEY_VAR = 'TYPESAFE_API_KEY';
 const ENDPOINT_VAR = 'EAGLE_EYE_AUDIT_ENDPOINT';
-const CACHE_VAR = 'EAGLE_EYE_AUDIT_CACHE';
 
 // Fewer shuffled controls than this and the box is not calibrated. The kept
 // decisions box builds six and the example box three; the example is thin, and
@@ -313,30 +315,24 @@ function bodyFor(e) {
 // Every request a real run would send: the argued edges, then the controls.
 const { controls, good } = shuffle();
 
-// The cache holds answers only: no state, no key, no usage. It is keyed by a
-// hash of the endpoint and the body, so answers from a test fake never serve a
-// real run, and a changed box asks again.
-const cacheDir = process.env[CACHE_VAR] || join(tmpdir(), 'eagle-eye-audit');
+const requests = n => `${n} request${n === 1 ? '' : 's'}`;
 
-// The dry run states the size of a real run, and never a price. The skill's
-// offer to the user repeats this count: a price is the provider's to change,
-// and a count stays true. Standard output keeps one parseable request body, so
-// the size goes to standard error.
+// The dry run states the size of a real run and who pays for it, and never a
+// price. The skill's offer to the user repeats this line: a price is the
+// provider's to change, and a count stays true. Standard output keeps one
+// parseable request body, so the size goes to standard error.
 if (dryRun) {
   if (!argued.length) {
     console.log(`${boxPath}: no argued edge, so there is no request to show.`);
     process.exit(EXIT.ok);
   }
   const bodies = [...argued, ...controls].map(bodyFor);
-  const waiting = bodies.filter(b => !cached(cacheFileFor(b)));
-  const done = bodies.length - waiting.length;
-  const tokens = waiting.reduce((n, b) => n + Math.ceil(JSON.stringify(b).length / CHARS_PER_TOKEN), 0);
+  const tokens = bodies.reduce((n, b) => n + Math.ceil(JSON.stringify(b).length / CHARS_PER_TOKEN), 0);
   console.log(JSON.stringify(bodies[0], null, 2));
   console.error(
-    waiting.length
-      ? `A real run sends ${waiting.length} requests: ${argued.length} argued edges and ${controls.length} controls, ${done ? `${done} already cached` : 'none cached'}. ` +
-          `That is about ${tokens.toLocaleString('en-US')} input tokens, estimated at ${CHARS_PER_TOKEN} characters a token. Nothing was sent.`
-      : `A real run sends nothing: all ${bodies.length} requests are already cached. Nothing was sent.`,
+    `A real run sends ${requests(bodies.length)} to TypeSafe: ${argued.length} argued edges and ${controls.length} controls. ` +
+      `Each request is charged to your key, at TypeSafe's price. ` +
+      `That is about ${tokens.toLocaleString('en-US')} input tokens, estimated at ${CHARS_PER_TOKEN} characters a token. Nothing was sent.`,
   );
   process.exit(EXIT.ok);
 }
@@ -356,6 +352,7 @@ const SETUP = [
   `No ${KEY_VAR} in the environment. Nothing was sent.`,
   '',
   'The audit is optional. It sends a box\'s text to TypeSafe, the provider of the Jev model.',
+  'Each request it sends is charged to your key, at TypeSafe\'s price.',
   'To turn it on, get a key from TypeSafe (docs.typesafe.ai) and set it yourself, once,',
   'where every new session reads it:',
   '',
@@ -388,19 +385,13 @@ function scoresFrom(json) {
   return { scores };
 }
 
-function cacheFileFor(body) {
-  const hash = createHash('sha256').update(`${endpoint}\n${JSON.stringify(body)}`).digest('hex').slice(0, 32);
-  return join(cacheDir, `${hash}.json`);
-}
-
-function cached(file) {
-  try {
-    const { scores } = scoresFrom(JSON.parse(readFileSync(file, 'utf8')));
-    return scores;
-  } catch {
-    return undefined;
-  }
-}
+// What the run has spent, for the closing line. A request counts once the
+// service answered it with any status, because that is a request it received.
+// A connection that never reached the service counts for nothing. `model` is
+// the version the service says answered, when it says one: `jev-latest` is an
+// alias, and the answer is the only place the real version shows.
+let sent = 0;
+const models = new Set();
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -423,6 +414,7 @@ async function post(body) {
       }
       return { refused: `the service could not be reached twice (${e.cause?.code ?? e.message})` };
     }
+    sent++;
     // A body left unread holds its socket open, and process.exit with a socket
     // open crashed node on Windows (0xC0000409) in the test for a second 5xx.
     if (!res.ok) await res.arrayBuffer().catch(() => {});
@@ -440,30 +432,30 @@ async function post(body) {
     } catch {
       return { refused: 'the response is not JSON' };
     }
+    if (json && typeof json.model === 'string' && json.model) models.add(json.model);
     return scoresFrom(json);
   }
 }
 
 async function score(e) {
-  const body = bodyFor(e);
-  const file = cacheFileFor(body);
-  const hit = cached(file);
-  if (hit) return hit;
-  const { scores, refused } = await post(body);
+  const { scores, refused } = await post(bodyFor(e));
   if (refused) throw new Refused(refused);
-  const answers = Object.fromEntries(NAMES.map(n => [n, { type: 'noul', noul: scores[n] }]));
-  // Owner-only where the platform honours a mode. The default folder sits in a
-  // directory other local accounts may share; SECURITY.md states what is left.
-  // A cache that cannot be written costs a request next time, nothing more. The
-  // request has already gone out, so a throw here would lose a paid answer and
-  // exit 1, which means an unreadable box.
-  try {
-    mkdirSync(cacheDir, { recursive: true, mode: 0o700 });
-    writeFileSync(file, JSON.stringify({ answers }));
-  } catch {
-    // a miss next time
-  }
   return scores;
+}
+
+// The closing line, on standard error beside any refusal, so it prints whether
+// the run ranked or stopped partway. The agent passes it to the user: it is
+// what the run spent. Two versions in one run mean the alias moved mid-run,
+// and the calibration compared one model's edges with another's controls.
+function spent() {
+  if (!sent) return;
+  const by = [...models];
+  const answered = !by.length
+    ? ''
+    : by.length === 1
+      ? ` Answered by ${by[0]}.`
+      : ` Answered by ${by.join(' and ')}: the version changed during the run, so the scores may not compare.`;
+  console.error(`Sent ${requests(sent)} to TypeSafe, charged to your key.${answered}`);
 }
 
 // Thrown once a request has gone out. From there on the process ends by
@@ -482,6 +474,7 @@ try {
   console.error(`Refused: ${e.message}. Nothing was guessed, and no ranking is printed.`);
   process.exitCode = EXIT.service;
 }
+spent();
 
 // --- the ranking -------------------------------------------------------------
 

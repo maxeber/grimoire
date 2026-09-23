@@ -75,7 +75,7 @@ node skills/eagle-eye/render.mjs <box.json> --out page.html
 | --- | --- |
 | [`SKILL.md`](SKILL.md) | The skill. The prose an agent follows. |
 | [`render.mjs`](render.mjs) | The renderer and the validator. |
-| [`audit.mjs`](audit.mjs) | An optional audit of the argued edges. It ranks them, so you know which to reread first. It sends the box's text to the model provider, and only when you run it with a key. |
+| [`audit.mjs`](audit.mjs) | An optional audit of the argued edges. It ranks them, so you know which to reread first. It sends the box's text to the model provider, and only when you run it with a key. The provider charges each request to that key. |
 | [`box.schema.json`](box.schema.json) | The shape of a box file. |
 | [`lib/`](lib) | The one module the page and the tests both run. |
 | [`reference/`](reference) | How to write an edge, and the rest of the reference. |
