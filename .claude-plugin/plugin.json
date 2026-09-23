@@ -1,6 +1,6 @@
 {
   "name": "grimoire",
-  "version": "0.20.3",
+  "version": "0.20.4",
   "description": "A spellbook of agent skills for AI. Cast wisely. Two skills: eagle-eye, which lays coupled decisions out as a morphological box and renders one self-contained page that reads any configuration back; and groundtrack, which turns a plan or a written change into a call graph with recorded traces through it, on a page a reader can step.",
   "author": {
     "name": "Ayman Diab",

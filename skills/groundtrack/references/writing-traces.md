@@ -62,7 +62,9 @@ Then decide which kind of failure it is:
 
 - **The effect throws.** The effect move carries `raised`. A `propagate`
   follows for each frame the error leaves. Then comes either an `uncaught`, or
-  a `catch` in a frame whose call step declares that tag.
+  a `catch` in a frame whose call step declares that tag. Before an
+  `uncaught`, the `propagate` moves are optional. The `uncaught` pops every
+  frame still open, and the error path records each one.
 - **The effect returns a failure value the code inspects.** The effect move
   carries `next` to the `if` that inspects it, and the `if` routes to the
   `throw` step.

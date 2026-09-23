@@ -460,10 +460,15 @@ propagate, the entry frame returning, and an error reaching the top uncaught.
   callee is pushed, which is why a caller's cursor is already past its own guard
   while the callee runs. That detail is not trivia: it is exactly what one of
   the shipped validator checks had to get right.
-- **A frame is popped by a return or a propagate**, and by nothing else.
-- **The two terminal moves are stack-free.** They arrive after the last frame
-  has gone, so a validator that demands an open frame on every move rejects
-  every valid trace.
+- **A frame is popped by a return, a propagate or an uncaught**, and by nothing
+  else.
+- **The two terminal moves need no open frame, and they treat open frames
+  differently.** A `done` arrives after the last frame has gone, so a validator
+  that demands an open frame on every move rejects every valid trace. An
+  `uncaught` may arrive with frames still open. It pops them, and the error path
+  records each one as propagated, innermost first. The asymmetry is deliberate:
+  the uncaught check reads those open frames for a handler that should have
+  caught the tag, and it would have nothing to read if the move required none.
 
 **A failing effect is one move, not two.** The effect move carries `raised`
 instead of a `next`, and the ledger row is derived from that one move. **There
@@ -560,7 +565,8 @@ The validator proves the trace is a **legal path** and evaluates nothing:
 - A call's target matches the step's target; an effect's kind matches the step's
   kind.
 - A catch names a step that declares that handler, and lands on it.
-- Frames push and pop in order, and the terminal move arrives with none open.
+- Frames push and pop in order. A `done` arrives with none open; an `uncaught`
+  may arrive with frames open, and the check for a handler in its way reads them.
 - A fail is in the error list of every node it leaves, and a die is in none.
 - A throw move and an uncaught move repeat the cause the error carries.
 

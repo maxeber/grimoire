@@ -530,12 +530,45 @@ test('every error-path entry that names a node carries the call site of its fram
   ]);
 });
 
-test('an error that reaches the top names no node and no site', () => {
+test('an error that reaches the top propagates the frames still open, then names no node and no site', () => {
+  // greet threw in its own frame, and that frame is still open when the
+  // error reaches the top. So the frame says both, in path order: it threw,
+  // and then the error left it.
   const s = G.fold(greet, runNamed(greet, 'the post fails').trace);
   const path = s[s.length - 1].errorPath;
   assert.deepEqual(path.map(e => [e.how, e.nodeId, e.site]), [
     ['thrown', 'greet', '@entry'],
+    ['propagated', 'greet', '@entry'],
     ['reached the top uncaught', null, undefined],
+  ]);
+});
+
+test('an error that reaches the top with frames open puts every frame it crossed on the path', () => {
+  // Three frames deep, the innermost throws, and the walk writes one
+  // propagate for three frames crossed. No shipped example reaches this. The
+  // fold derives the two the walk left out, innermost first, each with its
+  // own frame's call site, and the top comes last.
+  const prog = G.graphView(errorPastTwoSites(JSON.parse(readFileSync(exampleFlightpath, 'utf8'))), 0);
+  const walk = runNamed(prog, 'the store is down').trace;
+  walk.steps.splice(walk.steps.findIndex(m => m.k === 'propagate'), 1);
+  assert.equal(walk.steps.filter(m => m.k === 'propagate').length, 1);
+  const end = G.fold(prog, walk).slice(-1)[0];
+  assert.deepEqual(end.errorPath.map(e => [e.how, e.nodeId, e.site, e.chain && e.chain.join('/')]), [
+    ['thrown', 'lookupName', 'loadProfile#1', '@entry/greet#0/loadProfile#1'],
+    ['propagated', 'lookupName', 'loadProfile#1', '@entry/greet#0/loadProfile#1'],
+    ['propagated', 'loadProfile', 'greet#0', '@entry/greet#0'],
+    ['propagated', 'greet', '@entry', '@entry'],
+    ['reached the top uncaught', null, undefined, undefined],
+  ]);
+  assert.deepEqual(end.frames, []);
+  // And the tree marks every crossed row, while the row that threw keeps its
+  // own word.
+  const rows = G.treeRows(prog, walk, null, undefined, G.fold(prog, walk));
+  assert.deepEqual(rows.map(r => [r.site ? r.site.aside : null, r.errorPath ? r.errorPath.how : null, r.path]), [
+    [null, ['propagated'], 'propagated'],
+    ['the only call that can fail', ['propagated'], 'propagated'],
+    ['by id', null, null],
+    ['by alias', ['thrown'], 'thrown'],
   ]);
 });
 
@@ -765,18 +798,19 @@ test('the error path marks nothing before the raise and nothing after the return
   }
 });
 
-test('an error that reaches the top adds no row, and marks only the frames it crossed', () => {
-  // The frames still open when it reaches the top are not on the fold's path —
-  // nothing unwound them — so greet carries nothing. The top itself names no
-  // node, so no row carries it and no row is made for it.
+test('an error that reaches the top adds no row, and marks every frame it crossed', () => {
+  // The frames still open when it reaches the top are on the path too: the
+  // move that reaches the top propagates them. So greet reads propagated. The
+  // top itself names no node, so no row carries it and no row is made for it.
   assert.deepEqual(errorRows(twoSites, 'the store is down'), [
-    ['greet', null, null],
+    ['greet', null, ['propagated']],
     ['loadProfile', 'the only call that can fail', ['propagated']],
     ['lookupName', 'by id', null],
     ['lookupName', 'by alias', ['thrown']],
   ]);
   // And on the shipped example: the entry raised, and the lookup it called
-  // earlier and which returned took no part.
+  // earlier and which returned took no part. The entry is also propagated at
+  // the top, and the row that threw keeps its own word.
   assert.deepEqual(errorRows(greet, 'the post fails'), [
     ['greet', null, ['thrown']],
     ['lookupName', 'the only call that can fail', null],
