@@ -89,10 +89,13 @@ rows. A cell that closes half the box is usually a position, not an option.
    ```
 
    The probe prints `yes` or `no`, and it sends nothing. Treat any other output
-   as `no`. On `no`, or with no `audit.mjs`, say nothing about the audit.
-   When the user asks for the audit and the probe says `no`, run the audit. It
-   sends nothing. It prints the steps to set a key, and you give those steps to
-   the user. Never ask for the key. Never write it into a file.
+   as `no`. With no `audit.mjs`, say nothing about the audit.
+
+   On `no`, tell the user one time in a conversation that a tool can rank the
+   argued edges. Say that it needs a key from the model provider. Ask if they
+   want the steps to set a key. On a yes, run the audit with no key. It sends
+   nothing. It prints the steps, and you give those steps to the user. Never
+   ask for the key. Never write it into a file.
 
    On `yes`, run the audit with `--dry-run` first. It sends nothing. It prints
    how many requests a real run sends, and their rough size. Then tell the

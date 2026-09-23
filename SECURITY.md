@@ -28,10 +28,11 @@ So the realistic risks are narrow, and worth naming precisely:
   modules only, so there is no dependency tree to poison today. That is a fact
   about now, not a guarantee about later.
 - **A credential in the environment that a script in the tree reads.**
-  `audit.mjs` reads `TYPESAFE_API_KEY` and sends it as a bearer token. A change
-  to that script, or to the endpoint it posts to, is a change that could send
-  the key somewhere else. A reviewer should read any diff to that file as a
-  change to this one.
+  `audit.mjs` reads `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` and sends the
+  one it uses as a bearer token. A change to that script, to the endpoints it
+  posts to, or to the rule that pairs a key with an endpoint, is a change that
+  could send a key somewhere else. A reviewer should read any diff to that file
+  as a change to this one.
 
 ## What the renderer actually does with box text
 
@@ -194,8 +195,9 @@ by a reviewer, and a new `="${` there is a change to this file.
 eagle-eye's step 4 checks every `argued` edge against eight weakness patterns.
 `skills/eagle-eye/audit.mjs` can do a first pass: it asks a small decision
 model, Jev from TypeSafe, eight yes/no questions per edge, and ranks the edges
-for rereading. It is the only file in this repository that opens a connection,
-and it is opt-in twice over.
+for rereading. It reaches Jev by one of two routes: TypeSafe's own endpoint, or
+OpenRouter's decisions endpoint, which relays to TypeSafe. It is the only file
+in this repository that opens a connection, and it is opt-in twice over.
 
 - **When.** Only when somebody runs it with a box path and a key in the
   environment. The skill tells the agent to probe for a key, offer the audit in
@@ -205,7 +207,11 @@ and it is opt-in twice over.
   runs the script against a fake bound to `127.0.0.1` in the test process, and
   clears any real key from the child's environment first.
 - **What.** One `POST` per argued edge, and one per shuffled control, to
-  `https://api.typesafe.ai/v1/systemone`. With `--sel`, only the argued edges
+  `https://api.typesafe.ai/v1/systemone`, or on the OpenRouter route to
+  `https://openrouter.ai/api/alpha/decisions`. OpenRouter documents that
+  endpoint as an alpha feature, so its contract can change; the dry run, the
+  setup text and the closing line all say *alpha endpoint*, and a response
+  whose shape moved is refused, never guessed at. With `--sel`, only the argued edges
   that make that configuration fail, plus every control; a set that holds sends
   nothing, and a sourced or measured edge is never sent. Each body carries the box's
   `problem`; the edge's `why` and the relation it claims; and, for both of its
@@ -216,19 +222,48 @@ and it is opt-in twice over.
   sends, their rough size, and that each is charged to the key; the skill's
   offer repeats all three. It names no price: the provider sets the price and
   can change it, and a count stays true. A real run ends by saying how many
-  requests the service received and which model version answered them.
-- **To whom.** TypeSafe. What the provider does with the text is its policy,
-  not this repository's. A box holds whatever its author wrote into it, so do
-  not audit a box whose text you would not send.
-- **The key.** Read from `TYPESAFE_API_KEY` and nowhere else: not a flag, not a
-  file. It is never printed and never written. With no key the script sends
-  nothing, exits `3` and prints how to set one: the variable, the two places a
-  key persists across sessions, that a project `.env` is not read, and never
-  to paste the key into a chat. The skill tells the agent to pass those steps
-  on, only when the user asks for the audit, and never to ask for the key or
-  write it into a file. A key typed into a chat lands in the transcript. `--probe` answers
-  `yes` or `no`, never the value, and opens no connection. The tests hold all
-  four, with a fake key they look for in every stream.
+  requests the service received and which model version answered them. Both
+  lines name the route. OpenRouter's answer also reports a cost; the script
+  reads no field it does not need, and prints no cost.
+- **To whom.** The route follows the key that is set. With `TYPESAFE_API_KEY`,
+  TypeSafe. With only `OPENROUTER_API_KEY`, OpenRouter, which passes the
+  request to TypeSafe: two companies see the text. When both keys are set,
+  TypeSafe wins, because its contract is the documented one and it adds no
+  second company. A run **never falls back** to the other route. A fallback
+  would send one box to two companies, and the two name the model differently
+  (`jev-1.13.0` against `typesafe/jev-1.13-20260917`), so #104's one-model rule
+  would stop the run anyway. The OpenRouter body pins its upstream with
+  `provider: { only: ["TypeSafe"], allow_fallbacks: false }`, so a second
+  upstream for Jev cannot answer part of a run. It sets no `data_collection`
+  filter: that filter applies to the upstream, which is TypeSafe on either
+  route, and the direct route already sends the box there with no such
+  condition. What each company does with the text is its policy, not this
+  repository's. OpenRouter documents that it keeps no prompt or response text
+  unless the account turns logging on
+  (openrouter.ai/docs/guides/privacy/data-collection); check that setting on
+  your OpenRouter account before you use that route. A box holds whatever its
+  author wrote into it, so do not audit a box whose text you would not send.
+- **The keys.** Read from `TYPESAFE_API_KEY` and `OPENROUTER_API_KEY` and
+  nowhere else: not a flag, not a file. Neither is ever printed or written.
+  With no key the script sends nothing, exits `3` and prints how to set one:
+  both variables and which one wins, the two places a key persists across
+  sessions, that a project `.env` is not read, and never to paste the key into
+  a chat. The skill tells the agent to mention the audit once when the probe
+  says `no`, to pass those steps on only when the user asks for them, and never
+  to ask for the key or write it into a file. A key typed into a chat lands in
+  the transcript. `--probe` answers `yes` or `no`, never the value, and opens
+  no connection. `--provider` names the route and its endpoint, never a key,
+  and opens no connection either. The tests hold all of this, with fake keys
+  they look for in every stream.
+- **The misplaced key.** An OpenRouter key starts with `sk-or-v1-`. A
+  `TYPESAFE_API_KEY` that starts with it is refused before any request, in
+  every mode, including the dry run: exit `3`, a message that names
+  `OPENROUTER_API_KEY`, and nothing sent. `--probe` answers `no` for it. It
+  does not switch to an `OPENROUTER_API_KEY` set beside it, because the user's
+  setup is wrong and a silent switch would hide that. Before this guard, such a
+  key went to TypeSafe as a bearer token, was refused with a 401, and had still
+  left for a company that did not issue it (#117). TypeSafe documents no key
+  prefix, so this negative check is the only shape check the script can make.
 - **The override.** `EAGLE_EYE_AUDIT_ENDPOINT` exists so the tests can point
   the script at the fake. Whatever URL it names receives the key and the box
   text, so it accepts only an address in `127.0.0.0/8`, or `::1`. Not the name
@@ -251,7 +286,7 @@ and it is opt-in twice over.
   (#104). A network error or a `5xx` is retried once; a second one fails the
   same way.
 
-**The provider's name appears in that script and nowhere else under
+**The providers' names appear in that script and nowhere else under
 `skills/`.** The prose says *the model provider*. Why code may name a service
 and prose may not is argued in
 [`docs/adr/0001-skills-own-their-vocabulary.md`](docs/adr/0001-skills-own-their-vocabulary.md).
@@ -696,7 +731,8 @@ a threat model:
   before you install it, here or anywhere.
 - **What the provider does with a box you chose to audit.** The audit sends the
   text listed above, and only after a yes. Past that point the text is under
-  the provider's policy. This repository cannot see or change it.
+  the policy of each company on the route. This repository cannot see or
+  change it.
 - **A malicious maintainer account.** Branch protection raises the cost of a bad
   commit. It does not survive a stolen account with admin rights.
 - ~~**The one request the page makes when you open it.**~~ **Closed.** This
