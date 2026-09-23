@@ -205,7 +205,9 @@ and it is opt-in twice over.
   runs the script against a fake bound to `127.0.0.1` in the test process, and
   clears any real key from the child's environment first.
 - **What.** One `POST` per argued edge, and one per shuffled control, to
-  `https://api.typesafe.ai/v1/systemone`. Each body carries the box's
+  `https://api.typesafe.ai/v1/systemone`. With `--sel`, only the argued edges
+  that make that configuration fail, plus every control; a set that holds sends
+  nothing, and a sourced or measured edge is never sent. Each body carries the box's
   `problem`; the edge's `why` and the relation it claims; and, for both of its
   options, the label, the row name and question, the option's own `why`,
   `notes` and `src`. Nothing else from the disk is read into a request.

@@ -14,10 +14,10 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { audit, root, runAsync } from './helpers.mjs';
+import { audit, renderer, root, run, runAsync } from './helpers.mjs';
 
 const work = mkdtempSync(join(tmpdir(), 'grimoire-audit-'));
 after(() => rmSync(work, { recursive: true, force: true }));
@@ -351,6 +351,184 @@ test('an answer that names no model is refused, because the report could not say
     } finally {
       await svc.close();
     }
+  }
+});
+
+// ---- --sel: one configuration ----
+//
+// A configuration of the kept decisions box that does not hold, for three
+// edges: two argued conflicts and one sourced requirement. The first argued
+// edge is the one the full run flags.
+const FAILING = 'eagle-eye: scope-guest, sup-archive, rel-main';
+const SOURCED_UNMET = 'Branch protection blocks a merge on a required check, and only CI supplies one.';
+
+// The edges the renderer names for a code, read off its own --sel lines, as
+// `<why> [<tier>]`. The audit must treat exactly these as active.
+function rendererActive(code) {
+  const r = run(renderer, [decisions, '--sel', code]);
+  assert.equal(r.code, 0, r.stderr);
+  return r.stdout
+    .split(/\r?\n/)
+    .filter(l => /^ {2}(conflict|not met): /.test(l))
+    .map(l => l.replace(/^.* — /, ''))
+    .sort();
+}
+
+test('--sel scores only the configuration\'s argued edges, against the full run\'s controls, and flags them the same way', async () => {
+  const svc = await fake(decisionsReply());
+  const sidecar = join(work, 'sel.json');
+  const fullSidecar = join(work, 'full.json');
+  const before = readFileSync(decisions);
+  try {
+    const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY };
+    const r = await runAudit([decisions, '--sel', FAILING, '--json', sidecar], env);
+    assert.equal(r.code, 0, r.stderr);
+    assertNoKey(r);
+
+    // Two argued edges and the same six controls a full run builds. The
+    // sourced edge is never sent.
+    assert.equal(svc.seen.length, 8);
+    assert.match(r.stderr, /^Sent 8 requests to TypeSafe, charged to your key\./m);
+    // A control reuses a sourced `why` with another target, so the test is the
+    // pair: that `why` never goes out pointing at its own target.
+    const own = s => s.body.state.edge.why === SOURCED_UNMET && s.body.state.edge.target.option === 'A GitHub Action checks every example box on push. Tags on top.';
+    assert.equal(svc.seen.filter(own).length, 0, 'the sourced active edge was sent');
+    assert.match(r.stdout, /Calibrated: 6 shuffled controls score 0\.60 to 0\.80 on weakly connected/);
+
+    const all = blocks(r.stdout);
+    assert.equal(all.length, 2);
+    assert.ok(all[0].startsWith('FLAG') && all[0].includes(INSIDE));
+    assert.ok(all[1].startsWith('    '));
+
+    // The sourced edge is listed, with the reason it is not scored.
+    assert.match(r.stdout, /not scored: sourced — recheck its src/);
+    assert.ok(r.stdout.includes(SOURCED_UNMET));
+
+    // The same edges the renderer names for the same code.
+    const json = JSON.parse(readFileSync(sidecar, 'utf8'));
+    assert.equal(json.sel, FAILING);
+    assert.equal(json.holds, false);
+    assert.equal(json.controls.length, 6);
+    assert.deepEqual(json.edges.map(e => `${e.why} [${e.tier}]`).sort(), rendererActive(FAILING));
+    const unscored = json.edges.filter(e => e.scored === false);
+    assert.deepEqual(unscored.map(e => `${e.source} ${e.kind} ${e.target}`), ['sec-platform req rel-ci']);
+    assert.equal(unscored[0].scores, undefined);
+
+    // Each scored edge carries the flag the full run gives it.
+    const full = await runAudit([decisions, '--json', fullSidecar], env);
+    assert.equal(full.code, 0, full.stderr);
+    const fullJson = JSON.parse(readFileSync(fullSidecar, 'utf8'));
+    const fullFlags = new Map(fullJson.edges.map(e => [`${e.source} ${e.kind} ${e.target}`, e.flagged]));
+    const scored = json.edges.filter(e => e.scored !== false);
+    assert.equal(scored.length, 2);
+    for (const e of scored) assert.equal(e.flagged, fullFlags.get(`${e.source} ${e.kind} ${e.target}`), `${e.source} ${e.kind} ${e.target}`);
+    assert.equal(json.threshold, fullJson.threshold);
+
+    assert.deepEqual(readFileSync(decisions), before, 'the box file changed');
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--sel on a set that holds says so, sends nothing, and exits 0', async () => {
+  const svc = await fake();
+  const sidecar = join(work, 'holds.json');
+  try {
+    const r = await runAudit([decisions, '--sel', 'eagle-eye: none', '--json', sidecar], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(svc.seen.length, 0);
+    assert.match(r.stdout, /The set holds\. There is nothing to audit, and nothing was sent\./);
+    assert.doesNotMatch(r.stderr, /Sent \d/);
+    const json = JSON.parse(readFileSync(sidecar, 'utf8'));
+    assert.equal(json.sel, 'eagle-eye: none');
+    assert.equal(json.holds, true);
+    assert.deepEqual(json.edges, []);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--sel on a set that fails only on sourced edges lists them and sends nothing', async () => {
+  const svc = await fake();
+  try {
+    const r = await runAudit([decisions, '--sel', 'eagle-eye: rel-main'], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(svc.seen.length, 0);
+    assert.match(r.stdout, /not scored: sourced — recheck its src/);
+    assert.ok(r.stdout.includes(SOURCED_UNMET));
+    assert.match(r.stdout, /No active edge is argued, so nothing was sent\./);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--sel --dry-run counts the configuration\'s requests and sends nothing', async () => {
+  const svc = await fake();
+  try {
+    const r = await runAudit([decisions, '--sel', FAILING, '--dry-run'], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(svc.seen.length, 0);
+    assert.match(r.stderr, /A real run sends 8 requests to TypeSafe: 2 argued edges and 6 controls\./);
+    assert.match(r.stderr, /Nothing was sent\./);
+    assert.equal(JSON.parse(r.stdout).state.edge.why, INSIDE);
+
+    const holds = await runAudit([decisions, '--sel', 'eagle-eye: none', '--dry-run'], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url });
+    assert.equal(holds.code, 0, holds.stderr);
+    assert.match(holds.stdout, /The set holds/);
+    assert.equal(svc.seen.length, 0);
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--sel scores an argued conflict whose mirror is sourced, which the renderer prints once', async () => {
+  // The renderer prints a conflict drawn from both ends once. That is display.
+  // Each direction is its own edge with its own evidence, so the audit scores
+  // the argued one and lists the sourced one, whichever the renderer printed.
+  const box = JSON.parse(readFileSync(decisions, 'utf8'));
+  box.rel['proof-pages'].rel = [
+    ...(box.rel['proof-pages'].rel ?? []),
+    ['scope-guest', 'conf', 'Pages serves a repository the author owns.', 'sourced', 'GitHub Pages documentation'],
+  ];
+  const mirrored = join(work, 'mirrored.json');
+  writeFileSync(mirrored, JSON.stringify(box));
+  const svc = await fake(decisionsReply());
+  const sidecar = join(work, 'mirrored-sel.json');
+  try {
+    const r = await runAudit([mirrored, '--sel', 'eagle-eye: scope-guest', '--json', sidecar], { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY });
+    assert.equal(r.code, 0, r.stderr);
+    const json = JSON.parse(readFileSync(sidecar, 'utf8'));
+    assert.deepEqual(
+      json.edges.map(e => `${e.source} ${e.kind} ${e.target} ${e.scored}`).sort(),
+      ['proof-pages conf scope-guest false', 'scope-guest conf proof-pages true'],
+    );
+  } finally {
+    await svc.close();
+  }
+});
+
+test('--sel refuses an unknown id, a missing value, and a following flag with exit 2', async () => {
+  const svc = await fake();
+  try {
+    const env = { EAGLE_EYE_AUDIT_ENDPOINT: svc.url, TYPESAFE_API_KEY: KEY };
+    const unknown = await runAudit([decisions, '--sel', 'eagle-eye: no-such-option'], env);
+    assert.equal(unknown.code, 2, unknown.stderr);
+    assert.match(unknown.stderr, /unknown option "no-such-option"/);
+    assert.doesNotMatch(unknown.stderr, /at Object|at Module/);
+    // An id a plain object would find on its prototype is still unknown.
+    const proto = await runAudit([decisions, '--sel', 'eagle-eye: constructor'], env);
+    assert.equal(proto.code, 2, proto.stderr);
+    // A second --sel is refused rather than read: the renderer and the audit
+    // would otherwise each pick a different one of the two.
+    const twice = [decisions, '--sel', 'eagle-eye: none', '--sel', FAILING];
+    for (const args of [[decisions, '--sel'], [decisions, '--sel', '--json', join(work, 'x.json')], twice]) {
+      const r = await runAudit(args, env);
+      assert.equal(r.code, 2, `${args.join(' ')}: ${r.stderr}`);
+      assert.match(r.stderr, /^usage:/);
+    }
+    assert.equal(svc.seen.length, 0);
+  } finally {
+    await svc.close();
   }
 });
 

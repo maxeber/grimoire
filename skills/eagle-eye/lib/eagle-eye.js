@@ -22,6 +22,22 @@ const EagleEye = (() => {
     return { optById, chosenOf };
   }
 
+  // A restore code ("eagle-eye: opt-id, opt-id") to the configuration it names: the chosen set with
+  // each listed option swapped in, and the rows the code changed. "none", or no code, is the chosen
+  // set. The renderer and the audit both read --sel through this, so they cannot disagree about
+  // which set a code names or which edges are active. An unknown id throws; each caller turns that
+  // into its usage error. The id comes from the command line, so the lookup is an own-property test:
+  // `constructor` is not an option just because a plain object has one.
+  function parseSel(box, code){
+    const { chosenOf, optById } = index(box);
+    const sel = { ...chosenOf }, touched = new Set();
+    if (code) code.replace(/^\s*eagle-eye:\s*/i, '').split(',').map(s => s.trim()).filter(s => s && s !== 'none').forEach(id => {
+      if (!Object.hasOwn(optById, id)) throw new Error(`unknown option "${id}"`);
+      sel[optById[id].dim.id] = id; touched.add(optById[id].dim.id);
+    });
+    return { sel, touched };
+  }
+
   // sel: {dimId: optId}. touched: Set of dimIds the user has clicked in. Returns everything the panel needs.
   function analyse(box, sel, touched = new Set()){
     const { optById, chosenOf } = index(box);
@@ -202,6 +218,6 @@ const EagleEye = (() => {
     return { optById, chosenOf, selected, overrides, conflicts, unmet, met, closed, pulled, verdict, basis, moves, affected, suspected: box.suspected || [] };
   }
 
-  return { analyse, index, esc };
+  return { analyse, index, parseSel, esc };
 })();
 if (typeof module !== 'undefined') module.exports = EagleEye;

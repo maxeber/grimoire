@@ -43,6 +43,9 @@ if (!boxPath) usage();
 // box being readable — and it exits 2, the code a missing box path produces.
 const missingValue = n => args.some((a, i) => a === n && (args[i + 1] === undefined || args[i + 1].startsWith('--')));
 if (missingValue('--sel') || missingValue('--out')) usage();
+// A second --sel is refused, as the audit refuses it. `flag` reads the first and the audit's loop
+// read the last, so a line with two named a different set in each script.
+if (args.filter(a => a === '--sel').length > 1) usage();
 
 const TIERS = new Set(['measured', 'sourced', 'argued']);
 const KINDS = new Set(['conf', 'req']);
@@ -160,12 +163,12 @@ function validate(box) {
 }
 
 function findings(box, code) {
-  const { chosenOf, optById } = EagleEye.index(box);
-  const sel = { ...chosenOf }, touched = new Set();
-  if (code) code.replace(/^\s*eagle-eye:\s*/i, '').split(',').map(s => s.trim()).filter(s => s && s !== 'none').forEach(id => {
-    if (!optById[id]) throw new Error(`--sel: unknown option "${id}"`);
-    sel[optById[id].dim.id] = id; touched.add(optById[id].dim.id);
-  });
+  const { optById } = EagleEye.index(box);
+  // The parser is the library's, so the audit reads the same code the same way. An unknown id is a
+  // usage error, exit 2, as it is in the audit. It was an uncaught throw: exit 1 and a stack trace.
+  let parsed;
+  try { parsed = EagleEye.parseSel(box, code); } catch (e) { console.error(`--sel: ${e.message}`); process.exit(2); }
+  const { sel, touched } = parsed;
   const r = EagleEye.analyse(box, sel, touched), strip = s => { let p, o = String(s); do { p = o; o = o.replace(/<[^>]+>/g, ''); } while (o !== p); return o; };
   // The brief leads, because the findings are about something. An agent reads this output and says
   // it in chat, and a reader who meets "conflict: Coach layer vs Depth control" without the problem

@@ -2,9 +2,15 @@
 // eagle-eye edge audit. Zero dependencies. Box file in, a ranking of its argued
 // edges out: which `why` to reread first. Opt-in, and never run without a yes.
 //
-//   node audit.mjs <box.json> [--json <path>] [--dry-run]
+//   node audit.mjs <box.json> [--sel <restore code>] [--json <path>] [--dry-run]
 //   node audit.mjs --probe
 //
+//   --sel      audit one configuration ("eagle-eye: opt-id, opt-id"), read the
+//              way the renderer's --sel reads it. Only the edges that make it
+//              fail are active: its conflicts and its requirements not met.
+//              The argued ones are scored against the full run's controls and
+//              flagged by the full run's rule. A sourced or measured one is
+//              listed and never sent. A set that holds sends nothing.
 //   --probe    print `yes` when a key is in the environment and `no` when it is
 //              not. Reads no box and opens no connection. The skill's offer to
 //              run the audit hangs on this answer.
@@ -16,9 +22,9 @@
 //
 // Exit codes, each one tested in tests/audit.test.mjs:
 //
-//   0  a ranking, a probe answer, or a dry run
+//   0  a ranking, a probe answer, a dry run, or a --sel set with nothing to send
 //   1  the box file cannot be read as a box
-//   2  a usage error
+//   2  a usage error, including an unknown option id in --sel
 //   3  no key in the environment. Nothing was sent.
 //   4  the service failed or refused, its answer did not have the pinned shape,
 //      or two answers in one run named different models
@@ -44,7 +50,9 @@
 // **Every request is charged to the user's key** (issue #106). So the dry run
 // says so before a yes, and a real run ends by saying how many it sent and
 // which model version answered. Nothing is cached: each run asks for every
-// edge and every control anew. Whether a cache should come back is issue #107.
+// edge and every control anew, and a --sel run sends every control beside its
+// active argued edges (issue #99 assumed a cache here). Whether a cache should
+// come back is issue #107.
 //
 // **One run, one model** (issue #104). `jev-latest` is an alias, and every
 // answer must name the model that gave it. The report names that model. The
@@ -61,7 +69,14 @@
 //                              the box text.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isIP } from 'node:net';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The renderer's analysis module, for --sel. One parser and one analysis, so
+// the audit's active edges are the renderer's conflicts and unmet requirements.
+const EagleEye = createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), 'lib/eagle-eye.js'));
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 const MODEL = 'jev-latest';
@@ -168,15 +183,27 @@ function stop(code, message) {
 
 const args = process.argv.slice(2);
 const usage = () =>
-  stop(EXIT.usage, 'usage: node audit.mjs <box.json> [--json <path>] [--dry-run]\n       node audit.mjs --probe');
-const KNOWN = new Set(['--json', '--dry-run', '--probe']);
+  stop(
+    EXIT.usage,
+    'usage: node audit.mjs <box.json> [--sel "eagle-eye: ids"] [--json <path>] [--dry-run]\n       node audit.mjs --probe',
+  );
+const KNOWN = new Set(['--json', '--dry-run', '--probe', '--sel']);
 let boxPath;
 let jsonPath;
+let selCode;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--json') {
     jsonPath = args[++i];
     if (jsonPath === undefined || jsonPath.startsWith('--')) usage();
+  } else if (a === '--sel') {
+    // A restore code never begins with --, so a following flag is a missing
+    // value, as it is in the renderer.
+    // A second --sel is refused, in both scripts: the renderer would read the
+    // first and this loop the last, so each would name a different set.
+    if (selCode !== undefined) usage();
+    selCode = args[++i];
+    if (selCode === undefined || selCode.startsWith('--')) usage();
   } else if (a.startsWith('--')) {
     if (!KNOWN.has(a)) usage();
   } else if (boxPath === undefined) {
@@ -278,7 +305,42 @@ for (const [source, entry] of Object.entries(box.rel)) {
     edges.push({ source, target, kind, why, tier });
   }
 }
-const argued = edges.filter(e => e.tier === 'argued');
+// The edges this run scores. A full run scores every argued edge. Under --sel,
+// only the active ones: the conflicts and the requirements not met that the
+// library's analysis finds for that set, which are the edges the renderer's
+// --sel prints. A sourced or measured active edge is listed and never scored:
+// the controls are built from those edges, so scoring one against them is
+// circular, and the fix for a doubtful one is its source, not its wording.
+//
+// One difference, and it is display against evidence. A conflict drawn from
+// both ends prints once in the renderer, whichever end it met first. Here each
+// direction is its own edge with its own `why` and tier, so both count: an
+// argued mirror of a sourced conflict is scored, not hidden behind it. The
+// selected set, and so which pairs conflict, is still the library's.
+let argued = edges.filter(e => e.tier === 'argued');
+let unscored = [];
+let holds;
+if (selCode !== undefined) {
+  try {
+    EagleEye.index(box);
+  } catch {
+    stop(EXIT.box, `${boxPath}: a row has no chosen option. Run the renderer with --check.`);
+  }
+  let parsed;
+  try {
+    parsed = EagleEye.parseSel(box, selCode);
+  } catch (e) {
+    stop(EXIT.usage, `--sel: ${e.message}`);
+  }
+  const { selected, unmet } = EagleEye.analyse(box, parsed.sel, parsed.touched);
+  const conflicts = edges.filter(
+    e => e.kind === 'conf' && selected.has(e.source) && selected.has(e.target) && options.get(e.source).row !== options.get(e.target).row,
+  );
+  const active = [...conflicts, ...unmet.map(e => ({ source: e.from, target: e.to, kind: e.kind, why: e.why, tier: e.tier }))];
+  argued = active.filter(e => e.tier === 'argued');
+  unscored = active.filter(e => e.tier !== 'argued');
+  holds = !active.length;
+}
 
 // Shuffled controls, written by nobody: keep a sourced or measured edge's
 // source and `why`, and point it at another such edge's target in a third row.
@@ -320,7 +382,68 @@ function bodyFor(e) {
 // Every request a real run would send: the argued edges, then the controls.
 const { controls, good } = shuffle();
 
-const requests = n => `${n} request${n === 1 ? '' : 's'}`;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const requests = n => plural(n, 'request');
+
+// Names, never ids, the way the renderer prints them: the agent reads this
+// out, and an id names nothing to the user. The --json sidecar keeps ids.
+const verb = { conf: 'rules out', req: 'requires' };
+const edgeName = e => `${options.get(e.source).name} ${verb[e.kind]} ${options.get(e.target).name}`;
+
+// The --sel lines that come before any ranking: which set, and whether it holds.
+function selHeader() {
+  if (holds) return [`Configuration: ${selCode}`, 'The set holds. There is nothing to audit, and nothing was sent.'];
+  return [
+    `Configuration: ${selCode}`,
+    `The set does not hold on ${plural(argued.length + unscored.length, 'active edge')}: ${argued.length} argued, ${unscored.length} sourced or measured.`,
+  ];
+}
+
+// An active sourced or measured edge, listed so the reader still meets it.
+const unscoredLines = () =>
+  unscored.flatMap(e => [`not scored: ${e.tier} — recheck its src`, `      ${edgeName(e)}`, `      why: ${e.why}`, '']);
+
+// The --json sidecar. Under --sel it also carries the code, whether the set
+// holds, and each active edge's tier and whether it was scored. A full run's
+// shape is what it was. `model` is absent when nothing was sent.
+function writeReport({ model, calibrated, threshold, ranked, controls }) {
+  const sel = selCode !== undefined;
+  const edge = e => ({
+    source: e.source,
+    kind: e.kind,
+    target: e.target,
+    why: e.why,
+    ...(sel ? { tier: e.tier } : {}),
+    ...(e.scores ? { scores: e.scores } : {}),
+  });
+  const out = {
+    box: boxPath,
+    ...(model !== undefined ? { model } : {}),
+    ...(sel ? { sel: selCode, holds } : {}),
+    pattern: CALIBRATED,
+    calibrated,
+    floor: MIN_CONTROLS,
+    threshold,
+    edges: [
+      ...ranked.map(e => ({ ...edge(e), top: e.top, flagged: e.flagged, ...(sel ? { scored: true } : {}) })),
+      ...unscored.map(e => ({ ...edge(e), scored: false })),
+    ],
+    controls: controls.map(c => ({ ...edge(c), shuffledFrom: c.from })),
+  };
+  writeFileSync(jsonPath, `${JSON.stringify(out, null, 2)}\n`);
+}
+
+// A --sel set with no argued active edge has nothing to send: it holds, or it
+// fails only on sourced or measured edges. Say which, before the dry run and
+// before the key, and send nothing. Not even the controls: with no edge to
+// compare they calibrate nothing.
+if (selCode !== undefined && !argued.length) {
+  const lines = [box.title ?? boxPath, ...selHeader()];
+  if (!holds) lines.push('', ...unscoredLines(), 'No active edge is argued, so nothing was sent.');
+  console.log(lines.join('\n'));
+  if (jsonPath && !dryRun) writeReport({ calibrated: false, threshold: null, ranked: [], controls: [] });
+  process.exit(EXIT.ok);
+}
 
 // The dry run states the size of a real run and who pays for it, and never a
 // price. The skill's offer to the user repeats this line: a price is the
@@ -500,12 +623,14 @@ function report() {
   }
   ranked.sort((a, b) => b.scores[CALIBRATED] - a.scores[CALIBRATED]);
 
-  // Names, never ids, the way the renderer prints them: the agent reads this
-  // out, and an id names nothing to the user. The --json sidecar keeps ids.
+  // Under --sel the threshold is the full run's: the same controls, the same
+  // rule and the same floor. It depends on the controls only, never on how
+  // many edges are scored.
   const f2 = p => p.toFixed(2);
-  const verb = { conf: 'rules out', req: 'requires' };
   const [model] = models;
-  const lines = [box.title ?? boxPath, `${ranked.length} argued edges, ranked by the ${CALIBRATED} score.`, `Scored by ${model}.`];
+  const lines = [box.title ?? boxPath];
+  if (selCode !== undefined) lines.push(...selHeader());
+  lines.push(`${ranked.length} argued edges, ranked by the ${CALIBRATED} score.`, `Scored by ${model}.`);
   if (calibrated) {
     lines.push(
       `Calibrated: ${scoredControls.length} shuffled controls score ${f2(threshold)} to ${f2(Math.max(...controlScores))} on ${CALIBRATED}. An edge at ${f2(threshold)} or above is flagged. The floor is ${MIN_CONTROLS} controls.`,
@@ -518,27 +643,15 @@ function report() {
   lines.push('A flag says which edge to reread first. It is not a verdict, and no score changes a tier.', '');
   for (const e of ranked) {
     lines.push(
-      `${e.flagged ? 'FLAG' : '    '}  ${options.get(e.source).name} ${verb[e.kind]} ${options.get(e.target).name}`,
+      `${e.flagged ? 'FLAG' : '    '}  ${edgeName(e)}`,
       `      ${NAMES.map(n => `${n} ${f2(e.scores[n])}`).join(', ')}`,
       `      top: ${e.top} ${f2(e.scores[e.top])}`,
       `      why: ${e.why}`,
       '',
     );
   }
+  lines.push(...unscoredLines());
   console.log(lines.join('\n'));
 
-  if (jsonPath) {
-    const edge = e => ({ source: e.source, kind: e.kind, target: e.target, why: e.why, scores: e.scores });
-    const out = {
-      box: boxPath,
-      model,
-      pattern: CALIBRATED,
-      calibrated,
-      floor: MIN_CONTROLS,
-      threshold,
-      edges: ranked.map(e => ({ ...edge(e), top: e.top, flagged: e.flagged })),
-      controls: scoredControls.map(c => ({ ...edge(c), shuffledFrom: c.from })),
-    };
-    writeFileSync(jsonPath, `${JSON.stringify(out, null, 2)}\n`);
-  }
+  if (jsonPath) writeReport({ model, calibrated, threshold, ranked, controls: scoredControls });
 }
