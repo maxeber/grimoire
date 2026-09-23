@@ -209,9 +209,9 @@ in this repository that opens a connection, and it is opt-in twice over.
 - **What.** One `POST` per argued edge, and one per shuffled control, to
   `https://api.typesafe.ai/v1/systemone`, or on the OpenRouter route to
   `https://openrouter.ai/api/alpha/decisions`. OpenRouter documents that
-  endpoint as an alpha feature, so its contract can change; the dry run, the
-  setup text and the closing line all say *alpha endpoint*, and a response
-  whose shape moved is refused, never guessed at. With `--sel`, only the argued edges
+  endpoint as an alpha feature, so its contract can change; the dry run and
+  the closing line say *alpha endpoint*, the setup text says OpenRouter labels
+  it alpha, and a response whose shape moved is refused, never guessed at. With `--sel`, only the argued edges
   that make that configuration fail, plus every control; a set that holds sends
   nothing, and a sourced or measured edge is never sent. Each body carries the box's
   `problem`; the edge's `why` and the relation it claims; and, for both of its
