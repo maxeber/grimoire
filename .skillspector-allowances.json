@@ -182,8 +182,8 @@
       "analyzers": [
         "static_patterns_tool_misuse"
       ],
-      "sha256": "890411849b0c0437e8ca4fd7732f18e7a47c07049e4852b715aad048e1194863",
-      "reason": "The listener, which opens the microphone through ffmpeg, asks Voicebox to transcribe and to speak, and plays the reply through a player. The destructive-command parser stops partway through a long expression and marks the file partial for that one check; every other check reads it in full. The entry also accepts a marker-pass give-up inside that one check, which the scanner reports under this code. Read by hand on 2026-11-13 (issue 208): the file holds no rm, del or erase in any spelling, no eval, no Function constructor and no shell string; it starts programs only with an argument list and shell false (ffmpeg, ffplay or a system player, and the setup listing), and deletes only its own files in its state folder: the say file it has read, the player temporary file and its run files."
+      "sha256": "ad605bb8aa95968f38f528de24ea2f480f8563629f8d3882e0f818f24dbeab04",
+      "reason": "The listener, which opens the microphone through ffmpeg, asks Voicebox to transcribe and to speak, and plays the reply through a player. The destructive-command parser stops partway through a long expression and marks the file partial for that one check; every other check reads it in full. The entry also accepts a marker-pass give-up inside that one check, which the scanner reports under this code. Read by hand on 2026-11-13 (issue 208): the file holds no rm, del or erase in any spelling, no eval, no Function constructor and no shell string; it starts programs only with an argument list and shell false (ffmpeg, ffplay or a system player, and the setup listing), and deletes only its own files in its state folder: the say file it has read, the player temporary file and its run files. Re-read on 2026-11-14 (issue 638): the change imports the meter's settings and hands the meter the gate's frame length; it adds no command, no deletion and no shell string."
     },
     {
       "skill": "incantation",
@@ -203,8 +203,8 @@
         "static_patterns_supply_chain",
         "static_patterns_system_prompt_leakage"
       ],
-      "sha256": "890411849b0c0437e8ca4fd7732f18e7a47c07049e4852b715aad048e1194863",
-      "reason": "The listener. The scanner could not fully evaluate text it took for obfuscated instructions, and reports that under this code for the twelve checks named. Read by hand on 2026-11-13 (issue 208): the file holds no rm, del or erase in any spelling, no eval, no Function constructor and no shell string; it holds regular expressions, fixed message lines and code, no base64 or other encoded text, no escape sequence that hides a character, and no instruction addressed to a model."
+      "sha256": "ad605bb8aa95968f38f528de24ea2f480f8563629f8d3882e0f818f24dbeab04",
+      "reason": "The listener. The scanner could not fully evaluate text it took for obfuscated instructions, and reports that under this code for the twelve checks named. Read by hand on 2026-11-13 (issue 208): the file holds no rm, del or erase in any spelling, no eval, no Function constructor and no shell string; it holds regular expressions, fixed message lines and code, no base64 or other encoded text, no escape sequence that hides a character, and no instruction addressed to a model. Re-read on 2026-11-14 (issue 638): the change imports the meter's settings and hands the meter the gate's frame length; it adds no encoded text and no instruction addressed to a model."
     },
     {
       "skill": "incantation",

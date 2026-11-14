@@ -29,7 +29,7 @@ import { captureArgs, listDevices, resolveRecorder, stampOf } from './capture/ff
 import { isEngine, loadEngine } from './engines/index.mjs';
 import { Gate, HeardQueue, Joiner, KNOBS, formatHeard, frameBytes, isFragment, isMuteWord, isStopWord, isUnmuteWord } from './gate.mjs';
 import { checkFile, cleanText, commandPath, levelsPath, observeDir, readSettings, readText, runDir, secureState, statusPath, writePrivate } from './lib.mjs';
-import { Meter, levelsLine } from './meter.mjs';
+import { METER, Meter, levelsLine } from './meter.mjs';
 import { makePlayer } from './player.mjs';
 
 class Stop extends Error {
@@ -268,7 +268,7 @@ export async function startListener(options = {}) {
     };
     // The mic's loudness for the band (T16): the stamp, the word and 24 digits, written when
     // the digits or the word change, and on the heartbeat so a reader can tell a gone listener.
-    const meter = new Meter();
+    const meter = new Meter({ ...METER, frameMs: knobs.frameMs });
     let lastLevels = '';
     let wroteLevels = false;
     function writeLevels(force = false) {
