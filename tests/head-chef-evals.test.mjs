@@ -282,20 +282,19 @@ test('the one-sided rules the contract held stand in their homes (#604 S9, A1 to
   assert.ok(section(skill, '## The permission warning', '## Actions that need').includes("When there is no mod, or the warning's tool is missing or refuses, say it in chat, once, as written, without its two controls, which chat cannot show:"), 'A11');
 });
 
-// The body's level-3 clauses keep the waits SKILL.md's "Autonomy levels" keeps
-// (adversarial review of #613): a merge that changes a threat model's accepted
-// risks, an edit to the line that names it, and dropping or narrowing a review
-// of sensitive work. A dropped or narrowed review is the lead's flagged call
-// only outside sensitive work. Each sentence stands in the schedule too.
-test('the contract body keeps the level-3 waits for accepted risks, the threat model line and sensitive-work reviews', () => {
+// Issue 644: at level 3 a call the owner's file keeps for the owner does not stop the lead; only
+// Claude's own guardrails and the harness do. The body and SKILL.md say so, and neither keeps a
+// list of what still waits at level 3.
+test('the contract body and SKILL.md say level 3 stops for nothing but the guardrails and the harness', () => {
   const body = flat(read('skills/head-chef/references/CONTRACT.md').split('\n## schedules\n')[0]);
   const levels = flat(read('skills/head-chef/SKILL.md'));
-  const waits = body.slice(body.indexOf('**What a standing goal never decides.**'), body.indexOf('**Never lifted, at any level.**'));
-  assert.ok(waits.includes("a merge that changes a threat model's scope or accepted risks, or an edit to the line that names it"), 'waits: the threat model');
-  assert.ok(waits.includes('dropping or narrowing a review of sensitive work'), 'waits: a review of sensitive work');
-  const visible = body.slice(body.indexOf('**Visibility in place of approval at level 3.**'), body.indexOf('**Not asking for a yes it can take.**'));
-  assert.ok(visible.includes('a dropped or narrowed review outside sensitive work'), 'visibility: only outside sensitive work');
-  assert.ok(levels.includes("a merge that changes a threat model's scope or accepted risks"), 'SKILL.md keeps the merge wait');
-  assert.ok(levels.includes("an edit to a threat model's scope, to the line that names it"), 'SKILL.md keeps the line wait');
-  assert.ok(levels.includes('dropping or narrowing a review, check or route'), 'SKILL.md keeps the review wait');
+  const stops = body.slice(body.indexOf('**What stops the lead at level 3.**'), body.indexOf('**A confirmation the file asks for, at level 3.**'));
+  assert.ok(stops.includes("Nothing the owner's instructions or any other file keeps: only Claude's own guardrails and the harness, a permission prompt, a classifier block or a tool that refuses."), 'body: what stops the lead');
+  assert.ok(body.includes("A call the owner's instructions keep for the owner is the lead's."), 'body: visibility in place of approval');
+  assert.ok(levels.includes("At level 3 only Claude's own guardrails and the harness stop you: a permission prompt, a classifier block, a tool that refuses."), 'SKILL.md: what stops the lead');
+  assert.ok(levels.includes('(a hard stop, a risk call, a security finding, a merge, a publish, a guard\'s stop), does not stop you'), 'SKILL.md: a kept call does not stop the lead');
+  for (const [name, text] of [['body', body], ['SKILL.md', levels]]) {
+    assert.equal(/still waits?\b/i.test(text), false, `${name} keeps no "still waits"`);
+    assert.equal(text.includes('even toward a standing goal'), false, `${name} keeps no "even toward a standing goal"`);
+  }
 });

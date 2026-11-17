@@ -138,10 +138,10 @@ or type `/brigade` to open it.
 - **Runs at your level** (since 0.17.0). It reads the Brigade pane's
   autonomy level before each decision it would take alone, and logs each
   decision before it acts. At 1 it asks you on every decision; at 2 it
-  decides what it is sure of and sends you the rest as to-dos; at 3 it runs
+  decides everything but what your user-level instructions file keeps for you, which it sends you as to-dos; at 3 it runs
   toward your goal and lists each decision in the Decisions tab for you to
   review. At levels 2 and 3 it follows your user-level instructions file:
-  what that file keeps for you waits. At level 3, inside the goal, where that file lets its standing-goal rule decide what it keeps and names, in one place, what it keeps even toward a goal, the lead itself decides the rest of what it keeps, flagged for you; what the file keeps even toward a goal, a publish that leaves your machine other than issue and pull-request work in your repositories or the goal's, and a few other calls the skill lists still wait. Cleanup waits for your yes in chat at
+  at level 2, what that file keeps for you waits. At level 3, inside the goal, the lead and its members stop for nothing: what the file keeps for you, its hard stops included, the lead decides itself, logs with an "Owner's call:" flag and tells you after. Only Claude's own guardrails and the harness stop them: a permission prompt, a classifier block, a tool that refuses. Cleanup waits for your yes in chat at
   levels 1 and 2, and a hand-off request or a fresh session a context figure
   prompts waits at every level.
 

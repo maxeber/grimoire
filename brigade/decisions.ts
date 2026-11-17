@@ -188,7 +188,7 @@ export const TOOL_ONLY_KEYS: readonly string[] = ['ask', 'stop']
 export const ASK_FORM =
   "Fix the entry's ask, stop or question and log it again: ask is question, review or notify, notify never waits, stop is one of the head-chef skill's kinds and only on a wait, and at level 3 a wait needs both and a one-line question. The step stays held until it is logged; if you can't log it, say so in chat."
 export const ASK_NO_STOP =
-  "At level 3 a wait needs one stop from the head-chef skill's list. If the call fits one, log it again with that stop; owner-file-keeps covers anything the owner's file keeps and anything you cannot place for sure. Only a call that fits none is yours: log it as Lead with your pick, act, and tell the owner what you took."
+  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it as Lead with your pick, flag it, act, and tell the owner what you took."
 
 // --- the to-do gate (618, S5) ---------------------------------------------------
 
