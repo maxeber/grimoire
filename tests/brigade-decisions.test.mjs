@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 const d = await import('../brigade/decisions.ts');
 const {
   MAX_ENTRIES, MAX_LOG_BYTES, MAX_MARKS, MAX_MARKS_BYTES, HISTORY_PAGE,
-  appendEntry, checkInput, checkLog, checkMarks, emptyLog, addMark, addMarks, mergeMarks, markKey,
+  appendEntry, checkInput, mapInput, SHAPE_TAIL, checkLog, checkMarks, emptyLog, addMark, addMarks, mergeMarks, markKey,
   reviewQueue, flaggedRows, historyRows, matchesSearch, searchWords, serializeLog, serializeMarks,
   sha256Hex, projectDigest, sourceLabel, writerName, missingIds,
   MAX_HANDOFF_BYTES, checkHandoffInput, checkHandoff, serializeHandoff, chooseHandoff,
@@ -1184,7 +1184,7 @@ test('C15a, #496: level 3 is named Turbo, and logs written before either rename 
 const FORM =
   "Fix the entry's ask, stop or question and log it again: ask is question, review or notify, notify never waits, stop is one of the head-chef skill's kinds and only on a wait, and at level 3 a wait needs both and a one-line question. The step stays held until it is logged; if you can't log it, say so in chat.";
 const NO_STOP =
-  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it as Lead with your pick, flag it, act, and tell the owner what you took.";
+  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it with source lead and your pick, flag it, act, and tell the owner what you took.";
 const waits = (over = {}) => input({ waiting: true, pick: '', ...over });
 
 test('618 C2: the two fixed answers are exported whole, and neither names level 1 or echoes an input', () => {
@@ -1251,4 +1251,87 @@ test('618 C3: a stored log holding ask or stop fails the strict check, and an ol
   const r = appendEntry(old.value, input(), { at: NOW + 1, level: 3, read: new Map() });
   assert.ok('value' in r);
   assert.deepEqual(r.value.log.entries.map(e => e.id), ['1', '2']);
+});
+
+// --- issue 630: log_decision records what the lead sends -----------------------------
+// mapInput maps the call before checkInput judges it, so the entry written is always valid;
+// only a field over its limit, or more than six options, is left for checkInput to refuse.
+
+const mapped = over => checkInput(mapInput({ ...input(), ...over }));
+const lng = n => 'x'.repeat(n);
+
+test('630 C6: a source in any case, an unknown source, a stamped or unused field and a field in another case all land', () => {
+  assert.equal(mapped({ source: 'Lead' }).value.source, 'lead');
+  assert.equal(mapped({ source: ' RELAYED ' }).value.source, 'relayed');
+  for (const s of ['owner', 'pane', 'alarm', undefined, 7]) assert.equal(mapped({ source: s }).value.source, 'lead', String(s));
+  const r = mapped({ id: '7', at: 1, level: 3, decision: 'x', colour: 'red' });
+  assert.ok('value' in r);
+  assert.deepEqual(Object.keys(r.value).sort(), Object.keys(checkInput(input()).value).sort());
+  const cased = input();
+  delete cased.pick;
+  delete cased.why;
+  cased.Pick = 'Thorough';
+  cased.WHY = 'because';
+  const c = checkInput(mapInput(cased));
+  assert.equal(c.value.pick, 'Thorough');
+  assert.equal(c.value.why, 'because');
+  assert.equal(mapInput({ ...input(), ASK: 'question' }).ask, 'question');
+  assert.equal(mapInput(null).source, 'lead');
+});
+
+test('630 C6: missing text becomes "not given"; control and hidden characters go; options merge; a pick outside the options joins them', () => {
+  const bare = checkInput(mapInput({}));
+  assert.ok('value' in bare, JSON.stringify(bare));
+  assert.equal(bare.value.why, 'not given');
+  assert.equal(bare.value.pick, 'not given');
+  assert.deepEqual(bare.value.options, ['not given']);
+  assert.equal(mapped({ why: 'a\u{7}b\u{200B}c' }).value.why, 'a bc');
+  assert.equal(mapped({ why: 'line one\nline two' }).value.why, 'line one\nline two');
+  assert.deepEqual(mapped({ options: ['Yes', 'yes', 'No'], pick: 'YES' }).value.options, ['Yes', 'No']);
+  assert.equal(mapped({ options: ['Yes', 'yes', 'No'], pick: 'YES' }).value.pick, 'Yes');
+  assert.deepEqual(mapped({ pick: 'Maybe' }).value.options, ['Thorough', 'Standard', 'Maybe']);
+  assert.equal(mapped({ pick: '' }).value.pick, 'Thorough');
+  assert.deepEqual(mapped({ options: 'Solo', pick: undefined }).value.options, ['Solo']);
+});
+
+test('630 C6: the couplings hold by mapping: a waiting entry is a lead entry with an empty pick; answers and flag only where they may be', () => {
+  const w = mapped({ waiting: true, source: 'relayed', pick: 'Thorough', answers: '3', flag: 'unsure' });
+  assert.equal(w.value.waiting, true);
+  assert.equal(w.value.source, 'lead');
+  assert.equal(w.value.pick, '');
+  assert.equal(w.value.answers, '');
+  assert.equal(w.value.flag, undefined);
+  assert.equal(mapped({ answers: '5' }).value.answers, '', 'a lead entry answers none');
+  assert.equal(mapped({ source: 'relayed', answers: '5' }).value.answers, '5');
+  assert.equal(mapped({ source: 'relayed', answers: 'abc' }).value.answers, '');
+  assert.equal(mapped({ source: 'relayed', flag: 'x' }).value.flag, undefined);
+  assert.equal(mapped({ flag: 'two\nlines' }).value.flag, 'two lines');
+});
+
+test('630 C6b: a field over its limit, or more than six options, is the only thing refused, and the shape tail never says act at level 1', () => {
+  assert.match(mapped({ work: lng(301) }).error, /^work is over 300 characters/);
+  assert.match(mapped({ question: lng(1001) }).error, /^question is over 1000 characters/);
+  assert.match(mapped({ options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'], pick: 'a' }).error, /^options is not a list of 1 to 6 items/);
+  assert.equal(mapped({ work: lng(300) }).error, undefined);
+  assert.equal(
+    SHAPE_TAIL,
+    "The decision log is unchanged; shorten it and log it again. The step stays held until it is logged; if you can't log it, say so in chat.",
+  );
+  assert.doesNotMatch(SHAPE_TAIL, /level 1/);
+  assert.doesNotMatch(mapped({ work: lng(301) }).error, new RegExp(lng(20)), 'no value is echoed');
+});
+
+test('630 C6: a wait sent as "true", "yes" or 1 is a wait, and a long options list is read in bounded time', () => {
+  for (const w of ['true', 'TRUE', 'yes', ' 1 ', 1]) assert.equal(mapInput({ ...input(), waiting: w }).waiting, true, String(w));
+  for (const w of [false, 'false', 'no', 0, undefined]) assert.equal(mapInput({ ...input(), waiting: w }).waiting, false, String(w));
+  const t = Date.now();
+  const r = mapped({ options: Array.from({ length: 200000 }, (_, i) => `o${i}`), pick: 'o0' });
+  assert.match(r.error, /^options is not a list of 1 to 6 items/);
+  assert.ok(Date.now() - t < 2000);
+});
+
+test('630 C6b: no option is dropped unread: 100 copies of one option then six more are seven distinct options, refused; plain duplicates still merge', () => {
+  const opts = [...Array.from({ length: 100 }, () => 'A'), 'B', 'C', 'D', 'E', 'F', 'G'];
+  assert.match(mapped({ options: opts, pick: 'A' }).error, /^options is not a list of 1 to 6 items/);
+  assert.deepEqual(mapped({ options: [...Array.from({ length: 100 }, () => 'A'), 'B'], pick: 'A' }).value.options, ['A', 'B']);
 });

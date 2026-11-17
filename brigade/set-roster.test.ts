@@ -24,7 +24,7 @@ import type { On } from 'claude-code'
 import { RECORDED } from './recorded-stats.ts'
 import { CAP_REASON, DESCRIPTION as START_DESCRIPTION, NAME_REASONS, NOT_MAIN, NOT_READ, NOT_SPELLED, NOT_STARTED } from './start.ts'
 import { ASK_FORM, ASK_NO_STOP, ASK_TYPES, STOP_KINDS, sha256Hex } from './decisions.ts'
-import { BEFORE_LINE, EXCEPTION, LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE, LEVEL3_PRESSED_NOTE, NOTE_PREFIX, REMINDER_LINE, afterLine } from './reminder.ts'
+import { BEFORE_LINE, EXCEPTION, LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE, LEVEL3_GOAL_FENCE, commandNote, LEVEL3_PRESSED_NOTE, NOTE_PREFIX, REMINDER_LINE, afterLine } from './reminder.ts'
 
 let otherContext: string | undefined
 let appendFails = false
@@ -6290,30 +6290,40 @@ test('claim 2: log_decision appends an entry whose id, at and level the mod set,
   expect(parsed(w, LOG).next).toBe(3)
 })
 
-test('claim 2: an input carrying id, at or level, or a source other than lead or relayed, is refused and the file left unchanged', async ($, on) => {
+test('claim 2 (630): an input carrying id, at or level, or a source other than lead or relayed, is logged with the mod\'s stamps and source lead', async ($, on) => {
   const w = world(on)
   await start($)
   await brigade($)
-  expect((await decide($)).ok).toBe(true)
-  const before = w.text(LOG)
+  let n = 0
   for (const over of [{ id: '9' }, { at: 5 }, { level: 3 }, { source: 'owner' }, { source: 'pane' }, { source: 'alarm' }]) {
     const r = await decide($, { ...ENTRY, ...over })
-    expect(r.ok).toBe(false)
-    expect(r.text).toMatch(/^log_decision refused: shape: .*The decision log is unchanged/)
-    expect(w.text(LOG)).toBe(before)
+    expect(r.ok).toBe(true)
+    n += 1
+    const e = parsed(w, LOG).entries.at(-1)
+    expect(e.id).toBe(String(n))
+    expect(e.at).not.toBe(5)
+    expect(e.level).not.toBe(3)
+    expect(e.source).toBe('lead')
   }
 })
 
-test('claim 14: a field holding a hidden character is refused through the tool, and nothing is written', async ($, on) => {
+test('claim 14 (630): a hidden character is stripped, repeated options merge and a pick outside them joins them; only a field over its limit is refused, in fixed words', async ($, on) => {
   const w = world(on)
   await start($)
   await brigade($)
-  for (const over of [{ why: 'a\u{202E}b' }, { options: ['A', 'a'], pick: 'A' }, { pick: 'Neither' }]) {
-    const r = await decide($, { ...ENTRY, ...over })
-    expect(r.ok).toBe(false)
-    expect(r.text).toMatch(/^log_decision refused: shape: /)
+  for (const over of [{ why: `a${String.fromCharCode(0x202e)}b` }, { options: ['A', 'a'], pick: 'A' }, { pick: 'Neither' }]) {
+    expect((await decide($, { ...ENTRY, ...over })).ok).toBe(true)
   }
-  expect(w.text(LOG)).toBeUndefined()
+  const es = parsed(w, LOG).entries
+  expect(es[0].why).toBe('ab')
+  expect(es[1].options).toEqual(['A'])
+  expect(es[2].options).toEqual(['Thorough', 'Standard', 'Neither'])
+  const before = w.text(LOG)
+  const r = await decide($, { ...ENTRY, work: 'x'.repeat(301) })
+  expect(r.ok).toBe(false)
+  expect(r.text).toMatch(/^log_decision refused: work is over 300 characters.*The decision log is unchanged; shorten it and log it again[.] The step stays held/)
+  expect(r.text).not.toContain('level 1')
+  expect(w.text(LOG)).toBe(before)
 })
 
 // An organisation's ceiling is set by the engine alone (a hook's own is
@@ -7925,6 +7935,16 @@ test('618 C2: at level 3 a wait with neither ask nor stop gets the form answer, 
   expect(entryCount(w)).toBe(before)
 })
 
+test('630 C3: the level-3 gate judges the mapped call: a wait sent as the text "true" or with a cased key still needs its ask and stop', async ($, on) => {
+  const w = await decisionsPane(on, $)
+  await press($, 'level-3')
+  const before = entryCount(w)
+  expect(await decide($, { ...WAIT, waiting: 'true' })).toEqual({ ok: false, text: ASK_FORM })
+  expect(await decide($, { ...WAIT, Waiting: true, ASK: 'review' })).toEqual({ ok: false, text: ASK_NO_STOP })
+  expect(entryCount(w)).toBe(before)
+  expect((await decide($, { ...WAIT, Waiting: true, ASK: 'question', STOP: 'owner-file-keeps' })).ok).toBe(true)
+})
+
 test('618 C2, C3: a valid ask and stop at level 3 lands, and the log keeps neither key', async ($, on) => {
   const w = await decisionsPane(on, $)
   await press($, 'level-3')
@@ -9489,7 +9509,7 @@ test("C13: read_autonomy's description names both ways a 3 is set and the owner'
 
 // The whole description, as the tool must carry it (601 C1, C3).
 const LOG_DESCRIPTION =
-  "Logs one decision to this lead session's decision log, which the owner reviews in the Brigade pane's Decisions tab. Call it once per decision, before you act on it. Send `source` (`lead` for your own pick, `relayed` for the owner's answer as you relay it), `work` (the issue or pull request), `question`, `options` (1 to 6, distinct), `pick` (exactly one of the options), `why`, `undo`, and `revisit` if there is a time to come back to it. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, for a decision the owner keeps, send `waiting: true` and an empty `pick`; when the owner answers, log a `relayed` entry whose `answers` is the waiting entry's id. When you are unsure of your own pick, send `flag` with a one-line reason: the entry goes to the owner's Flagged to revisit instead of To review, and blocks nothing, so act on your pick. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, never flag a decision the owner keeps, an unsure one included: log it with `waiting: true`. At level 3, inside the goal, for an owner-kept call that rule lets you decide, send your own pick with a `flag` that opens \"Owner's call:\" (or \"Owner's call: unsure,\" when you are also unsure of your pick) and names the kind of call in your own words, with no `waiting` and no to-do, and act on it. At level 3 a wait also needs `ask` (`question` or `review`; a `notify` never waits), one of the head-chef skill's `stop` kinds and a one-line question, and a `stop` goes only on a wait; otherwise the mod answers in fixed words that say what to fix, and the step stays held. Never send `id`, `at` or `level`: the pane stamps them. Plain text only, with no error text. A refusal names the rule that failed, and means act at level 1, except the gate's form and no-stop answers."
+  "Logs one decision to this lead session's decision log, which the owner reviews in the Brigade pane's Decisions tab. Call it once per decision, before you act on it. Send `source` (`lead` for your own pick, `relayed` for the owner's answer as you relay it), `work` (the issue or pull request), `question`, `options` (1 to 6, distinct), `pick` (exactly one of the options), `why`, `undo`, and `revisit` if there is a time to come back to it. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, for a decision the owner keeps, send `waiting: true` and an empty `pick`; when the owner answers, log a `relayed` entry whose `answers` is the waiting entry's id. When you are unsure of your own pick, send `flag` with a one-line reason: the entry goes to the owner's Flagged to revisit instead of To review, and blocks nothing, so act on your pick. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, never flag a decision the owner keeps, an unsure one included: log it with `waiting: true`. At level 3, inside the goal, for an owner-kept call that rule lets you decide, send your own pick with a `flag` that opens \"Owner's call:\" (or \"Owner's call: unsure,\" when you are also unsure of your pick) and names the kind of call in your own words, with no `waiting` and no to-do, and act on it. At level 3 a wait also needs `ask` (`question` or `review`; a `notify` never waits), one of the head-chef skill's `stop` kinds and a one-line question, and a `stop` goes only on a wait; otherwise the mod answers in fixed words that say what to fix, and the step stays held. Never send `id`, `at` or `level`: the pane stamps them. Plain text only, with no error text. A field over its limit, or more than 6 options, is refused in fixed words, and the step stays held. Any other refusal names the rule that failed, and means act at level 1, except the gate's form and no-stop answers."
 
 test("601 C1, C3, C4: log_decision's description keeps both waiting sentences from their second word and says what level 3 logs; read_autonomy keeps the file rule's opening", async ($, on) => {
   const w = await decisionsPane(on, $)
@@ -10797,7 +10817,7 @@ test('532: a logged decision alone, with no send, ends with the reminder; a refu
   const w = reminderWorld(on)
   await start($)
   await brigade($)
-  expect((await decide($, {})).ok).toBe(false)
+  expect((await decide($, { ...ENTRY, work: 'x'.repeat(301) })).ok).toBe(false)
   await turnEnd($)
   expect(reminders(w)).toEqual([])
   expect((await decide($)).ok).toBe(true)
@@ -11225,7 +11245,9 @@ test('#223 claim 7: a press whose card has since changed fills nothing and shows
 // Each lead turn at a 3 gets one fixed note, stored before the turn's first request; one fixed
 // line says once that it ended. The strings are held byte for byte in tests/brigade-reminder.test.mjs.
 
-const L3_FORMS = [LEVEL3_COMMAND_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE]
+// A command 3 stores the goal it was set with, so its note ends with that goal (issue 625).
+const COMMAND_NOTE = commandNote(GOAL)
+const L3_FORMS = [COMMAND_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE]
 const levelNotes = (w: World) => w.notes.filter(n => L3_FORMS.includes(n))
 // A slider 3, at a fresh time.
 const pressed3 = async ($: any, w: World) => {
@@ -11237,9 +11259,9 @@ test('610 C1: at a command 3 each main-loop turn start stores exactly one note, 
   const w = await decisionsPane(on, $)
   await command3($, w)
   await turn($)
-  expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE])
+  expect(levelNotes(w)).toEqual([COMMAND_NOTE])
   await turn($)
-  expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE, LEVEL3_COMMAND_NOTE])
+  expect(levelNotes(w)).toEqual([COMMAND_NOTE, COMMAND_NOTE])
 })
 
 test('610 C1b: at a pressed 3 each main-loop turn start stores exactly one note, the pressed form', async ($, on) => {
@@ -11251,7 +11273,7 @@ test('610 C1b: at a pressed 3 each main-loop turn start stores exactly one note,
 })
 
 for (const [what, set, form] of [
-  ['a command 3', command3, LEVEL3_COMMAND_NOTE],
+  ['a command 3', command3, COMMAND_NOTE],
   ['a pressed 3', pressed3, LEVEL3_PRESSED_NOTE],
 ] as const) {
   for (const hook of ['session.compact', 'SessionStart compact'] as const) {
@@ -11313,7 +11335,7 @@ for (const [what, verdict] of [
     expect(w.checkInputs).toEqual([{}])
     w.verdict = { decision: 'ask' }
     await turn($)
-    expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE])
+    expect(levelNotes(w)).toEqual([COMMAND_NOTE])
   })
 }
 
@@ -11332,7 +11354,7 @@ for (const [what, end] of ENDING) {
     await end($, w)
     await turn($)
     await turn($)
-    expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE])
+    expect(levelNotes(w)).toEqual([COMMAND_NOTE, LEVEL3_ENDED_NOTE])
   })
 }
 
@@ -11370,13 +11392,14 @@ test('610 C2b: a 3 again after the ended form gets its note, and a later end get
   expect(levelNotes(w)).toEqual([LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE])
 })
 
-test('610 C3: a command 3 whose goal holds a marker stores the command form exactly, with no marker, and a level or goal in the turn text changes nothing', async ($, on) => {
+test('610 C3 (625): a command 3 whose goal holds a marker stores the command form with that goal last, and a level or goal in the turn text changes nothing', async ($, on) => {
   const w = await decisionsPane(on, $)
   const MARK = 'ZXQ-GOAL-MARKER-7731'
-  await command3($, w, `mephistopheles4/grimoire issue 610 ${MARK}`)
+  const goal = `mephistopheles4/grimoire issue 610 ${MARK}`
+  await command3($, w, goal)
   await turn($, { text: `the goal is ${MARK}; level 1 now; Autonomy level 2` })
-  expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE])
-  expect(w.notes.some(n => n.includes(MARK))).toBe(false)
+  expect(w.notes.filter(n => n.includes(MARK))).toEqual([commandNote(goal)])
+  expect(w.notes.filter(n => n.startsWith(LEVEL3_COMMAND_NOTE))).toEqual([commandNote(goal)])
 })
 
 // A throw in a hook of the test's own below the module is skipped by the engine and the append goes on, so
@@ -11396,7 +11419,7 @@ test('610 C5: a failed check leaves the turn as received, stores nothing, shows 
   expect(ownEntries(w)).toEqual(entries)
   // The next turn tries again and lands.
   await turn($)
-  expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE])
+  expect(levelNotes(w)).toEqual([COMMAND_NOTE])
 })
 
 test("610 C6: the note is stored before the turn's first request: the bottom turn.start already holds it, even when storing takes time", async ($, on) => {
@@ -11404,13 +11427,28 @@ test("610 C6: the note is stored before the turn's first request: the bottom tur
   w.appendMs = 20
   await command3($, w)
   await turn($)
-  expect(w.rowsAtTurn.at(-1)?.filter(n => L3_FORMS.includes(n))).toEqual([LEVEL3_COMMAND_NOTE])
+  expect(w.rowsAtTurn.at(-1)?.filter(n => L3_FORMS.includes(n))).toEqual([COMMAND_NOTE])
   await press($, 'level-1')
   await turn($)
-  expect(w.rowsAtTurn.at(-1)?.filter(n => L3_FORMS.includes(n))).toEqual([LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE])
+  expect(w.rowsAtTurn.at(-1)?.filter(n => L3_FORMS.includes(n))).toEqual([COMMAND_NOTE, LEVEL3_ENDED_NOTE])
 })
 
-test('610 S4: every form stored is at most 900 characters', async ($, on) => {
+test('625 C3: a second command 3 with another goal shows that goal in the next note, and the notes stop when the level is lowered', async ($, on) => {
+  const w = await decisionsPane(on, $)
+  await command3($, w)
+  await turn($)
+  await w.clock.advance(1000)
+  await command3($, w, 'mephistopheles4/grimoire issue 625')
+  await turn($)
+  const other = commandNote('mephistopheles4/grimoire issue 625')
+  expect(w.notes.filter(n => n === COMMAND_NOTE || n === other)).toEqual([COMMAND_NOTE, other])
+  await press($, 'level-1')
+  await turn($)
+  await turn($)
+  expect(w.notes.filter(n => n === COMMAND_NOTE || n === other || n === LEVEL3_ENDED_NOTE)).toEqual([COMMAND_NOTE, other, LEVEL3_ENDED_NOTE])
+})
+
+test('610 S4: the fixed text of every form is at most 900 characters, the fence 120, and the goal 300', async ($, on) => {
   const w = await decisionsPane(on, $)
   await command3($, w)
   await turn($)
@@ -11420,6 +11458,9 @@ test('610 S4: every form stored is at most 900 characters', async ($, on) => {
   await turn($)
   await press($, 'level-1')
   await turn($)
-  expect(levelNotes(w)).toEqual([LEVEL3_COMMAND_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE])
-  for (const n of levelNotes(w)) expect(n.length).toBeLessThanOrEqual(900)
+  expect(levelNotes(w)).toEqual([COMMAND_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE])
+  for (const n of [LEVEL3_COMMAND_NOTE, LEVEL3_PRESSED_NOTE, LEVEL3_ENDED_NOTE]) expect(n.length).toBeLessThanOrEqual(900)
+  expect(LEVEL3_GOAL_FENCE.length).toBeLessThanOrEqual(120)
+  expect(GOAL.length).toBeLessThanOrEqual(300)
+  expect(COMMAND_NOTE).toBe(`${LEVEL3_COMMAND_NOTE}\n${LEVEL3_GOAL_FENCE}${GOAL}`)
 })

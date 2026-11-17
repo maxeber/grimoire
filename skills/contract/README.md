@@ -40,8 +40,8 @@ request to run a skill or agent that already exists.
 **Read before you install.** Read a shared skill, agent or CLAUDE.md and its
 contract before you use it, as you would any code from someone else.
 
-**The hiring page keeps your answers, unencrypted.** When you say yes to the
-notice (below), the page keeps your answers in your browser until you press
+**The hiring page keeps your answers, unencrypted.** Once you have asked for
+the interview (see the notice below), the page keeps your answers in your browser until you press
 **Reset** on it. Other pages opened from disk in the same
 browser, browser extensions with file access, programs running as you and
 backups of your browser profile can read them. Reset removes them from the
@@ -102,8 +102,9 @@ which way you want.
    scratch folder is, that the draft and your answers sit there unencrypted
    until deleted, that the page keeps them in your browser until Reset, and
    that copying the answer block, online spell check, dictation and synced
-   browser history can carry what you type off the machine. It waits for
-   your yes. A no means chat.
+   browser history can carry what you type off the machine. It does not wait
+   for a yes: your request for the interview is the go. If you object, it
+   stops and goes on by chat.
 2. The skill drafts the contract, every answer *Proposed*, and renders it as
    a page on your machine: a short offer letter with blanks, and its
    schedules below it. You open the page in your own browser.

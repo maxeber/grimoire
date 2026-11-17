@@ -184,11 +184,94 @@ export const STOP_KINDS = [
 ] as const
 export const TOOL_ONLY_KEYS: readonly string[] = ['ask', 'stop']
 
+// --- the call as a record (630) -------------------------------------------------
+//
+// The log is a record of what the lead decided, not a gate on how it asks. A call
+// is mapped before `checkInput` judges it, so the entry written is always valid:
+// only a field over its limit, or more than six options, is left for the check to
+// refuse. `ask` and `stop` pass through for `checkAsk`, which stays the gate on
+// waits.
+
+/** The words a refusal for a field over its limit ends with: no "act at level 1", the step stays held. */
+export const SHAPE_TAIL =
+  "The decision log is unchanged; shorten it and log it again. The step stays held until it is logged; if you can't log it, say so in chat."
+
+const NOT_GIVEN = 'not given'
+const KNOWN_KEYS: readonly string[] = [...INPUT_KEYS, ...TOOL_ONLY_KEYS]
+const CONTROL_ALL = new RegExp(CONTROL.source, 'gu')
+const HIDDEN_ALL = new RegExp(HIDDEN.source, 'gu')
+
+// A value as text with control and hidden characters taken out, or undefined for a value that is not text.
+function plain(v: unknown): string | undefined {
+  if (typeof v === 'number' || typeof v === 'boolean') v = String(v)
+  if (typeof v !== 'string') return undefined
+  return v.replace(CONTROL_ALL, ' ').replace(HIDDEN_ALL, '').trim()
+}
+const folded = (s: string) => s.toUpperCase().toLowerCase()
+
+/** What `log_decision` does with its input before `checkInput` (issue 630): a known field in any case is
+ *  taken; a stamped or unused field is dropped; `source` is `relayed` only when it says so, else `lead`, so
+ *  a call never claims the owner's authority; missing text becomes "not given"; a missing pick or options is
+ *  filled from the other; repeated options merge; a waiting entry is a lead entry with an empty pick;
+ *  `answers` stays only on a relayed entry that does not wait, `flag` only on a lead entry that does not. */
+export function mapInput(v: unknown): Record<string, unknown> {
+  const raw: Record<string, unknown> = {}
+  if (isRecord(v)) {
+    for (const k of Object.keys(v)) {
+      const key = k.trim().toLowerCase()
+      if (KNOWN_KEYS.includes(key) && (!(key in raw) || k === key)) raw[key] = v[k]
+    }
+  }
+  const waiting = raw.waiting === true || ['true', 'yes', '1'].includes(folded(String(raw.waiting).trim()))
+  const source = !waiting && folded(plain(raw.source) ?? '') === 'relayed' ? 'relayed' : 'lead'
+  const given = (k: string): string => {
+    const t = plain(raw[k])
+    return t === undefined || t === '' ? NOT_GIVEN : t
+  }
+  const options: string[] = []
+  const list = Array.isArray(raw.options) ? raw.options : typeof raw.options === 'string' ? [raw.options] : []
+  const seen = new Set<string>()
+  for (const o of list) {
+    const t = plain(o)
+    if (t === undefined || t === '' || seen.has(folded(t))) continue
+    seen.add(folded(t))
+    options.push(t)
+  }
+  let pick = plain(raw.pick) ?? ''
+  if (waiting) {
+    pick = ''
+    if (options.length === 0) options.push(NOT_GIVEN)
+  } else {
+    if (pick === '') pick = options[0] ?? NOT_GIVEN
+    const same = options.find(x => folded(x) === folded(pick))
+    if (same === undefined) options.push(pick)
+    else pick = same
+  }
+  const out: Record<string, unknown> = {
+    source,
+    waiting,
+    work: given('work'),
+    question: given('question'),
+    options,
+    pick,
+    why: given('why'),
+    undo: given('undo'),
+    revisit: plain(raw.revisit) ?? '',
+    answers: '',
+  }
+  const answers = plain(raw.answers) ?? ''
+  if (source === 'relayed' && ENTRY_ID.test(answers)) out.answers = answers
+  const flag = plain(raw.flag)?.replace(/\n+/g, ' ')
+  if (flag !== undefined && flag !== '' && source === 'lead' && !waiting) out.flag = flag
+  for (const k of TOOL_ONLY_KEYS) if (k in raw) out[k] = raw[k]
+  return out
+}
+
 /** The two fixed answers: neither echoes input, and neither takes the refusal's "act at level 1". */
 export const ASK_FORM =
   "Fix the entry's ask, stop or question and log it again: ask is question, review or notify, notify never waits, stop is one of the head-chef skill's kinds and only on a wait, and at level 3 a wait needs both and a one-line question. The step stays held until it is logged; if you can't log it, say so in chat."
 export const ASK_NO_STOP =
-  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it as Lead with your pick, flag it, act, and tell the owner what you took."
+  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it with source lead and your pick, flag it, act, and tell the owner what you took."
 
 // --- the to-do gate (618, S5) ---------------------------------------------------
 

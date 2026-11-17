@@ -103,6 +103,8 @@ import {
   checkHandoffInput,
   checkInput,
   checkAsk,
+  mapInput,
+  SHAPE_TAIL,
   changedTodos,
   openWaitIds,
   todosHaveOpenWaits,
@@ -241,7 +243,7 @@ import {
 } from './view.ts'
 import type { ContextOutlook, Finder, PrRow, ReadMemory, Spark, SummaryMemory } from './view.ts'
 import { registerWriter, writerEpoch, writerSession } from './writer.ts'
-import { compactSign, endTurn, figuresOf, LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE, LEVEL3_PRESSED_NOTE, newCycle, NOTE_PREFIX, SEND_TOOL, sendsMessage, setFigures, takeAfter, tally, turnEnd } from './reminder.ts'
+import { commandNote, compactSign, endTurn, figuresOf, LEVEL3_ENDED_NOTE, LEVEL3_PRESSED_NOTE, newCycle, NOTE_PREFIX, SEND_TOOL, sendsMessage, setFigures, takeAfter, tally, turnEnd } from './reminder.ts'
 import { registerMic } from './mic-band.tsx'
 import { DESCRIPTION as WARNING_DESCRIPTION, SCHEMA as WARNING_SCHEMA, STORE_KEY as WARNING_KEY, TOOL as WARNING_TOOL, ackFrom, registerWarning } from './warning.tsx'
 
@@ -2064,7 +2066,7 @@ const LOG_TOOL = 'log_decision'
 const LOG_TOOL_NAME = 'mcp__grimoire__log_decision'
 
 const LOG_DESCRIPTION =
-  "Logs one decision to this lead session's decision log, which the owner reviews in the Brigade pane's Decisions tab. Call it once per decision, before you act on it. Send `source` (`lead` for your own pick, `relayed` for the owner's answer as you relay it), `work` (the issue or pull request), `question`, `options` (1 to 6, distinct), `pick` (exactly one of the options), `why`, `undo`, and `revisit` if there is a time to come back to it. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, for a decision the owner keeps, send `waiting: true` and an empty `pick`; when the owner answers, log a `relayed` entry whose `answers` is the waiting entry's id. When you are unsure of your own pick, send `flag` with a one-line reason: the entry goes to the owner's Flagged to revisit instead of To review, and blocks nothing, so act on your pick. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, never flag a decision the owner keeps, an unsure one included: log it with `waiting: true`. At level 3, inside the goal, for an owner-kept call that rule lets you decide, send your own pick with a `flag` that opens \"Owner's call:\" (or \"Owner's call: unsure,\" when you are also unsure of your pick) and names the kind of call in your own words, with no `waiting` and no to-do, and act on it. At level 3 a wait also needs `ask` (`question` or `review`; a `notify` never waits), one of the head-chef skill's `stop` kinds and a one-line question, and a `stop` goes only on a wait; otherwise the mod answers in fixed words that say what to fix, and the step stays held. Never send `id`, `at` or `level`: the pane stamps them. Plain text only, with no error text. A refusal names the rule that failed, and means act at level 1, except the gate's form and no-stop answers."
+  "Logs one decision to this lead session's decision log, which the owner reviews in the Brigade pane's Decisions tab. Call it once per decision, before you act on it. Send `source` (`lead` for your own pick, `relayed` for the owner's answer as you relay it), `work` (the issue or pull request), `question`, `options` (1 to 6, distinct), `pick` (exactly one of the options), `why`, `undo`, and `revisit` if there is a time to come back to it. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, for a decision the owner keeps, send `waiting: true` and an empty `pick`; when the owner answers, log a `relayed` entry whose `answers` is the waiting entry's id. When you are unsure of your own pick, send `flag` with a one-line reason: the entry goes to the owner's Flagged to revisit instead of To review, and blocks nothing, so act on your pick. At levels 1 and 2, and at level 3 outside the goal or for a call the rule in `read_autonomy`'s description says waits at level 3, never flag a decision the owner keeps, an unsure one included: log it with `waiting: true`. At level 3, inside the goal, for an owner-kept call that rule lets you decide, send your own pick with a `flag` that opens \"Owner's call:\" (or \"Owner's call: unsure,\" when you are also unsure of your pick) and names the kind of call in your own words, with no `waiting` and no to-do, and act on it. At level 3 a wait also needs `ask` (`question` or `review`; a `notify` never waits), one of the head-chef skill's `stop` kinds and a one-line question, and a `stop` goes only on a wait; otherwise the mod answers in fixed words that say what to fix, and the step stays held. Never send `id`, `at` or `level`: the pane stamps them. Plain text only, with no error text. A field over its limit, or more than 6 options, is refused in fixed words, and the step stays held. Any other refusal names the rule that failed, and means act at level 1, except the gate's form and no-stop answers."
 
 const LOG_SCHEMA = {
   type: 'object',
@@ -2104,8 +2106,10 @@ async function logDecision($: EngineInterface, e: Record<string, unknown>, signa
   if (!rulesAllowTool(await $.tool.check({ tool: LOG_TOOL_NAME, input }))) {
     return refuseLog("the owner's rules: a deny verdict, an ask rule or an organisation ceiling covers this tool")
   }
-  const checked = checkInput(input)
-  if ('error' in checked) return refuseLog(`shape: ${checked.error}`)
+  // The call is a record of what the lead decided: map it, and refuse only a field over its limit (issue 630).
+  const mapped = mapInput(input)
+  const checked = checkInput(mapped)
+  if ('error' in checked) return { deny: `log_decision refused: ${checked.error}. ${SHAPE_TAIL}` }
   const at = await where($)
   if ('error' in at) return refuseLog('path: no decision log file can be named')
 
@@ -2115,10 +2119,11 @@ async function logDecision($: EngineInterface, e: Record<string, unknown>, signa
     // The level stamped is the one read_autonomy would answer now.
     const state = await levelTurn(() => levelState($, at.id))
     // The gate on waits (618): ask and stop are judged here alone and stored nowhere.
-    const asked = checkAsk(input, state.level)
+    const asked = checkAsk(mapped, state.level)
     if (asked !== undefined) return { deny: asked }
     const r = await appendToLog($, at, checked.value, { level: state.level, fixed: false, signal, progress })
     if ('refused' in r) return refuseLog(r.refused)
+    if ('held' in r) return { deny: `log_decision refused: ${r.held}. ${SHAPE_TAIL}` }
     if ('after' in r) return failedAfterLog()
     return { result: `Logged decision ${r.entry.id} at ${new Date(r.entry.at).toISOString()}, at level ${levelWords(state)}.` }
   })
@@ -2144,7 +2149,7 @@ async function readOwnLog($: EngineInterface, at: Where): Promise<DecisionLog | 
 // scanned and read entries drop, as for the tool's entry (#497). A
 // refusal is fixed words for log_decision to answer with; `after` means the
 // write began and the path then failed its check.
-type Appended = { entry: DecisionEntry } | { refused: string } | { after: true }
+type Appended = { entry: DecisionEntry } | { refused: string } | { held: string } | { after: true }
 type AppendRun = { level: Level; fixed: boolean; signal?: AbortSignal; progress?: Progress }
 async function appendToLog($: EngineInterface, at: Where, raw: unknown, o: AppendRun): Promise<Appended> {
   const placed = await placeKind($, at, 'decisions', at.id)
@@ -2164,7 +2169,8 @@ async function appendToLog($: EngineInterface, at: Where, raw: unknown, o: Appen
   const opts = { at: now, level: o.level, read: new Map(), sid: at.id, fixed: o.fixed }
   let r = appendEntry(log, raw, opts)
   if ('error' in r && r.error === FULL) r = appendEntry(log, raw, { ...opts, read: await allReadMarks($, at, now) })
-  if ('error' in r) return { refused: r.error === FULL ? 'the decision log is full: review the Decisions tab' : `shape: ${r.error}` }
+  // What is left to refuse here is a relayed answer to a wait this log does not hold: the step is held, not the level (630).
+  if ('error' in r) return r.error === FULL ? { refused: 'the decision log is full: review the Decisions tab' } : { held: r.error }
   const text = serializeLog(r.value.log)
   if ('error' in text) return { refused: 'the decision log is full: review the Decisions tab' }
   if (o.signal?.aborted === true) return { refused: 'abandoned: the call ran out of time or was interrupted before its write' }
@@ -2898,25 +2904,26 @@ async function readAutonomy($: EngineInterface, e: Record<string, unknown>) {
   return levelTurn(async () => ({ result: levelAnswer(await levelState($, sid)) }))
 }
 
-// The level-3 note (issue 610), at a lead turn's start: one fixed string per
-// turn while a 3 holds, and the ended form once after it. The strings are
-// reminder.ts's constants, so nothing from the turn, a message, a file or the
-// goal reaches them; the level is read as read_autonomy reads it, and only
-// that read runs inside the lock. The cheap check comes first and asks the
+// The level-3 note (issue 610), at a lead turn's start: one string per turn
+// while a 3 holds, and the ended form once after it. The strings are
+// reminder.ts's constants, so nothing from the turn, a message or a file
+// reaches them; a command 3's note ends with the goal that command stored,
+// read in the same lock as the level and followed by nothing (issue 625). The
+// level is read as read_autonomy reads it, and only that read runs inside the lock. The cheap check comes first and asks the
 // engine nothing, so a session at 1 or 2 with no ended form owed pays nothing.
 // A refusal of read_autonomy's verdict counts as level 1. The append is
 // awaited, so the row is stored before the turn's first request. A throw is
 // the caller's to catch.
 async function levelNoteTurn($: EngineInterface) {
   if (![...pressedLevel.values()].includes(3) && !levelNoted) return
-  let held: { level: Level; command: boolean } = { level: 1, command: false }
+  let held: { level: Level; command: string | undefined } = { level: 1, command: undefined }
   const sid = await levelSid($).catch(() => undefined)
   if (sid !== undefined && pressedOf(sid) === 3 && toolsOfferedFor === sid && rulesAllowTool(await $.tool.check({ tool: AUTONOMY_NAME, input: {} }))) {
-    held = await levelTurn(async () => ({ level: levelNow(sid), command: (await commandNow($, sid)) !== undefined }))
+    held = await levelTurn(async () => ({ level: levelNow(sid), command: (await commandNow($, sid))?.goal }))
   }
   const row = (text: string) => ({ message: { type: 'user' as const, content: [{ type: 'text' as const, text }] } })
   if (held.level === 3) {
-    await $.session.append(row(held.command ? LEVEL3_COMMAND_NOTE : LEVEL3_PRESSED_NOTE))
+    await $.session.append(row(held.command !== undefined ? commandNote(held.command) : LEVEL3_PRESSED_NOTE))
     levelNoted = true
   } else if (levelNoted) {
     await $.session.append(row(LEVEL3_ENDED_NOTE))

@@ -31,7 +31,7 @@ owner, who cleans it up by hand.
    cleanup, log the decision, go on, and end your report to the owner with a
    list of what you touched, by title, repository and branch, never a path;
    where it keeps it and the rules for a flagged owner-kept call
-   give you the call, decide it as your own flagged pick (logged as Lead, with a
+   give you the call, decide it as your own flagged pick (logged with source lead, with a
    flag opening "Owner's call:", no to-do) and go on; otherwise log a waiting
    entry that names the cleanup by repository and title only, add a
    to-do for it that names the cleanup by its verb and the card's title, as
