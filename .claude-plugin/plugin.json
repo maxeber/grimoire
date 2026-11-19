@@ -1,6 +1,6 @@
 {
   "name": "grimoire",
-  "version": "0.161.0",
+  "version": "0.162.0",
   "description": "A spellbook of agent skills for AI. Cast wisely. incantation lets you talk with your session by voice, head-chef leads a brigade of sessions from one Claude Desktop chat, contract turns agreed terms into a skill or agent, eagle-eye lays out coupled decisions, and groundtrack draws a plan as a call graph.",
   "author": {
     "name": "Ayman Diab",
