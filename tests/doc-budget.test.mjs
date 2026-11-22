@@ -20,7 +20,7 @@ const BUDGET = {
   'CONTRIBUTING.md': 6300,
   'docs/agents/issue-tracker.md': 1300,
   'docs/layout.md': 117,
-  'docs/security/brigade.md': 36450, // raised from 35,500 for Incantation's relay and nudge rows; GRIM-40 says why
+  'docs/security/brigade.md': 36460, // raised from 35,500 for Incantation's relay and nudge rows (GRIM-40 says why), and by 7 words for GRIM-43's row 16 checkpoint line
   'docs/security/checks.md': 7200,
   'docs/security/scanners.md': 5900,
   'docs/security/rendering.md': 2400,

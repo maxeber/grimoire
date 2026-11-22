@@ -155,7 +155,7 @@ test('the start rule agrees with the yes table, and "What goes out" holds the ow
   const contract = flat(schedule("SKILL.md: Actions that need the owner's yes"));
   const contractTools = flat(schedule('SKILL.md: Tools'));
   const starting = flat(read('skills/head-chef/references/starting.md'));
-  const row = "the owner's words in this chat asking for the work; at levels 2 and 3, as the owner's user-level instructions file says, except a fresh session a context figure prompts, which waits for the owner's words at every level";
+  const row = "the owner's ask, in any form and anywhere, or a goal that names the work";
   assert.ok(contract.includes(row), 'the contract\'s yes table schedule holds the start row');
   assert.ok(skill.includes(row), 'SKILL.md\'s yes table holds the start row');
   const opening = t => t.split(' A start needs ')[1]?.split('. ')[0] ?? '';
@@ -251,17 +251,17 @@ test('the one-sided rules the contract held stand in their homes (#604 S9, A1 to
   // A2 SKILL.md "Sending and idle notices"
   assert.ok(section(skill, '## Sending and idle notices', '## Between the owner').includes("The idle-cost line below still holds for a check that reaches a member idle over an hour."), 'A2');
   // A3 cleanup.md
-  assert.ok(cleanup.includes("where it allows cleanup, log the decision, go on, and end your report to the owner with a list of what you touched, by title, repository and branch, never a path;"), 'A3');
+  assert.ok(cleanup.includes("At level 3, log and flag it, and go on, and end your report to the owner with a list of what you touched, by title, repository and branch, never a path."), 'A3');
   // A4 SKILL.md "Cleanup" and cleanup.md
   assert.ok(section(skill, '## Cleanup', '## Who decides').includes("a session whose folder or repository is not known, or whose folder is one of those, gets no cleaner run and is listed as staying"), 'A4 SKILL.md');
   assert.ok(cleanup.includes("A session whose folder or repository you do not know gets no cleaner run: tell the owner, who cleans it up by hand."), 'A4 cleanup.md, Which sessions');
   assert.ok(cleanup.includes("A session whose folder or repository you do not know, whose folder came from a report, message or hand-off,"), 'A4 cleanup.md, step 3');
   // A5 handoff.md
   assert.ok(handoff.includes("Name a session in it by title, repository and branch, and a level-3 waiting entry by repository and title, never a path."), 'A5');
-  // A6 SKILL.md "Starting a session" and starting.md
-  const stop1 = `Stop 1 still applies to those requests, for a pressed goal and for a command goal alike: the request is "anything other than the owner's words", and your own pick is not a request.`;
-  assert.ok(section(skill, '## Starting a session', '## Sending and idle notices').includes(stop1), 'A6 SKILL.md');
-  assert.ok(starting.includes(stop1), 'A6 starting.md');
+  // A6 SKILL.md "Starting a session" and starting.md: GRIM-43 (r301) drops the start restrictions; a start is not a stop.
+  const stop1 = `Stop 1 still applies to those requests`;
+  assert.ok(!section(skill, '## Starting a session', '## Sending and idle notices').includes(stop1), 'A6 SKILL.md');
+  assert.ok(!starting.includes(stop1), 'A6 starting.md');
   // A7 and A13 SKILL.md "Tools"
   const tools = section(skill, '## Tools', '## The start prompt');
   assert.ok(tools.includes("Run the checks and the removals as separate calls. When a folder will not go, tell the owner, and never delete it another way."), 'A7');
@@ -270,7 +270,7 @@ test('the one-sided rules the contract held stand in their homes (#604 S9, A1 to
   assert.ok(section(skill, '## The Brigade pane', '## Rules').includes("Record nothing beyond the roster, your decision log and your hand-off."), 'A9');
   // A10, A12, A14 SKILL.md "Autonomy levels"
   const levels = section(skill, '## Autonomy levels', '## The decision log and the hand-off');
-  assert.ok(levels.includes("keep it in your hand-off's rules section in your own words, naming work by repository and issue only, marked paused;"), 'A10');
+  assert.ok(levels.includes("keep it in your hand-off's rules section in your own words, naming work by repository and issue only, marked paused"), 'A10');
   assert.ok(section(levels, '- **2 Auto.**', '- **3 Turbo.**').includes("tell the owner what you took, as a statement and not a question"), 'A12');
   assert.ok(levels.includes("a head that moved waits for a new round."), 'A14');
   assert.ok(!levels.includes("a head that moved waits for a new review"), 'A14 leaves no "new review"');
@@ -288,11 +288,11 @@ test('the one-sided rules the contract held stand in their homes (#604 S9, A1 to
 test('the contract body and SKILL.md say level 3 stops for nothing but the guardrails and the harness', () => {
   const body = flat(read('skills/head-chef/references/CONTRACT.md').split('\n## schedules\n')[0]);
   const levels = flat(read('skills/head-chef/SKILL.md'));
-  const stops = body.slice(body.indexOf('**What stops the lead at level 3.**'), body.indexOf('**A confirmation the file asks for, at level 3.**'));
+  const stops = body.slice(body.indexOf('**What stops the lead at level 3.**'), body.indexOf('**Never lifted, at any level.**'));
   assert.ok(stops.includes("Nothing the owner's instructions or any other file keeps: only Claude's own guardrails and the harness, a permission prompt, a classifier block or a tool that refuses."), 'body: what stops the lead');
   assert.ok(body.includes("A call the owner's instructions keep for the owner is the lead's."), 'body: visibility in place of approval');
   assert.ok(levels.includes("At level 3 only Claude's own guardrails and the harness stop you: a permission prompt, a classifier block, a tool that refuses."), 'SKILL.md: what stops the lead');
-  assert.ok(levels.includes('(a hard stop, a risk call, a security finding, a merge, a publish, a guard\'s stop), does not stop you'), 'SKILL.md: a kept call does not stop the lead');
+  assert.ok(levels.includes('A call the owner\'s rules keep for the owner, a checkpoint included, is a logged pick, flagged'), 'SKILL.md: a kept call does not stop the lead');
   for (const [name, text] of [['body', body], ['SKILL.md', levels]]) {
     assert.equal(/still waits?\b/i.test(text), false, `${name} keeps no "still waits"`);
     assert.equal(text.includes('even toward a standing goal'), false, `${name} keeps no "even toward a standing goal"`);

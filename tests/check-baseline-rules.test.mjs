@@ -266,6 +266,7 @@ const SHIPPED = {
     ['EA2', 'SKILL.md'],
     ['EA2', 'references/CONTRACT.md'],
     ['EA2', 'README.md'],
+    ['EA2', 'references/contract.changelog.md'],
   ],
   contract: [
     ['EA2', 'references/binding-antigravity.md'],

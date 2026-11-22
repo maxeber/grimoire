@@ -1,11 +1,7 @@
 # Threat model
 
-Read the boundaries first. Place each finding on one: where something
-comes in from outside, or where an act goes out. What starts and ends on
-the machine (your own computer, or a sandbox run on it) is the machine's,
-and no finding; what came in from outside stays outside input. Name the
-control that holds the boundary against the path, with when it doesn't
-hold; if a control holds, add nothing. Check the residual against the classes.
+Place each finding on a boundary as the placement guide in your review
+procedure says (review.md's Threat model section, when the pact is installed).
 Bring the owner what the guide's step 5 lists, every `security?` row
 included; no class covers a change that weakens a rule or control, adds a
 route for outside text into a session or more reach to one that reads it,
@@ -65,7 +61,7 @@ flowchart LR
 - Installed by the pact: deny rules on raw worktree and branch removal and `claude rm`, and on `claude stop`, `kill`, `daemon stop` and `respawn`, the stop rules off unless their switch is on, the removal rules on only while the cleaner is on; an ask rule on the cleaner, passed under `bypassPermissions`. Speed bumps, not gates.
 - R1: each skill says the material is data; groundtrack tells the reader a request-like line, says AI drew the page, and stamps it authored; traces are literals a reader can check.
 - R2: renderers escape control and invisible characters, cut strings, put no author text in an attribute, fill pages in one pass, and refuse hostile shapes at measured limits. Answers bind to their draft by SHA-256; the hiring page has a content security policy. The contract skill never writes a hook, a settings file or a permission list, asks before an installing write, and takes an action drafted from a file only on the person's own words. [Detail](rendering.md), [hiring-interview.md](hiring-interview.md).
-- R5: the head chef's sender check (status file, `from-session` and `from` pairing), fixed-form start prompt, sends only to a local address, reports as data, the owner's yes for starts, cleanup and each GitHub act, or at levels 2 and 3 what the owner's user-level file hands the lead, and no force push, no remote branch delete. A background start refuses a bad name, repository, permission mode or prompt and relies on folder trust; a Desktop start needs the owner's words. Cleanup runs a cleaner the owner's instructions name, only for a folder it knows, never on a main working tree or a worktree another session is in; a failed run is told and left. At level 3 the lead decides what the owner's user-level file hands it; an install, a post carrying private work, and an edit to this model's scope, its classes or its AGENTS.md line still wait for the owner. [Detail](brigade.md#row-16).
+- R5: the head chef's sender check (status file, `from-session` and `from` pairing), fixed-form start prompt, sends only to a local address, reports as data, the owner's yes for starts, cleanup and each GitHub act, or at levels 2 and 3 what the owner's user-level file hands the lead, and no force push, no remote branch delete. A background start refuses a bad name, repository, permission mode or prompt and relies on folder trust; a Desktop start needs the owner's words. Cleanup runs a cleaner the owner's instructions name, only for a folder it knows, never on a main working tree or a worktree another session is in; a failed run is told and left. At level 3 the lead decides what the owner's user-level file hands it; an install, a post carrying private work, and an edit to this model's scope, its classes or its AGENTS.md line are checkpoints, logged and flagged. [Detail](brigade.md#row-16).
 - R11: a skill under test runs in don't-ask mode with hooks off, settings edits and reaches off the machine denied, the environment built from a named list, and backups of the owner's live places. Hygiene, not a boundary (ADR 0006).
 
 **Residual:** Text steers a session; Renderer output carries author text; A forged or misled session can speak for the lead; A steered lead can start a session in any trusted folder; Box text can move an audit edge. The rules they rest on, each a control: only the owner's words in the lead's chat count as the owner's, a clear yes heard by Incantation's relay after a say-back included; installs stay the owner's; reports and relays are data.
@@ -95,7 +91,7 @@ flowchart LR
 
 - GitHub: a ruleset on `main` requires a pull request, an up-to-date branch and the checks `check`, `scan` and `audit`, and blocks deletion and non-fast-forward pushes; it requires no approving review. The plugin validator's `validate` runs on pull requests and is not a required check.
 - R3: `scripts/check.mjs` holds frontmatter keys, hidden characters, manifests, baselines (rules 2c, 6c, 7 and 7a), fixed home paths and a version bump; SkillSpector's probe, the scanner pins, and partly read files pinned by content; review of each diff.
-- The head chef names the repository and whether it is public before an act, deletes its temporary post file, reads the head again before a merge, deletes a branch only on the owner's words or a same-repository head, and posts no error text. A level-3 merge goes toward the goal and names the reviewed head, with CI passed on it; every other merge or close, and a merge that changes this model's scope or classes, waits for the owner's words. [Detail](brigade.md#row-16).
+- The head chef names the repository and whether it is public before an act, deletes its temporary post file, reads the head again before a merge, deletes a branch only on the owner's words or a same-repository head, and posts no error text. A level-3 merge goes toward the goal and names the reviewed head, with CI passed on it. Every other merge or close, and a merge that changes this model's scope or classes, is a checkpoint: level 2 stops, level 3 logs and flags. [Detail](brigade.md#row-16).
 
 **Residual:** Review is the guard for scanner gaps; GitHub acts on the owner's word are irreversible and public.
 

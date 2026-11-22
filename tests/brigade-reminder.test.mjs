@@ -235,7 +235,9 @@ const LEVEL3_PARAGRAPH =
 
 test('610 C4: each section the note points at exists', () => {
   const skill = text('skills/head-chef/SKILL.md');
-  for (const lead of ['**3 Turbo.**', '**Risk at level 3.**', '**Level 3, a flagged owner-kept call.**', '**A command goal.**', '**Waiting entries.**']) {
+  // GRIM-43 folded "Risk at level 3", "Level 3, a flagged owner-kept call" and "A command goal" into the
+  // levels rewrite; the mod's notes in brigade/reminder.ts still name them (a follow-up, listed in the PR).
+  for (const lead of ['**3 Turbo.**', '**The goal**', '**Waiting entries.**']) {
     assert.ok(skill.includes(lead), lead);
   }
 });
@@ -292,58 +294,26 @@ const HOLDS_NOTHING =
   "and go on; a relay, a member's reply or a flagged pick never confirms it. When the owner's words later correct it, go back to the step " +
   "they touch; past a merge, publish or install, tell the owner what can't be undone.";
 
-test('618 C1: the contract and SKILL.md each hold the new sentence once, and neither keeps the old wait', () => {
+// GRIM-43 (r198) cuts the sentence from the contract and SKILL.md; nothing comes back.
+test('618 C1: neither the contract nor SKILL.md holds the cut sentence or the old wait', () => {
   for (const p of ['skills/head-chef/references/CONTRACT.md', 'skills/head-chef/SKILL.md']) {
     const t = text(p);
-    assert.equal(t.split(HOLDS_NOTHING).length - 1, 1, p);
+    assert.equal(t.includes(HOLDS_NOTHING), false, p);
     assert.equal(t.includes('which a flagged pick never confirms'), false, p);
   }
 });
 
-// 618 C2, C5: the clause on the mod's gate, in the contract and in SKILL.md, with its table of kinds.
-const GATE = "**Level 3, the mod's gate on waits.**";
-const flat = t => t.replace(/\s+/g, ' ');
-const gateOf = (path, end) => {
-  const raw = text(path);
-  const at = raw.indexOf(GATE);
-  assert.ok(at >= 0, `${path} holds the clause`);
-  const to = raw.indexOf(end, at + GATE.length);
-  return { clause: flat(raw.slice(at, to)), rest: flat(raw.slice(0, at) + raw.slice(to)), raw: raw.slice(at, to) };
-};
-// In 2.0.0 the contract holds the clause as a schedule, SKILL.md's own text, so both files end it the same way.
-const CLAUSES = [
-  ['skills/head-chef/references/CONTRACT.md', '\n\n**'],
-  ['skills/head-chef/SKILL.md', '\n\n**'],
-];
-// Issue 644: at level 3 only five kinds fit a wait, each named in the clause with what it keeps,
-// and the clause names the other kinds as never used at level 3.
-const LEVEL3_KINDS = [
-  ['blocked', 'an act a classifier or permission check blocked'],
-  ['owner-hands', "a step that needs the owner's own hands"],
-  ['owner-words', "what the owner's words in this chat keep"],
-  ['never-lifted', 'what is never lifted, at any level'],
-  ['outside-goal', 'a call outside the goal, which acts at level 2'],
-];
-
-for (const [path, end] of CLAUSES) {
-  test(`618 C5: ${path} names every stop kind, and the five that fit a wait at level 3 with what each keeps`, async () => {
-    const { STOP_KINDS } = await import('../brigade/decisions.ts');
-    const { clause } = gateOf(path, end);
-    for (const kind of STOP_KINDS) assert.ok(clause.includes(`\`${kind}\``), kind);
-    for (const [kind, item] of LEVEL3_KINDS) assert.ok(clause.includes(`\`${kind}\`, ${item}`), `${kind}: ${item}`);
-    const others = STOP_KINDS.filter(k => !LEVEL3_KINDS.some(([l]) => l === k));
-    assert.ok(clause.includes(`${others.slice(0, -1).map(k => `\`${k}\``).join(', ')} and \`${others.at(-1)}\`, are never used at level 3`), 'the other kinds');
-    assert.equal(clause.includes('| Kind |'), false, 'no table of waits');
-  });
-
-  test(`618 C2: ${path} holds the Log, then act exception and the to-do sentence`, () => {
-    const t = flat(text(path));
-    assert.ok(t.includes("the gate's form answer and the answer for a field over its limit hold the step until the entry is logged again, and its no-stop answer is not a refused log for this rule"));
-    assert.ok(t.includes("every owner-facing to-do starts from a waiting entry, an owner's-hands step included"));
+// 618 C2, C5: GRIM-43 (r218) drops the clause on the mod's gate, with its table of kinds, from SKILL.md and
+// the contract's schedule; level 3 logs and flags, and the mod's own refusal words name the kinds. The
+// mod's gate stays in brigade/ (a follow-up, listed in the PR), so STOP_KINDS is still pinned in
+// tests/brigade-decisions.test.mjs.
+for (const path of ['skills/head-chef/references/CONTRACT.md', 'skills/head-chef/SKILL.md']) {
+  test(`618 C5: ${path} no longer holds the clause on the mod's gate`, () => {
+    assert.equal(text(path).includes("**Level 3, the mod's gate on waits.**"), false);
   });
 }
 
-test('618 C1: the phrase appears in exactly two lines of the tree, the new sentence in the contract and in SKILL.md', async () => {
+test('618 C1: the phrase appears in no line of the tree', async () => {
   const { readdirSync, statSync } = await import('node:fs');
   const hits = [];
   const walk = rel => {
@@ -357,6 +327,5 @@ test('618 C1: the phrase appears in exactly two lines of the tree, the new sente
   };
   for (const d of ['skills', 'brigade', 'evals', 'docs', 'tests', 'scripts', 'hooks']) walk(d);
   for (const f of ['SECURITY.md', 'README.md', 'CONTRIBUTING.md', 'CONTEXT.md', 'AGENTS.md']) walk(f);
-  assert.deepEqual(hits.map(h => h.replace(/:\d+$/, '')).sort(), ['skills/head-chef/SKILL.md', 'skills/head-chef/references/CONTRACT.md']);
-  for (const l of hits) assert.ok(text(l.replace(/:\d+$/, '')).split('\n')[Number(l.split(':').pop()) - 1].includes('holds nothing at level 3'));
+  assert.deepEqual(hits, []);
 });
