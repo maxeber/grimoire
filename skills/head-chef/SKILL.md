@@ -633,6 +633,10 @@ as written:
 Your work is issue <number> on <owner/repository>. Send your questions and reports to <lead name>.
 ```
 
+When the work is a Linear item, the `issue` field holds its identifier, such as
+`PACT-12`, and the first sentence is `Your work is Linear item <identifier>
+for <owner/repository>.`; the rest is the same.
+
 A background start may also carry one `note`. The tool writes it after that
 line, under a label it writes itself, and the member gets one line:
 
@@ -722,7 +726,7 @@ nothing beyond the roster, your decision log and your hand-off. Call
 a start, a report taken, a decision sent, a new question for the owner, a
 merge, a cleanup. Never leave it for later. A refused call is said once in
 your next report, and you carry on. A card's `work` names the repository and
-issue number only. A card's `status` is `working`, `idle`, `done` or `stopped`.
+the issue number or Linear identifier only. A card's `status` is `working`, `idle`, `done` or `stopped`.
 Write `idle` for a member that has reported and waits on the owner or on you,
 and `working` again when it resumes; put what the owner must do in a to-do. Never write `needs-you`; the pane
 still reads that word as `idle`.
@@ -770,7 +774,9 @@ a pull request also `#pullrequestreview-C` or `#discussion_rC`), and nothing
 else, when the answer or step is on one. Give the comment link when the answer
 or the step is in one comment or review, and the issue or pull request link
 otherwise. Take a comment's address only from a comment you or a member posted
-on that issue or pull request, as read back from GitHub through `gh`.
+on that issue or pull request, as read back from GitHub through `gh`. When the
+step is on a Linear item, give its identifier alone, such as `PACT-12`, as the
+`link`; `references/roster.md` has its shape.
 
 ## Rules
 

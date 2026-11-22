@@ -5134,6 +5134,59 @@ test('#567 C4: a visit or link press on a parse with an anchor gives nothing, wh
   }
 });
 
+// --- the-pact#580: an issue link is never a gh press; a Linear link opens only a built address --
+
+const { visitLinear, linearPress } = view;
+const ISSUE_A = 'https://github.com/o/my-repo/issues/18';
+
+test('the-pact#580: a link press or visit press on a github.com issue link gives nothing, whatever digest it carries', () => {
+  assert.equal(linkPress(ISSUE_A, linkDigest(ISSUE_A)), undefined);
+  assert.equal(visitPress([{ id: 'Review-18', link: ISSUE_A }], 0, 'review18', linkDigest(ISSUE_A)), undefined);
+});
+
+test('the-pact#580: a Linear press goes only for the address its link was drawn for, built from the slug and the parsed identifier', () => {
+  const address = 'https://linear.app/acme/issue/PACT-12';
+  const drawn = linkDigest(address);
+  assert.equal(linearPress('PACT-12', 'acme', drawn), address);
+  // Another identifier, another slug, a changed or removed link, or a digest of another address.
+  assert.equal(linearPress('PACT-13', 'acme', drawn), undefined);
+  assert.equal(linearPress('PACT-12', 'other', drawn), undefined);
+  assert.equal(linearPress('GRIM-12', 'acme', drawn), undefined);
+  assert.equal(linearPress(undefined, 'acme', drawn), undefined);
+  assert.equal(linearPress('PACT-12', 'acme', linkDigest('https://linear.app/acme/issue/PACT-13')), undefined);
+  for (const word of [undefined, '', 'x', drawn.toUpperCase(), 7]) assert.equal(linearPress('PACT-12', 'acme', word), undefined, String(word));
+});
+
+test('the-pact#580: no slug, or a slug that is not the checked shape, gives no Linear press, whatever digest it carries', () => {
+  for (const slug of [undefined, null, '', 'Acme', 'a/b', 'a?x=1', 'a#b', 'a.b', '-a', 'a'.repeat(65), 7]) {
+    for (const built of ['https://linear.app/acme/issue/PACT-12', `https://linear.app/${slug}/issue/PACT-12`]) {
+      assert.equal(linearPress('PACT-12', slug, linkDigest(built)), undefined, `${JSON.stringify(slug)} ${built}`);
+    }
+  }
+});
+
+test('the-pact#580: a Linear link that is a github.com link, or any other text, gives no Linear press', () => {
+  for (const link of ['https://github.com/o/my-repo/pull/18', ISSUE_A, 'pact-12', 'PACT-12 ', 'https://linear.app/acme/issue/PACT-12']) {
+    assert.equal(linearPress(link, 'acme', linkDigest('https://linear.app/acme/issue/PACT-12')), undefined, link);
+  }
+});
+
+test('the-pact#580: a Linear visit press finds its to-do by place and id slug, then by the digest', () => {
+  const address = 'https://linear.app/acme/issue/PACT-12';
+  const word = linkDigest(address);
+  const todos = [{ id: 'Review-12', text: 'a', link: 'PACT-12' }, { id: 't2', text: 'b' }];
+  assert.equal(visitLinear(todos, 0, 'review12', 'acme', word), address);
+  assert.equal(visitLinear(todos, 1, 'review12', 'acme', word), undefined, 'moved to another place');
+  assert.equal(visitLinear(todos, 5, 'review12', 'acme', word), undefined, 'place gone');
+  assert.equal(visitLinear([{ id: 'other', link: 'PACT-12' }], 0, 'review12', 'acme', word), undefined, 'renamed');
+  assert.equal(visitLinear([{ id: 'Review-12', link: 'PACT-13' }], 0, 'review12', 'acme', word), undefined, 'relinked');
+  assert.equal(visitLinear([{ id: 'Review-12' }], 0, 'review12', 'acme', word), undefined, 'link removed');
+  assert.equal(visitLinear(todos, 0, 'review12', undefined, word), undefined, 'slug removed');
+  assert.equal(visitLinear(todos, 0, 'review12', 'other', word), undefined, 'slug changed');
+  // The to-do's github.com press stays visitPress's, and a Linear link gives it nothing.
+  assert.equal(visitPress(todos, 0, 'review12', word), undefined);
+});
+
 test('issue 598: a step with a well-formed model id writes it, and the reader gives the family when the card holds no settings', () => {
   const c = stepCall({ agentId: undefined }, { stopReason: 'end_turn', usage: { ...stepUsage(), model: 'claude-sonnet-5-5' }, answer: '', toolUses: [] });
   const written = JSON.parse(serializeSummary(summaryFrom(recordCall(newUsageMemory(), c, NOW - 1000), NOW)).value);

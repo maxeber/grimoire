@@ -101,6 +101,24 @@ export const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_][A-Za-z0-9._-]{
  *  name, then the issue form (3 to 6) and the pull form (7 to 12). */
 export const TODO_LINK = /^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_][A-Za-z0-9._-]{0,99})\/(?:(issues)\/([1-9][0-9]{0,6})(?:#(issuecomment)-([1-9][0-9]{0,11}))?|(pull)\/([1-9][0-9]{0,6})(?:#(issuecomment|pullrequestreview)-([1-9][0-9]{0,11})|#(discussion_r)([1-9][0-9]{0,11}))?)$/
 
+/** A Linear identifier (the-pact#580): a team key of 2 to 10 characters (a capital
+ *  letter, then capitals and digits), a hyphen, and a number of 1 to 9 digits
+ *  with no leading zero, as the whole string and nothing else. The start tool's
+ *  `issue` input and a to-do's `link` both take it. The groups are the key and
+ *  the number. */
+export const LINEAR_ID = /^([A-Z][A-Z0-9]{1,9})-([1-9][0-9]{0,8})$/
+
+/** What the to-do tool's `link` schema takes: a github.com link (`TODO_LINK`) or a
+ *  Linear identifier (`LINEAR_ID`), each anchored on its own, so the whole value
+ *  must be one of the two. `parseLink` and `parseLinear` hold the same checks. */
+export const TODO_LINK_ANY = `${TODO_LINK.source}|${LINEAR_ID.source}`
+
+/** A Linear workspace's URL slug (the-pact#580), read from the environment and
+ *  checked here, case-sensitively: 1 to 64 lower-case letters, digits and
+ *  hyphens, not starting with a hyphen. No slash, dot, colon, query or fragment
+ *  can pass, so the slug cannot move the address off linear.app or add a path. */
+export const LINEAR_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/
+
 /** The longest link the pattern allows is 203 characters (a pull request review
  *  with a 39-character owner, a 100-character name, a 7-digit number and a
  *  12-digit id); the field's cap is a little above it. */
@@ -149,6 +167,36 @@ export function linkUrl(p: LinkParts): string {
 export function linkLabel(p: LinkParts): string {
   const what = p.anchor === undefined ? '' : p.anchor.kind === 'comment' ? 'comment ' : p.anchor.kind === 'review' ? 'review ' : 'review comment '
   return `${p.kind === 'pr' ? 'PR ' : '#'}${p.number} ${what}${p.repo}`
+}
+
+/** What a Linear identifier parses to: its team key and its number. */
+export type LinearParts = { key: string; number: string }
+
+/** A Linear identifier's parts, or undefined for anything `LINEAR_ID` does not hold whole. */
+export function parseLinear(v: unknown): LinearParts | undefined {
+  if (typeof v !== 'string') return undefined
+  const m = LINEAR_ID.exec(v)
+  if (m === null || m[1] === undefined || m[2] === undefined) return undefined
+  return { key: m[1], number: m[2] }
+}
+
+/** The workspace slug an environment read gave, or undefined for no slug: an unset
+ *  variable, a value that is not text and a value `LINEAR_SLUG` does not hold whole. */
+export function linearSlug(v: unknown): string | undefined {
+  return typeof v === 'string' && LINEAR_SLUG.test(v) ? v : undefined
+}
+
+/** A Linear item's page: the constant host, the checked slug and the parsed
+ *  identifier, and nothing taken from stored text. Parts that do not pass
+ *  `LINEAR_ID` again, or a slug that does not pass `LINEAR_SLUG`, build no address. */
+export function linearUrl(p: LinearParts | undefined, slug: unknown): string | undefined {
+  if (p === undefined || linearSlug(slug) === undefined || parseLinear(`${p.key}-${p.number}`) === undefined) return undefined
+  return `https://linear.app/${slug}/issue/${p.key}-${p.number}`
+}
+
+/** A Linear link's label: the identifier alone, with no workspace. */
+export function linearLabel(p: LinearParts): string {
+  return `${p.key}-${p.number}`
 }
 
 /** Whether a value is a whole number from 0 to 2^53 - 1. */
@@ -223,7 +271,7 @@ function todo(i: number, v: unknown): Checked<Todo> {
   if (session.value !== undefined) out.session = session.value
   // Fixed words: the value is never echoed.
   if (f.value.link !== undefined) {
-    if (parseLink(f.value.link) === undefined) return { error: `${where} link is not a github.com issue, pull request or comment link` }
+    if (parseLink(f.value.link) === undefined && parseLinear(f.value.link) === undefined) return { error: `${where} link is not a github.com issue, pull request or comment link, or a Linear identifier` }
     out.link = f.value.link as string
   }
   return { value: out }
@@ -334,8 +382,8 @@ const MAX_PR = 9999999
  *  a card's repository passes the checked owner/name as GH_REPO in the run's
  *  environment, never on the command line (`ghRun`). The pill press runs a
  *  second list, `gh pr view <number> --web` (`ghViewRun`), whose one variable
- *  argument is a card's checked pull request number; a to-do link press (issue
- *  560) builds the same list with an issue or pull request kind. */
+ *  argument is a card's checked pull request number; a to-do pull request link
+ *  press (issues 560 and the-pact#580) builds the same list. */
 export const GH_ARGV: readonly string[] = [
   'gh',
   'pr',
@@ -359,20 +407,20 @@ export function ghRun(repo?: unknown): GhRun | undefined {
   return { argv: GH_ARGV, init: { timeoutMs: 15000, env: { GH_REPO: repo } } }
 }
 
-/** A pill press (issue 513, S2) or a to-do link press (issue 560): the second
- *  fixed list, `gh <pr|issue> view <number> --web`, with the repository always
- *  set as GH_REPO, behind a constant github.com host, and the same 15-second
- *  limit. The repository is the pill's `gh` answer or the to-do link's parse. The number is on the command line and has passed
- *  `PR_NUMBER` here; the repository has passed `REPO`. Either failing builds
- *  no run. */
+/** A pill press (issue 513, S2) or a to-do's pull request link press (issues 560
+ *  and the-pact#580): the second fixed list, `gh pr view <number> --web`, with the
+ *  repository always set as GH_REPO, behind a constant github.com host, and the
+ *  same 15-second limit. The repository is the pill's `gh` answer or the to-do
+ *  link's parse. The number is on the command line and has passed `PR_NUMBER`
+ *  here; the repository has passed `REPO`. Either failing builds no run. The
+ *  kind is the one word `pr`: no run opens an issue. */
 export function ghViewRun(number: unknown, repo: unknown, kind: unknown = 'pr'): GhRun | undefined {
   if (typeof number !== 'string' || !PR_NUMBER.test(number)) return undefined
   if (typeof repo !== 'string' || !REPO.test(repo)) return undefined
-  // The kind is one of two words (issue 560: a to-do's link opens an issue or a pull request).
-  if (kind !== 'pr' && kind !== 'issue') return undefined
+  if (kind !== 'pr') return undefined
   // The host is pinned: gh takes `[HOST/]OWNER/REPO`, so GH_HOST and gh's own
   // default cannot move the page off github.com (the only host an answer draws for).
-  return { argv: ['gh', kind, 'view', number, '--web'], init: { timeoutMs: 15000, env: { GH_REPO: `github.com/${repo}` } } }
+  return { argv: ['gh', 'pr', 'view', number, '--web'], init: { timeoutMs: 15000, env: { GH_REPO: `github.com/${repo}` } } }
 }
 
 /** One PR `gh` answered for, after its checks. `updatedAt` is epoch ms. */

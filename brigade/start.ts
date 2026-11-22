@@ -1,4 +1,4 @@
-import { foldsCase, oneLine, pathKey, REPO } from './roster.ts'
+import { foldsCase, LINEAR_ID, oneLine, pathKey, REPO } from './roster.ts'
 
 // The background start tool's rules (issue 543, spec rev 4), as plain
 // TypeScript with no engine import, so tests/brigade-start.test.mjs runs them
@@ -34,7 +34,7 @@ export const START_TIMEOUT_MS = 60000
 
 /** What the lead still reads after a compaction (issue 543 S2.0, amended by issue 578 S3.4). */
 export const DESCRIPTION =
-  'The only way to start a background member: never type `claude --bg`. Needs name, repository, issue, model, effort, lead (your own name) and folder (a main checkout of the repository; the harness refuses a folder the owner has not trusted). It starts one session on Remote Control with a fixed command and a fixed one-line prompt, with an optional note, takes no permission mode, and prints nothing from the run. It writes no card: call set_roster after it. It works only while the Brigade pane is open. A refusal names the rule that failed. A note is one sentence of at most 200 characters, ending in a full stop, with no colon and no path, address, id (one commit aside), session name, or words about where to send questions or reports, posting, or accepting a risk; the member reads it as your words, not the owner\'s.'
+  'The only way to start a background member: never type `claude --bg`. Needs name, repository, issue (a GitHub issue number or a Linear identifier such as PACT-12), model, effort, lead (your own name) and folder (a main checkout of the repository; the harness refuses a folder the owner has not trusted). It starts one session on Remote Control with a fixed command and a fixed one-line prompt, with an optional note, takes no permission mode, and prints nothing from the run. It writes no card: call set_roster after it. It works only while the Brigade pane is open. A refusal names the rule that failed. A note is one sentence of at most 200 characters, ending in a full stop, with no colon and no path, address, id (one commit aside), session name, or words about where to send questions or reports, posting, or accepting a risk; the member reads it as your words, not the owner\'s.'
 
 export const NAME_REASONS = {
   card: 'name: a roster card already has this name',
@@ -52,6 +52,8 @@ const KEYS = ['name', 'repository', 'issue', 'model', 'effort', 'lead', 'folder'
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const MAX_FOLDER = 1000
 const MAX_NOTE = 200
+/** The member's first prompt is one line of at most this many characters. */
+const MAX_PROMPT = 640
 
 /** The note's refusals, in fixed words that never quote it (issue 578, S3.1 and S3.2). */
 export const NOTE_REASONS = {
@@ -129,7 +131,10 @@ export function noteNames(note: string, names: readonly string[], own: readonly 
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
 const MODEL = /^[A-Za-z][A-Za-z0-9._-]{0,63}$/
+// A GitHub issue number, whole and nothing else; a Linear identifier is checked by LINEAR_ID (the-pact#580).
 const ISSUE = /^[1-9][0-9]{0,6}$/
+/** The issue input's refusal, in fixed words that never quote it. */
+export const ISSUE_REASON = 'issue: a GitHub issue number or a Linear identifier such as PACT-12'
 // No full stop: the lead's name sits in the member's first sentence, and a full stop would let a second one in.
 const LEAD = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$/
 
@@ -147,7 +152,7 @@ function shape(raw: unknown): Checked<Inputs> {
   const i = raw as Inputs
   if (!goodName(i.name)) return { why: 'name: 1 to 64 letters, digits, . _ -, starting with a letter or digit, no .., not ending in . or .lock' }
   if (!REPO.test(i.repository)) return { why: 'repository: not a plain owner/name' }
-  if (!ISSUE.test(i.issue)) return { why: 'issue: 1 to 7 digits, not starting with 0' }
+  if (!ISSUE.test(i.issue) && !LINEAR_ID.test(i.issue)) return { why: ISSUE_REASON }
   if (!MODEL.test(i.model)) return { why: 'model: starts with a letter; 1 to 64 letters, digits, . _ -' }
   if (!EFFORTS.includes(i.effort)) return { why: `effort: one of ${EFFORTS.join(', ')}` }
   if (!LEAD.test(i.lead) || i.lead.endsWith(' ') || i.lead.includes('  ')) return { why: 'lead: 1 to 80 letters, digits, single spaces, _ -, no full stop' }
@@ -182,13 +187,23 @@ function passed(i: unknown): Inputs {
 
 // --- the prompt and the argv (S2.3) -------------------------------------------------
 
-/** The line the member starts with, from inputs that passed: the fixed sentence, and with a note the
- *  tool's label then the note, so the member can tell the lead's words from the owner's (issue 578). */
+/** The prompt's text for inputs that passed their own rules: the fixed first sentence (a Linear
+ *  identifier names the Linear item, the-pact#580; a GitHub number names the issue as before), the fixed question line, and with a note the tool's
+ *  label then the note, so the member can tell the lead's words from the owner's (issue 578). */
+function promptOf(i: Inputs): string {
+  const first = LINEAR_ID.test(i.issue)
+    ? `Your work is Linear item ${i.issue} for ${i.repository}.`
+    : `Your work is issue ${i.issue} on ${i.repository}.`
+  let prompt = `${first} Send your questions and reports to ${i.lead}.`
+  if (i.note !== undefined) prompt += ` ${i.lead}, not the owner, adds: ${i.note}`
+  return prompt
+}
+
+/** The line the member starts with, from inputs that passed. */
 export function startPrompt(input: Inputs): string {
   const i = passed(input)
-  let prompt = `Your work is issue ${i.issue} on ${i.repository}. Send your questions and reports to ${i.lead}.`
-  if (i.note !== undefined) prompt += ` ${i.lead}, not the owner, adds: ${i.note}`
-  if (/[\r\n]/.test(prompt) || prompt.length > 640) throw new Error('start: the prompt is not one short line')
+  const prompt = promptOf(i)
+  if (/[\r\n]/.test(prompt) || prompt.length > MAX_PROMPT) throw new Error('start: the prompt is not one short line')
   return prompt
 }
 

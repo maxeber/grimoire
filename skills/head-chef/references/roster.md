@@ -74,7 +74,7 @@ the file itself.
   never an issue's or a pull request's address, which takes Open in app away.
   A Desktop session's card carries `desktopId`, and a background session's
   card `bgId`, so leave `url` out.
-- `work` names the repository and the issue number only, as in the example.
+- `work` names the repository and the issue number or Linear identifier only, as in the example.
 - A to-do is one line the owner takes in at a glance: at most 50 characters
   (the 300 below is only the check's limit), one ask or one owner step. It
   starts with a verb, then names the act and the work: "<verb> <repository>
@@ -109,6 +109,11 @@ the file itself.
   query, no other fragment, no second `#`, no trailing slash. A link that does
   not fit is refused as a shape. The pane never opens a link until the owner
   presses it, and shows the repository beside the number.
+  When the answer or step is on a Linear item, give its identifier alone as the
+  `link`, written whole, such as `PACT-12`: 2 to 10 capital letters or digits,
+  the first a letter, then `-` and 1 to 9 digits with no leading zero. The pane
+  shows the identifier only, and opens the item's page only when the owner has
+  set `GRIMOIRE_LINEAR_SLUG` to the workspace's name in its address.
 - Caps: a title at most 80 characters; `work` and `settings` at
   most 300; `desktopId`, `bgId` and `url` at most 100. A to-do's `id` at
   most 40, its `text` at most 300, its `session` at most 80, its `link` at
@@ -124,7 +129,8 @@ the file itself.
 
 A pane from before the to-do `link` field refuses a roster that holds one, and
 a pane from before comment links refuses a roster that holds a link with a
-`#` fragment.
+`#` fragment, and a pane from before Linear links refuses one that holds a
+bare identifier.
 If `set_roster` refuses a `link`, or the owner says the pane refused the roster
 file for one, send the roster again without links, and ask the owner to delete
 that session's roster file by hand: you write no file yourself, and the mod

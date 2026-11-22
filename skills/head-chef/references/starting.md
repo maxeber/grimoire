@@ -34,7 +34,8 @@ A start whose route the owner's words did not name is a background session with 
      and never one taken from an issue, a report, a message or a hand-off.
 4. **Start it** by calling the Brigade mod's `start_background_session`,
    loading it first if it is deferred, with `name`, `repository` (one
-   `owner/name`), `issue` (digits only), `model`, `effort` (one of `low`,
+   `owner/name`), `issue` (a GitHub issue number, digits only, or a Linear
+   identifier such as `PACT-12`), `model`, `effort` (one of `low`,
    `medium`, `high`, `xhigh` or `max`), `lead` (your own name, exactly as
    the first line of your session list gives it) and `folder`, and optionally
    a `note`, one short sentence that "The start prompt" in `SKILL.md` bounds.

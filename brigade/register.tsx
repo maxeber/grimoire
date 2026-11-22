@@ -19,7 +19,7 @@ import {
   OPEN_WAIT_MS,
   SESSION_ID,
   STATUSES,
-  TODO_LINK,
+  TODO_LINK_ANY,
   HOST_PROBES,
   answerFor,
   appLink,
@@ -29,6 +29,9 @@ import {
   pathKey,
   ghRun,
   ghViewRun,
+  linearLabel,
+  linearSlug,
+  linearUrl,
   linkLabel,
   linkUrl,
   listsOpenTool,
@@ -40,6 +43,7 @@ import {
   typedLoadRan,
   oneLine,
   openerArgv,
+  parseLinear,
   parseLink,
   parsePrList,
   placeDecisions,
@@ -211,6 +215,7 @@ import {
   prAnswer,
   linkDigest,
   slug,
+  visitLinear,
   visitPress,
   prUrl,
   prNumber,
@@ -1515,6 +1520,25 @@ async function openSplit($: EngineInterface, c: Card) {
 
 // The link route: the host's opener, one press per link at a time.
 async function viaLink($: EngineInterface, c: Card, app: string) {
+  await hostOpen($, app, {
+    none: 'Open in app has no opener on this system.',
+    failed: program => `Could not open ${oneLine(c.title, 40)} with ${program}.`,
+    // explorer.exe exits 1 even when it hands the link on, so on every host the
+    // toast reports the exit code rather than judging it.
+    done: code => `Opening ${oneLine(c.title, 40)} in the app (${code})`,
+  })
+}
+
+// The words a host-opener press shows. `done` is left out where a finished run
+// shows nothing.
+type OpenerWords = { none: string; failed: (program: string) => string; done?: (exitCode: number) => string }
+
+// The host's opener (explorer.exe, /usr/bin/open or /usr/bin/xdg-open, as the
+// host is proven below) given one address as one argument, with no shell, for at
+// most 15 s, one press per address at a time. The address is a link the caller
+// built from constants and a checked id: the card app link, or (the-pact#580) a
+// Linear item's page.
+async function hostOpen($: EngineInterface, app: string, words: OpenerWords) {
   if (linking.has(app)) return
   linking.add(app)
   try {
@@ -1529,19 +1553,17 @@ async function viaLink($: EngineInterface, c: Card, app: string) {
       os = undefined
     }
     if (os === 'next' || os === undefined) {
-      $.ui.toast('Open in app has no opener on this system.')
+      $.ui.toast(words.none)
       return
     }
     const argv = openerArgv(os, app)
     const ran = await $.process.run(argv, { timeoutMs: 15000 }).catch(() => undefined)
     // The rejection's own text is never shown: name the program instead.
     if (ran === undefined) {
-      $.ui.toast(`Could not open ${oneLine(c.title, 40)} with ${argv[0]}.`)
+      $.ui.toast(words.failed(argv[0] ?? ''))
       return
     }
-    // explorer.exe exits 1 even when it hands the link on, so on every host the
-    // toast reports the exit code rather than judging it.
-    $.ui.toast(`Opening ${oneLine(c.title, 40)} in the app (${ran.exitCode})`)
+    if (words.done !== undefined) $.ui.toast(words.done(ran.exitCode))
   } finally {
     linking.delete(app)
   }
@@ -1567,12 +1589,13 @@ async function openPill($: EngineInterface, c: Card) {
   }
 }
 
-// A to-do's link press on Desktop (issue 560): the pill's route, `gh issue view
-// <number> --web` or `gh pr view <number> --web`, built by `ghViewRun` from the
-// link's parse, with the repository behind a constant github.com host, after
-// the same PATH check. One press per to-do at a time (the pill has no such
-// guard; this one is keyed on the to-do's id). Failure is a refused or failed
-// start, a non-zero exit or a timeout, and shows the one fixed toast.
+// A to-do's pull request link press on Desktop (issues 560 and the-pact#580): the pill's
+// route, `gh pr view <number> --web`, built by `ghViewRun` from the link's
+// parse, with the repository behind a constant github.com host, after the same
+// PATH check. No `gh` run opens an issue: an issue link is the engine's Link,
+// with no press. One press per to-do at a time (the pill has no such guard;
+// this one is keyed on the to-do's id). Failure is a refused or failed start, a
+// non-zero exit or a timeout, and shows the one fixed toast.
 const LINK_FAILED = 'Could not open the page'
 const visiting = new Set<string>()
 async function openTodoLink($: EngineInterface, id: string, parts: LinkParts) {
@@ -1587,6 +1610,33 @@ async function openTodoLink($: EngineInterface, id: string, parts: LinkParts) {
     $.ui.toast(LINK_FAILED)
   } finally {
     visiting.delete(id)
+  }
+}
+
+// A to-do's Linear link press on Desktop (the-pact#580): the page address, built
+// by `visitLinear` from constants, the slug the environment holds now and the
+// parsed identifier, goes to the host opener the card's Open in app uses
+// (`hostOpen`), as one argument with no shell. One press per to-do at a time,
+// and one per address. Any failure shows the one fixed toast; a finished run
+// shows nothing, as explorer.exe exits 1 even when it hands the page on.
+async function openLinearLink($: EngineInterface, id: string, address: string) {
+  if (visiting.has(id)) return
+  visiting.add(id)
+  try {
+    await hostOpen($, address, { none: LINK_FAILED, failed: () => LINK_FAILED })
+  } finally {
+    visiting.delete(id)
+  }
+}
+
+// The workspace slug a Linear link's page needs: the environment variable
+// GRIMOIRE_LINEAR_SLUG, checked by `linearSlug`. Unset, malformed or an
+// unreadable environment is no slug, never an error.
+async function linearSlugNow($: EngineInterface): Promise<string | undefined> {
+  try {
+    return linearSlug(await $.env.get('GRIMOIRE_LINEAR_SLUG'))
+  } catch {
+    return undefined
   }
 }
 
@@ -1673,7 +1723,7 @@ const SCHEMA = {
         type: 'object',
         additionalProperties: false,
         required: ['id', 'text'],
-        properties: { id: field(40), text: field(MAX_TEXT), session: field(80), link: { type: 'string', maxLength: MAX_LINK, pattern: TODO_LINK.source } },
+        properties: { id: field(40), text: field(MAX_TEXT), session: field(80), link: { type: 'string', maxLength: MAX_LINK, pattern: TODO_LINK_ANY } },
       },
     },
   },
@@ -3029,7 +3079,7 @@ const START_SCHEMA = {
   properties: {
     name: field(64),
     repository: field(201),
-    issue: field(7),
+    issue: field(20),
     model: field(64),
     effort: field(6),
     lead: field(80),
@@ -3900,7 +3950,14 @@ export const register: Register = on => {
         // if the address matches the one the button was drawn for. The check above
         // is the one this branch shares with the tick and Open presses.
         const parts = visitPress(current.todos, i, slugged, word)
-        if (parts !== undefined) await openTodoLink($, item.id, parts)
+        if (parts !== undefined) {
+          await openTodoLink($, item.id, parts)
+          return { element: e.element }
+        }
+        // A Linear link (the-pact#580): visitLinear builds the address again from the
+        // slug as it is now and the identifier as the roster holds it now.
+        const address = visitLinear(current.todos, i, slugged, await linearSlugNow($), word)
+        if (address !== undefined) await openLinearLink($, item.id, address)
         return { element: e.element }
       }
       if (verb === 'todo') {
@@ -3981,6 +4038,8 @@ export const register: Register = on => {
     const sessionName = new Map(liveList.flatMap(l => (l.shown === undefined ? [] : [[l.name, l.shown] as const])))
     const moves = movesFrom(liveList)
     const found = lookup(await read($, links))
+    // The Linear workspace slug (the-pact#580), read only when a to-do holds a Linear identifier.
+    const linearSlugValue = todos.some(t => parseLinear(t.link) !== undefined) ? await linearSlugNow($) : undefined
     const warm = new Map(warmthFrom(await read($, warmth)).map(w => [w.name, w]))
     const meterOf = new Map(metersFrom(await read($, meters)).map(m => [m.name, m]))
     // Read once, only through the two kind words, by card title.
@@ -4724,9 +4783,15 @@ export const register: Register = on => {
       // whole, never cut; the text above it is the one that is cut. A link with an anchor
       // (issue 567) is the engine's Link on every surface, Desktop included: no `gh` command
       // takes the anchor, so it has no button, and its label and address come from this one parse.
+      // Only a pull request link without an anchor is a button (the-pact#580: no `gh` run opens an
+      // issue). A Linear identifier (the-pact#580) draws its label alone with no workspace; with a
+      // slug set it is the same button on Desktop and the engine's Link on the built address
+      // elsewhere, and with none it is that label as plain text, with no press and no address.
       const linkParts = parseLink(t.link)
-      const linkHref = linkParts === undefined ? undefined : linkUrl(linkParts)
-      const linkButton = pointer && linkParts?.anchor === undefined
+      const linearParts = linkParts === undefined ? parseLinear(t.link) : undefined
+      const linkHref = linkParts !== undefined ? linkUrl(linkParts) : linearUrl(linearParts, linearSlugValue)
+      const linkText = linkParts !== undefined ? linkLabel(linkParts) : linearParts !== undefined ? linearLabel(linearParts) : undefined
+      const linkButton = pointer && (linkParts !== undefined ? linkParts.anchor === undefined && linkParts.kind === 'pr' : linkHref !== undefined)
       return (
         <Box flexDirection="row" alignItems="flex-start" columnGap={1} paddingX={terminal ? 0 : 'md'}>
           {/* Dim at rest (a blank on the terminal, a ○ on a desktop), a tick
@@ -4751,14 +4816,16 @@ export const register: Register = on => {
             <Text wrap="truncate-end" strikethrough={isTicked} dimColor={isTicked}>
               {oneLine(t.text, MAX_TEXT)}
             </Text>
-            {linkParts !== undefined && linkHref !== undefined &&
-              (linkButton ? (
+            {linkText !== undefined &&
+              (linkHref === undefined ? (
+                <Text wrap="wrap">{linkText}</Text>
+              ) : linkButton ? (
                 <Button key={`${keyFor('visit', i, t.id)}-${linkDigest(linkHref)}`} plain onPress={noop}>
-                  <Text wrap="wrap">{linkLabel(linkParts)}</Text>
+                  <Text wrap="wrap">{linkText}</Text>
                 </Button>
               ) : (
                 <Text wrap="wrap">
-                  <Link href={linkHref}>{linkLabel(linkParts)}</Link>
+                  <Link href={linkHref}>{linkText}</Link>
                 </Text>
               ))}
           </Box>

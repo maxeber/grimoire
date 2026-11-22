@@ -1,4 +1,4 @@
-import { AHEAD_MS, PR_NUMBER, PR_STATES, REPO, SESSION_ID, foldsCase, linkUrl, oneLine, parseLink, pathKey, placeSummary, projectFolder, sepOf, sessionRow, statRejection } from './roster.ts'
+import { AHEAD_MS, PR_NUMBER, PR_STATES, REPO, SESSION_ID, foldsCase, linearUrl, linkUrl, oneLine, parseLinear, parseLink, pathKey, placeSummary, projectFolder, sepOf, sessionRow, statRejection } from './roster.ts'
 import type { GhPr, LinkParts, Move, SessionRow, StatAnswer } from './roster.ts'
 import { sha256Hex } from './decisions.ts'
 import type { Meter, Pair, Sample, UsageCategory, UsageLimit, UsageSnapshot, Warmth } from './types'
@@ -962,12 +962,12 @@ export const linkDigest = (url: string): string => sha256Hex(url).slice(0, 16)
 /** A link button's press: the to-do's link parsed again from the roster as it
  *  is now, and kept only if the button's digest is the one of that address.
  *  A link changed since the draw, to anything, gives undefined. A link with an
- *  anchor (issue 567) is never a button's: no `gh` command takes the anchor, so
- *  it is drawn as the engine's Link and a press here, forged or real, gives
- *  undefined. */
+ *  anchor (issue 567) or to an issue (the-pact#580) is never a button's: no `gh`
+ *  command takes the anchor, and none opens an issue, so each is drawn as the
+ *  engine's Link and a press here, forged or real, gives undefined. */
 export function linkPress(link: unknown, word: unknown): LinkParts | undefined {
   const parts = parseLink(link)
-  if (parts === undefined || parts.anchor !== undefined) return undefined
+  if (parts === undefined || parts.anchor !== undefined || parts.kind !== 'pr') return undefined
   return word === linkDigest(linkUrl(parts)) ? parts : undefined
 }
 
@@ -982,6 +982,24 @@ export function visitPress(todos: ReadonlyArray<{ id: string; link?: unknown }>,
   const item = todos[place]
   if (item === undefined || slug(item.id) !== slugged) return undefined
   return linkPress(item.link, word)
+}
+
+/** A Linear link button's press (the-pact#580): the to-do's identifier parsed again
+ *  from the roster as it is now, and the page address built from the checked
+ *  slug and that parse alone, kept only if the button's digest is the one of
+ *  that address. A link or slug changed since the draw, a slug that is not the
+ *  checked shape and a link that is not a bare identifier give undefined. */
+export function linearPress(link: unknown, slugValue: unknown, word: unknown): string | undefined {
+  const address = linearUrl(parseLinear(link), slugValue)
+  return address !== undefined && word === linkDigest(address) ? address : undefined
+}
+
+/** A Linear link button's whole press: the to-do found as `visitPress` finds it,
+ *  then `linearPress`. The address is returned, never taken from stored text. */
+export function visitLinear(todos: ReadonlyArray<{ id: string; link?: unknown }>, place: number, slugged: string, slugValue: unknown, word: unknown): string | undefined {
+  const item = todos[place]
+  if (item === undefined || slug(item.id) !== slugged) return undefined
+  return linearPress(item.link, slugValue, word)
 }
 
 /** A pull request row: the card it comes from, its place in the roster, its

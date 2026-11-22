@@ -4699,27 +4699,30 @@ const visitKey = (i: number, id: string, link: string) => `visit-${i}-${id}-${sh
 const visitKeys = (all: Drawn[]) => all.filter(n => n.type === 'Button' && typeof n.props.key === 'string' && n.props.key.startsWith('visit-')).map(n => n.props.key)
 const linkViews = (w: World) => w.ghCalls.filter(a => a[2] === 'view')
 
-test('#560 desktop: a to-do with a link draws a press button keyed by place, id and a digest of the rebuilt address, labelled with the repository; one without draws none', async ($, on) => {
+test('#560, the-pact#580 desktop: a to-do with a pull request link draws a press button keyed by place, id and a digest of the rebuilt address, labelled with the repository; an issue link draws the engine\'s Link and no button; one without a link draws none', async ($, on) => {
   await grouped(on, $, LINKED)
   const m = await mountOn($, 'desktop')
   const all = await nodes(m)
-  expect(visitKeys(all)).toEqual([visitKey(0, 't1', PR_LINK), visitKey(1, 't2', ISSUE_LINK)])
-  expect(all.some(n => n.type === 'Link')).toBe(false)
+  expect(visitKeys(all)).toEqual([visitKey(0, 't1', PR_LINK)])
+  expect(all.filter(n => n.type === 'Link').map(l => l.props.href)).toEqual([ISSUE_LINK])
   const text = await textOf(m)
   expect(text).toContain('PR 18 o/r')
   expect(text).toContain('#560 mephistopheles4/grimoire')
 })
 
-test('#560 desktop: pressing an issue link runs exactly gh issue view <number> --web with GH_REPO pinned behind github.com, and a pull request link runs gh pr view', async ($, on) => {
+test('#560, the-pact#580 desktop: pressing a pull request link runs exactly gh pr view <number> --web with GH_REPO pinned behind github.com; an issue link has no button, so no gh run follows a draw or a press', async ($, on) => {
   const w = await grouped(on, $, LINKED)
   const m = await mountOn($, 'desktop')
   await nodes(m)
-  await m.press({ key: visitKey(1, 't2', ISSUE_LINK) })
-  expect(linkViews(w)).toEqual([['gh', 'issue', 'view', '560', '--web']])
-  expect(w.ghInits.at(-1)).toEqual({ timeoutMs: 15000, env: { GH_REPO: 'github.com/mephistopheles4/grimoire' } })
+  expect(linkViews(w)).toEqual([])
   await m.press({ key: visitKey(0, 't1', PR_LINK) })
-  expect(linkViews(w).at(-1)).toEqual(['gh', 'pr', 'view', '18', '--web'])
+  expect(linkViews(w)).toEqual([['gh', 'pr', 'view', '18', '--web']])
+  expect(w.ghInits.at(-1)).toEqual({ timeoutMs: 15000, env: { GH_REPO: 'github.com/o/r' } })
   expect(w.toasts).toEqual([])
+  // The issue link's button is not drawn, so there is no key to press; ghViewRun refuses an issue kind too (tests/brigade-roster-rules.test.mjs).
+  expect(await m.find({ key: visitKey(1, 't2', ISSUE_LINK) })).toBeUndefined()
+  expect(linkViews(w).length).toBe(1)
+  expect(w.procs.filter(p => p[0] !== 'gh')).toEqual([])
 })
 
 test('#560 desktop: a failed or non-zero gh shows the one fixed toast and none of its output; a failed PATH check runs nothing', async ($, on) => {
@@ -4743,7 +4746,8 @@ test('#560 desktop: a failed or non-zero gh shows the one fixed toast and none o
 })
 
 test('#560 desktop: a second press on the same to-do while a run waits starts no second run; another to-do still runs', async ($, on) => {
-  const w = await grouped(on, $, LINKED)
+  const PR_LINK_2 = 'https://github.com/o/r/pull/19'
+  const w = await grouped(on, $, { cards: [], todos: [{ id: 't1', text: 'Review PR 18', link: PR_LINK }, { id: 't2', text: 'Review PR 19', link: PR_LINK_2 }] })
   const m = await mountOn($, 'desktop')
   await nodes(m)
   w.holdGh = true
@@ -4751,7 +4755,7 @@ test('#560 desktop: a second press on the same to-do while a run waits starts no
   await w.clock.settle()
   await m.press({ key: visitKey(0, 't1', PR_LINK) })
   expect(linkViews(w).length).toBe(1)
-  const other = m.press({ key: visitKey(1, 't2', ISSUE_LINK) })
+  const other = m.press({ key: visitKey(1, 't2', PR_LINK_2) })
   await w.clock.settle()
   expect(linkViews(w).length).toBe(2)
   w.holdGh = false
@@ -4843,9 +4847,9 @@ for (const surface of ['terminal', 'vscode', 'desktop', 'mobile'] as const) {
     const m = await mountOn($, surface)
     const all = await nodes(m)
     const hrefs = all.filter(n => n.type === 'Link').map(l => l.props.href)
-    // The plain issue link is the Button route on Desktop (#560) and a Link elsewhere.
-    expect(hrefs).toEqual(surface === 'desktop' ? [COMMENT_LINK, PR_COMMENT_LINK, REVIEW_LINK, REVIEW_COMMENT_LINK] : [COMMENT_LINK, PR_COMMENT_LINK, REVIEW_LINK, REVIEW_COMMENT_LINK, ISSUE_LINK])
-    expect(visitKeys(all)).toEqual(surface === 'desktop' ? [visitKey(4, 't5', ISSUE_LINK)] : [])
+    // The plain issue link is a Link on every surface too (the-pact#580): no gh command opens an issue.
+    expect(hrefs).toEqual([COMMENT_LINK, PR_COMMENT_LINK, REVIEW_LINK, REVIEW_COMMENT_LINK, ISSUE_LINK])
+    expect(visitKeys(all)).toEqual([])
     const text = await textOf(m)
     for (const label of ANCHORED_LABELS) expect(text).toContain(label)
     expect(linkViews(w)).toEqual([])
@@ -4888,8 +4892,201 @@ test('#567 C2: the registered set_roster schema takes the anchored shapes by the
   expect(dots.ok).toBe(false)
   const refused = await call($, { cards: [], todos: [{ id: 't1', text: 'x', link: 'https://github.com/o/r/issues/1#issuecomment-0' }] })
   expect(refused.ok).toBe(false)
-  expect(refused.text).toContain('link is not a github.com issue, pull request or comment link')
+  expect(refused.text).toContain('link is not a github.com issue, pull request or comment link, or a Linear identifier')
   expect(refused.text).not.toContain('issuecomment-0')
+})
+
+// --- the-pact#580: a Linear identifier as a to-do's link -------------------------------------------
+//
+// The workspace slug is configuration: the environment variable GRIMOIRE_LINEAR_SLUG, read through the
+// engine's env.get and checked. The address is built from constants, the slug and the parsed identifier,
+// and a press opens it through the host opener the card's Open in app uses, as one argument.
+
+const LINEAR_TODOS = {
+  cards: [],
+  todos: [
+    { id: 't1', text: 'Review the item', link: 'PACT-12' },
+    { id: 't2', text: 'Read the other item', link: 'GRIM-3' },
+    { id: 't3', text: 'Paste the key' },
+  ],
+}
+const LINEAR_ADDRESS = 'https://linear.app/acme/issue/PACT-12'
+const LINEAR_ADDRESS_2 = 'https://linear.app/acme/issue/GRIM-3'
+const withSlug = (w: World, slug: string | undefined) => {
+  if (slug === undefined) delete w.env.GRIMOIRE_LINEAR_SLUG
+  else w.env.GRIMOIRE_LINEAR_SLUG = slug
+}
+
+test('the-pact#580 C1: the schema takes a Linear identifier and the tool keeps it; a near-miss is refused in the fixed words and never echoed', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await brigade($)
+  const link = w.schemas.get('set_roster').properties.todos.items.properties.link
+  expect(link.maxLength).toBe(210)
+  for (const flags of ['', 'u']) {
+    const re = new RegExp(link.pattern, flags)
+    for (const ok of ['PACT-12', 'GRIM-1', 'A1B2C3D4E5-987654321', PR_LINK, ISSUE_LINK]) expect(re.test(ok), `${flags} ${ok}`).toBe(true)
+    for (const bad of ['pact-12', 'PACT-', 'PACT-012', 'PACT-12 ', 'ABCDEFGHIJK-1', 'PACT-1234567890', 'https://linear.app/acme/issue/PACT-12']) expect(re.test(bad), `${flags} ${bad}`).toBe(false)
+  }
+  const ok = await call($, LINEAR_TODOS)
+  expect(ok.ok).toBe(true)
+  expect(JSON.parse(w.text(FILE) ?? 'null').todos.map((t: any) => t.link)).toEqual(['PACT-12', 'GRIM-3', undefined])
+  for (const bad of ['pact-12', 'PACT-012', 'https://linear.app/acme/issue/PACT-12']) {
+    const refused = await call($, { cards: [], todos: [{ id: 't1', text: 'x', link: bad }] })
+    expect(refused.ok).toBe(false)
+    expect(refused.text).toContain('link is not a github.com issue, pull request or comment link, or a Linear identifier')
+    expect(refused.text).not.toContain(bad)
+  }
+})
+
+test('the-pact#580 C2 desktop: with a slug set, a Linear link draws a press button keyed by place, id and a digest of the built address, labelled with the identifier only', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  const all = await nodes(m)
+  expect(visitKeys(all)).toEqual([visitKey(0, 't1', LINEAR_ADDRESS), visitKey(1, 't2', LINEAR_ADDRESS_2)])
+  expect(all.some(n => n.type === 'Link')).toBe(false)
+  const text = await textOf(m)
+  expect(text).toContain('PACT-12')
+  expect(text).toContain('GRIM-3')
+  expect(text).not.toContain('acme')
+  expect(text).not.toContain('linear.app')
+  const label = all.find(n => n.type === 'Text' && n.text === 'PACT-12')
+  expect(label?.props.wrap).toBe('wrap')
+})
+
+for (const surface of ['terminal', 'vscode', 'mobile'] as const) {
+  test(`the-pact#580 C2 ${surface}: with a slug set, a Linear link draws as the engine's Link on the built address, with the identifier alone as its label`, async ($, on) => {
+    const w = await grouped(on, $, LINEAR_TODOS)
+    withSlug(w, 'acme')
+    const m = await mountOn($, surface)
+    const all = await nodes(m)
+    expect(visitKeys(all)).toEqual([])
+    expect(all.filter(n => n.type === 'Link').map(l => l.props.href)).toEqual([LINEAR_ADDRESS, LINEAR_ADDRESS_2])
+    const text = await textOf(m)
+    expect(text).toContain('PACT-12')
+    expect(text).toContain('GRIM-3')
+    expect(w.procs).toEqual([])
+  })
+}
+
+for (const slug of [undefined, 'Acme']) {
+  for (const surface of ['desktop', 'terminal'] as const) {
+    test(`the-pact#580 C3 ${surface}: with ${slug === undefined ? 'no slug' : `the slug ${JSON.stringify(slug)}`}, a Linear link draws as plain label text: no press, no Link, no address`, async ($, on) => {
+      const w = await grouped(on, $, LINEAR_TODOS)
+      withSlug(w, slug)
+      const m = await mountOn($, surface)
+      const all = await nodes(m)
+      expect(visitKeys(all)).toEqual([])
+      expect(all.some(n => n.type === 'Link')).toBe(false)
+      const text = await textOf(m)
+      expect(text).toContain('PACT-12')
+      expect(text).toContain('GRIM-3')
+      expect(text).not.toContain('linear.app')
+      expect(w.procs.filter(p => p[0] !== 'gh')).toEqual([])
+    })
+  }
+}
+
+test('the-pact#580 C3: a slug read that fails draws plain label text and runs nothing', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  w.failEnv = true
+  const m = await mountOn($, 'desktop')
+  const all = await nodes(m)
+  expect(visitKeys(all)).toEqual([])
+  expect(await textOf(m)).toContain('PACT-12')
+  expect(w.procs).toEqual([])
+})
+
+test('the-pact#580 C4 desktop: pressing a Linear link runs the host opener with exactly the built address and nothing else, and shows no toast on a finished run', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs).toEqual([['explorer.exe', LINEAR_ADDRESS]])
+  expect(w.inits).toEqual([{ timeoutMs: 15000 }])
+  expect(w.ghCalls).toEqual([])
+  expect(w.toasts).toEqual([])
+  await m.press({ key: visitKey(1, 't2', LINEAR_ADDRESS_2) })
+  expect(w.procs).toEqual([['explorer.exe', LINEAR_ADDRESS], ['explorer.exe', LINEAR_ADDRESS_2]])
+})
+
+test('the-pact#580 C4 desktop: on macOS and on Linux the opener is the one the card\'s Open in app uses, found by the same host probes', async ($, on) => {
+  const mac = await grouped(on, $, LINEAR_TODOS)
+  macos(mac)
+  withSlug(mac, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(mac.procs).toEqual([['/usr/bin/open', LINEAR_ADDRESS]])
+  expect(mac.probed).toEqual([MAC_PROBE])
+})
+
+test('the-pact#580 C4 desktop: on Linux the press runs /usr/bin/xdg-open', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  linux(w)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs).toEqual([['/usr/bin/xdg-open', LINEAR_ADDRESS]])
+  expect(w.probed).toEqual([MAC_PROBE, LINUX_PROBE])
+})
+
+test('the-pact#580 C4 desktop: a host the pane cannot prove and a refused start each run nothing more and show the one fixed toast', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  w.failRun = true
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.toasts).toEqual(['Could not open the page'])
+  expect(w.toasts.join(' ')).not.toContain('SECRET_TOKEN')
+  w.failRun = false
+  w.env = { GRIMOIRE_LINEAR_SLUG: 'acme' }
+  const before = w.procs.length
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs.length).toBe(before)
+  expect(w.toasts).toEqual(['Could not open the page', 'Could not open the page'])
+})
+
+test('the-pact#580 C4 desktop: a press while that link\'s run is going does nothing, and another link still runs', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  w.holdRun = true
+  const first = m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  await w.clock.settle()
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(openers(w).length).toBe(1)
+  const other = m.press({ key: visitKey(1, 't2', LINEAR_ADDRESS_2) })
+  await w.clock.settle()
+  expect(openers(w).length).toBe(2)
+  w.holdRun = false
+  w.releaseRun()
+  await first
+  await other
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(openers(w).length).toBe(3)
+})
+
+test('the-pact#580 C4 desktop: a press reads the slug again: one removed or changed after the draw runs nothing', async ($, on) => {
+  const w = await grouped(on, $, LINEAR_TODOS)
+  withSlug(w, 'acme')
+  const m = await mountOn($, 'desktop')
+  await nodes(m)
+  withSlug(w, undefined)
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs).toEqual([])
+  withSlug(w, 'other')
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs).toEqual([])
+  withSlug(w, 'acme')
+  await m.press({ key: visitKey(0, 't1', LINEAR_ADDRESS) })
+  expect(w.procs).toEqual([['explorer.exe', LINEAR_ADDRESS]])
 })
 
 // --- the views ------------------------------------------------------------------
@@ -10334,6 +10531,8 @@ test('543 C11: the tool is offered with the others, with the spec\'s description
   // 578: the declared input holds the optional note, at 200 characters, and requires only the seven fields.
   const schema = w.schemas.get('start_background_session')
   expect(schema.properties.note).toEqual({ type: 'string', maxLength: 200 })
+  // the-pact#580: the issue field fits a Linear identifier of at most 20 characters.
+  expect(schema.properties.issue).toEqual({ type: 'string', maxLength: 20 })
   expect(schema.required).toEqual(['name', 'repository', 'issue', 'model', 'effort', 'lead', 'folder'])
   await ($ as any).session.start({ cwd: 'C:\\work', surface: null, isInteractive: false })
   await $.classic.SessionStart({ source: 'resume', session_id: SID, transcript_path: TRANSCRIPT })

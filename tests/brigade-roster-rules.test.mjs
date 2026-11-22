@@ -1026,6 +1026,9 @@ test('issue 504: a roster file holding phase loads with the key dropped, and a t
 // --- issue 560: a to-do's link ---------------------------------------------------------
 
 const { parseLink, linkUrl, linkLabel } = roster;
+// the-pact#580: the Linear forms, and the words that refuse a link of neither kind.
+const { parseLinear, linearSlug, linearUrl, linearLabel, LINEAR_ID, LINEAR_SLUG, TODO_LINK_ANY } = roster;
+const LINK_REFUSED = 'to-do 1 link is not a github.com issue, pull request or comment link, or a Linear identifier';
 const GOOD_LINKS = [
   'https://github.com/mephistopheles4/grimoire/issues/560',
   'https://github.com/o/r/pull/18',
@@ -1118,12 +1121,16 @@ test('#567 C8: the longest accepted link is 203 characters, MAX_LINK is 210, and
   assert.ok(parseLink(longestIssue));
 });
 
-test("#560 C3: every accepted link builds a Desktop run (the link's name set is the run's)", () => {
+test("#560 C3, the-pact#580: every accepted pull request link builds a Desktop run (the link's name set is the run's); an issue link builds none", () => {
   for (const link of GOOD_LINKS) {
     const p = parseLink(link);
     const run = ghViewRun(p.number, p.repo, p.kind);
+    if (p.kind === 'issue') {
+      assert.equal(run, undefined, link);
+      continue;
+    }
     assert.ok(run, link);
-    assert.deepEqual(run.argv, ['gh', p.kind, 'view', p.number, '--web']);
+    assert.deepEqual(run.argv, ['gh', 'pr', 'view', p.number, '--web']);
   }
 });
 
@@ -1141,12 +1148,11 @@ test('#567 C7: each anchored label is built from the parse alone, names the repo
   assert.equal(linkLabel(parseLink('https://github.com/mephistopheles/grimoire/pull/18#issuecomment-5')), 'PR 18 comment mephistopheles/grimoire');
 });
 
-test('#560 C4: an issue press builds gh issue view <number> --web with GH_REPO pinned behind github.com; the kind is one of two words', () => {
-  assert.deepEqual(ghViewRun('560', 'o/r', 'issue'), { argv: ['gh', 'issue', 'view', '560', '--web'], init: { timeoutMs: 15000, env: { GH_REPO: 'github.com/o/r' } } });
+test('#560 C4, the-pact#580: a pull request press builds gh pr view <number> --web with GH_REPO pinned behind github.com; an issue press builds no run, and the kind is one word', () => {
   assert.deepEqual(ghViewRun('18', 'o/r', 'pr'), { argv: ['gh', 'pr', 'view', '18', '--web'], init: { timeoutMs: 15000, env: { GH_REPO: 'github.com/o/r' } } });
   // The pill's call keeps its two arguments and its kind.
   assert.deepEqual(ghViewRun('18', 'o/r'), ghViewRun('18', 'o/r', 'pr'));
-  for (const kind of ['', 'merge', 'pull', 'issues', '--web', 7, null]) assert.equal(ghViewRun('18', 'o/r', kind), undefined, JSON.stringify(kind));
+  for (const kind of ['issue', '', 'merge', 'pull', 'issues', '--web', 7, null]) assert.equal(ghViewRun('18', 'o/r', kind), undefined, JSON.stringify(kind));
 });
 
 test('#560 C9: the roster reference, the skill and the contract give the to-do rules as the check holds them', async () => {
@@ -1244,7 +1250,73 @@ test('#560 C3: a to-do may carry link from the file and from the tool; any other
   for (const link of BAD_LINKS.filter(l => l !== undefined)) {
     for (const source of ['file', 'tool']) {
       const r = checkRoster(todo({ link }), true, source);
-      assert.equal(r.error, 'to-do 1 link is not a github.com issue, pull request or comment link', `${JSON.stringify(link)} ${source}`);
+      assert.equal(r.error, LINK_REFUSED, `${JSON.stringify(link)} ${source}`);
     }
   }
+});
+
+// --- the-pact#580: a to-do's link may be a Linear identifier ----------------------------------
+
+const GOOD_LINEAR = ['PACT-12', 'GRIM-1', 'STACKS-100', 'ATH-9', 'MEPH-123456789', 'AB-1', 'A1-1', 'ABCDEFGHIJ-1', 'A1B2C3D4E5-987654321'];
+const BAD_LINEAR = [
+  'pact-12', 'Pact-12', 'PACT-', 'PACT', '-12', 'PACT-012', 'PACT-0', 'PACT--12', 'PACT-12 ', ' PACT-12', 'PACT-12\n', 'PACT\n-12',
+  'P-12', 'ABCDEFGHIJK-1', 'PACT-1234567890', '1ACT-12', 'PA_CT-12', 'PA CT-12', 'PACT-1a', 'PACT-12-3', 'PACT-١٢', 'PACT-12​',
+  'https://linear.app/acme/issue/PACT-12', 'linear.app/acme/issue/PACT-12', '#12', 'PACT-12?x=1', 'PACT-12#c', 'PACT-12/', '',
+  7, null, undefined, ['PACT-12'], { id: 'PACT-12' },
+];
+
+test('the-pact#580: a Linear identifier is the whole string, a key of 2 to 10 characters, a hyphen and a number of 1 to 9 digits with no leading zero', () => {
+  for (const id of GOOD_LINEAR) {
+    const p = parseLinear(id);
+    assert.ok(p, id);
+    assert.equal(`${p.key}-${p.number}`, id);
+  }
+  assert.deepEqual(parseLinear('PACT-12'), { key: 'PACT', number: '12' });
+  for (const id of BAD_LINEAR) assert.equal(parseLinear(id), undefined, JSON.stringify(id));
+  // A github.com link is not a Linear identifier, and the reverse.
+  for (const link of GOOD_LINKS) assert.equal(parseLinear(link), undefined, link);
+  for (const id of GOOD_LINEAR) assert.equal(parseLink(id), undefined, id);
+});
+
+test('the-pact#580: the tool schema pattern takes a github.com link or a Linear identifier, whole, and nothing else', () => {
+  assert.equal(TODO_LINK_ANY, `${roster.TODO_LINK.source}|${LINEAR_ID.source}`);
+  for (const flags of ['', 'u']) {
+    const re = new RegExp(TODO_LINK_ANY, flags);
+    for (const ok of [...GOOD_LINEAR, ...GOOD_LINKS, ...ANCHORED.map(a => a[0])]) assert.equal(re.test(ok), true, `${flags} ${ok}`);
+    for (const bad of BAD_LINEAR.filter(b => typeof b === 'string')) assert.equal(re.test(bad), false, `${flags} ${JSON.stringify(bad)}`);
+    // An alternative never lets text ride in front of or behind the other one.
+    for (const bad of ['xPACT-12', 'PACT-12x', 'PACT-12https://github.com/o/r/issues/1', 'https://github.com/o/r/issues/1PACT-12', 'PACT-12\nPACT-13']) assert.equal(re.test(bad), false, `${flags} ${JSON.stringify(bad)}`);
+  }
+});
+
+test('the-pact#580: a to-do may carry a Linear identifier from the file and from the tool, and it comes back unchanged', () => {
+  const todo = link => JSON.stringify({ cards: [], todos: [{ id: 't1', text: 'Review the item', link }] });
+  for (const link of GOOD_LINEAR) {
+    for (const source of ['file', 'tool']) assert.equal(checkRoster(todo(link), true, source).value?.todos[0].link, link, `${link} ${source}`);
+  }
+  for (const link of BAD_LINEAR.filter(b => typeof b === 'string')) {
+    for (const source of ['file', 'tool']) assert.equal(checkRoster(todo(link), true, source).error, LINK_REFUSED, `${JSON.stringify(link)} ${source}`);
+  }
+});
+
+test('the-pact#580: the label names the identifier only, with no workspace', () => {
+  assert.equal(linearLabel(parseLinear('PACT-12')), 'PACT-12');
+  assert.equal(linearLabel(parseLinear('A1B2C3D4E5-987654321')), 'A1B2C3D4E5-987654321');
+});
+
+test('the-pact#580: a workspace slug is 1 to 64 lower-case letters, digits and hyphens, not starting with a hyphen, and is checked case-sensitively', () => {
+  for (const slug of ['acme', 'a', '9', 'my-team', 'a-', 'a--b', 'a'.repeat(64), '0abc']) assert.equal(linearSlug(slug), slug, slug);
+  const bad = ['', '-a', 'Acme', 'ACME', 'acme/', '/acme', 'a/b', 'a.b', 'acme?x=1', 'acme#c', 'acme:80', 'acme@evil', 'a b', ' acme', 'acme ', 'acme\n', 'a​b', 'a_b', '..', 'a%2Fb', 'a'.repeat(65), 'acéme', 7, null, undefined, ['acme']];
+  for (const slug of bad) assert.equal(linearSlug(slug), undefined, JSON.stringify(slug));
+  assert.equal(LINEAR_SLUG.test('acme\n'), false);
+});
+
+test('the-pact#580: the address is built only from constants, the slug and the parsed identifier, and any bad slug builds none', () => {
+  assert.equal(linearUrl(parseLinear('PACT-12'), 'acme'), 'https://linear.app/acme/issue/PACT-12');
+  assert.equal(linearUrl(parseLinear('A1B2C3D4E5-987654321'), 'my-team'), 'https://linear.app/my-team/issue/A1B2C3D4E5-987654321');
+  for (const slug of ['', 'a/b', 'a?x=1', 'a#b', 'Acme', 'a.b', 'a:b', undefined, null, 7]) assert.equal(linearUrl(parseLinear('PACT-12'), slug), undefined, JSON.stringify(slug));
+  // Only a parse can be built from: a made-up part with a path in it builds nothing.
+  assert.equal(linearUrl({ key: 'PACT', number: '12/../x' }, 'acme'), undefined);
+  assert.equal(linearUrl({ key: 'pact', number: '12' }, 'acme'), undefined);
+  assert.equal(linearUrl(undefined, 'acme'), undefined);
 });

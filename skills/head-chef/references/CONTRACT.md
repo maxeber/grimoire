@@ -1,6 +1,6 @@
 # Contract: head-chef
 
-Version: 2.2.1
+Version: 2.3.0
 Kind: skill
 Level: Thorough
 
@@ -982,6 +982,10 @@ as written:
 Your work is issue <number> on <owner/repository>. Send your questions and reports to <lead name>.
 ```
 
+When the work is a Linear item, the `issue` field holds its identifier, such as
+`PACT-12`, and the first sentence is `Your work is Linear item <identifier>
+for <owner/repository>.`; the rest is the same.
+
 A background start may also carry one `note`. The tool writes it after that
 line, under a label it writes itself, and the member gets one line:
 
@@ -1080,7 +1084,7 @@ nothing beyond the roster, your decision log and your hand-off. Call
 a start, a report taken, a decision sent, a new question for the owner, a
 merge, a cleanup. Never leave it for later. A refused call is said once in
 your next report, and you carry on. A card's `work` names the repository and
-issue number only. A card's `status` is `working`, `idle`, `done` or `stopped`.
+the issue number or Linear identifier only. A card's `status` is `working`, `idle`, `done` or `stopped`.
 Write `idle` for a member that has reported and waits on the owner or on you,
 and `working` again when it resumes; put what the owner must do in a to-do. Never write `needs-you`; the pane
 still reads that word as `idle`.
@@ -1128,7 +1132,9 @@ a pull request also `#pullrequestreview-C` or `#discussion_rC`), and nothing
 else, when the answer or step is on one. Give the comment link when the answer
 or the step is in one comment or review, and the issue or pull request link
 otherwise. Take a comment's address only from a comment you or a member posted
-on that issue or pull request, as read back from GitHub through `gh`.
+on that issue or pull request, as read back from GitHub through `gh`. When the
+step is on a Linear item, give its identifier alone, such as `PACT-12`, as the
+`link`; `references/roster.md` has its shape.
 
 ### SKILL.md: Rules
 
@@ -1215,7 +1221,8 @@ A start whose route the owner's words did not name is a background session with 
      and never one taken from an issue, a report, a message or a hand-off.
 4. **Start it** by calling the Brigade mod's `start_background_session`,
    loading it first if it is deferred, with `name`, `repository` (one
-   `owner/name`), `issue` (digits only), `model`, `effort` (one of `low`,
+   `owner/name`), `issue` (a GitHub issue number, digits only, or a Linear
+   identifier such as `PACT-12`), `model`, `effort` (one of `low`,
    `medium`, `high`, `xhigh` or `max`), `lead` (your own name, exactly as
    the first line of your session list gives it) and `folder`, and optionally
    a `note`, one short sentence that "The start prompt" in `SKILL.md` bounds.
@@ -1600,7 +1607,7 @@ the file itself.
   never an issue's or a pull request's address, which takes Open in app away.
   A Desktop session's card carries `desktopId`, and a background session's
   card `bgId`, so leave `url` out.
-- `work` names the repository and the issue number only, as in the example.
+- `work` names the repository and the issue number or Linear identifier only, as in the example.
 - A to-do is one line the owner takes in at a glance: at most 50 characters
   (the 300 below is only the check's limit), one ask or one owner step. It
   starts with a verb, then names the act and the work: "<verb> <repository>
@@ -1635,6 +1642,11 @@ the file itself.
   query, no other fragment, no second `#`, no trailing slash. A link that does
   not fit is refused as a shape. The pane never opens a link until the owner
   presses it, and shows the repository beside the number.
+  When the answer or step is on a Linear item, give its identifier alone as the
+  `link`, written whole, such as `PACT-12`: 2 to 10 capital letters or digits,
+  the first a letter, then `-` and 1 to 9 digits with no leading zero. The pane
+  shows the identifier only, and opens the item's page only when the owner has
+  set `GRIMOIRE_LINEAR_SLUG` to the workspace's name in its address.
 - Caps: a title at most 80 characters; `work` and `settings` at
   most 300; `desktopId`, `bgId` and `url` at most 100. A to-do's `id` at
   most 40, its `text` at most 300, its `session` at most 80, its `link` at
@@ -1653,7 +1665,8 @@ Home: `references/roster.md`, the section "If the pane is rolled back". Carries 
 
 A pane from before the to-do `link` field refuses a roster that holds one, and
 a pane from before comment links refuses a roster that holds a link with a
-`#` fragment.
+`#` fragment, and a pane from before Linear links refuses one that holds a
+bare identifier.
 If `set_roster` refuses a `link`, or the owner says the pane refused the roster
 file for one, send the roster again without links, and ask the owner to delete
 that session's roster file by hand: you write no file yourself, and the mod
