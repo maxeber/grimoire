@@ -37,7 +37,8 @@ it registers `/brigade`, a `skill.prompt` hook, and the two hooks of its usage s
 since 0.74.0 (#380) it also hooks the `Skill` tool's call, the typed `/head-chef` and `/grimoire:head-chef` commands, and each turn's start, and each of those passes on with no engine call unless a head-chef load is under way or a load left the pane waiting (the turn start also, at a level 3 and once after it, for one level-3 note, fixed text that after a command 3 ends with a copy of the owner's goal): where the security default skips `skill.prompt`, a model's head-chef load opens no pane and leaves one fixed note asking for `/brigade`, and a typed one that Claude Code itself answered opens the pane only after one read of the session's local skill list confirms the copy is grimoire's or the owner's; the notes are fixed rows added to the conversation, each starting "Brigade (plugin note):";
 since 0.73.0 (#376) its `skill.prompt` hook reads each skill load's name, source and plugin name, acts only on a head-chef skill from a plugin named grimoire or from any user-level skill of that name, and on such a load opens the pane when it is closed, which starts the reads and the `gh` call below and offers `set_roster`, even when the model chose the load (when the engine does not place the pane, it starts none of that and shows a fixed toast naming `/brigade`), and appends one fixed line to that skill's text, never text from the event, the roster or an error;
 since 0.69.0 it also reads one key, `permission-warning-ack`, from the plugin's own store and offers a second tool, `show_permission_warning`, below (0.117.0 added a second key, `cleaner-path`; since 0.118.0 nothing reads, writes or deletes it, so a value left there stays, unencrypted and readable by other plugins; since 0.148.0 it also reads the old `startFolders` key once at each session start and deletes it when present);
-since 0.158.0 (#208) its Incantation mic band starts a timer at the band's first draw in every session, which reads one file, `~/.grimoire/incantation/run/levels` (a stamp, a state word and 24 digits of mic loudness, no audio and no text), four times a second while a listener writes it and once in eight ticks otherwise, and a press on the band's button writes the one word `mute` or `unmute` to `run/command` beside it;
+since 0.158.0 (#208) its Incantation mic band starts a timer at the band's first draw in every session, which reads one file, `~/.grimoire/incantation/run/levels` (a stamp, a state word and 24 digits of mic loudness, no audio and no text), four times a second while a listener writes it and once in eight ticks otherwise, and a press on a band button writes the one word `mute`, `unmute`, `mute-voice` or `unmute-voice` to `run/command` beside it, and the band also reads `run/voice` (one word, `muted` or `on`) the same way;
+since 0.164.0 the same mod holds Incantation's voice relay and permission nudge, which act only in the session whose own typed `/incantation` turn ran the skill's `listen.mjs start`; the mod reads each main-thread shell command's text, in every session, to find that start, and keeps only a flag, and it holds the listener's one `wait` in the bound session, holds the listener's one `wait` through `$.process.spawn`, sends each heard turn into the chat as a user-role `[voice]` prompt (or, while a turn works, as context on a tool result), and on a permission prompt or a long tool call runs the skill's `nudge.mjs`, which speaks one fixed line and never answers the prompt; no heard text is written anywhere, and `docs/security/brigade.md` holds the row for each call;
 and it holds no idle rule: the owner removed it ([ADR 0019](docs/adr/0019-the-brigade-mod-holds-no-idle-rule.md), which supersedes [ADR 0008](docs/adr/0008-brigade-is-no-longer-idle-by-default.md)). While its pane is open it reads
 the engine's own session files, `<config>/sessions/<digits>.json`, for each
 session's name, status, waiting reason, update time,
@@ -589,9 +590,11 @@ any device signed in to the owner's account.
 The [row 16 section](docs/security/brigade.md#row-16) of `brigade.md` (the threat model's classes it cites include “Text steers a session”, “A forged or misled session can speak for the lead”, “GitHub acts on the owner's word are irreversible and public” and “Data leaves the machine as the owner accepted”) has the
 guards and the gaps.
 
-One script can send data, and only when somebody runs it. eagle-eye's
-optional edge audit sends to a provider: see
-[What the edge audit sends](#what-the-edge-audit-sends).
+Two scripts send data, and only when somebody runs them. eagle-eye's optional
+edge audit sends to a provider: see
+[What the edge audit sends](#what-the-edge-audit-sends). Incantation's runtime
+installer downloads files: see
+[What Incantation's runtime installer contacts](#what-incantations-runtime-installer-contacts).
 
 No script in the tree rewrites a file a person hands it. The contract skill
 validates what it builds with `claude plugin validate --strict`, the standard
@@ -678,9 +681,9 @@ The details, the tests, and what they do not cover:
 ## What the edge audit sends
 
 `skills/eagle-eye/audit.mjs` asks a model provider to rank a box's `argued`
-edges for rereading. It is the only file here that opens a connection, and it
-is opt-in twice: it needs a key in the environment, and the skill runs it only
-after the user says yes.
+edges for rereading. It is the only file here that sends a box's text off the
+machine, and it is opt-in twice: it needs a key in the environment, and the
+skill runs it only after the user says yes.
 
 - **What leaves the machine.** For each argued edge: the box's `problem`, the
   edge's `why`, and both options' labels, rows, `why`, `notes` and `src`.
@@ -696,6 +699,22 @@ after the user says yes.
 
 The full account, including endpoints, provider logging opt-ins, exit codes and
 the test override: [`docs/security/edge-audit.md`](docs/security/edge-audit.md).
+
+## What Incantation's runtime installer contacts
+
+`skills/incantation/scripts/runtime/install.mjs` runs only on the person's yes
+at `/incantation install`. It sends requests, with no cookie, token, credential
+or proxy and a generic `incantation-installer` user agent, to the hosts in
+`scripts/runtime/pins.mjs`: `huggingface.co` and its CDN, `registry.npmjs.org`,
+`github.com` and its release hosts, `pypi.org` and `files.pythonhosted.org`;
+the person's own `uv` also contacts those it needs and fetches its own CPython
+(from Astral's mirror, `releases.astral.sh`, or GitHub), with its own client
+details. Those hosts see the machine's address and the
+files asked for. Every file is pinned by size and sha256 before it is kept or
+run. The plan prints the hosts and the size before anything downloads. Outside
+the installer, the ONNX runtime in the sherpa-onnx addon sends Windows
+TraceLogging usage events that nothing here turns off; the Python workers turn
+theirs off.
 
 ## Scanners in CI
 

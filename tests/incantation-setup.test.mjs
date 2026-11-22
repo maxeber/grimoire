@@ -3,11 +3,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, posix, win32 } from 'node:path';
 import { stampOf } from '../skills/incantation/scripts/capture/ffmpeg.mjs';
-import { parseSettings, settingsPath } from '../skills/incantation/scripts/lib.mjs';
+import { deviceDigest, keyPath, parseSettings, readKey, settingsPath } from '../skills/incantation/scripts/lib.mjs';
 import { LINES, runSetup } from '../skills/incantation/scripts/setup.mjs';
 
 const win = process.platform === 'win32';
@@ -46,12 +46,35 @@ test('profiles prints id, name and engine, and leaves out an id outside the sett
   assert.deepEqual(r.lines, ['made-up-profile-1 Calm Voice (kokoro)']);
 });
 
-test('choose writes settings whose every key is in range, with the pinned recorder', async t => {
+test('choose writes settings whose every key is in range, with the pinned recorder and the mic as keyed digests (S13.5)', async t => {
   const r = await setup(['choose', '1', STAMP, 'made-up-profile-1']);
   t.after(r.remove);
   assert.deepEqual(r.lines, [LINES.saved]);
-  const s = parseSettings(readFileSync(settingsPath(r.home), 'utf8'));
-  assert.deepEqual(s, { engine: 'voicebox', port: 17493, endOfSpeechMs: 1500, profile: 'made-up-profile-1', device: { index: 1, stamp: STAMP }, recorder: RECORDER });
+  const text = readFileSync(settingsPath(r.home), 'utf8');
+  const s = parseSettings(text);
+  const key = readKey(r.home);
+  assert.ok(key, 'the key is made at the first choose');
+  assert.deepEqual(s.device, { index: 1, stamp: STAMP, id: deviceDigest(key, DEVICES[1].id), name: deviceDigest(key, DEVICES[1].name) });
+  assert.deepEqual({ ...s, device: null }, { engine: 'sherpa', port: 17493, endOfSpeechMs: 1500, profile: 'made-up-profile-1', device: null, recorder: RECORDER });
+  assert.ok(!text.includes(DEVICES[1].name) && !text.includes(DEVICES[1].id), 'no device name or id is kept in the file');
+  if (process.platform !== 'win32') assert.equal(statSync(keyPath(r.home)).mode & 0o777, 0o600);
+});
+
+test('a second choose keeps the key, so the digests stay comparable', async t => {
+  const r = await setup(['choose', '1', STAMP, 'made-up-profile-1']);
+  t.after(r.remove);
+  const first = readKey(r.home);
+  const again = await runSetup(['choose', '0', STAMP, 'made-up-profile-1'], { home: r.home, pathValue: BIN, startDir: r.home, fs, list: async () => LISTING, engine });
+  assert.deepEqual(again.lines, [LINES.saved]);
+  assert.deepEqual(readKey(r.home), first);
+});
+
+test('settings with a mic id or name that is not a digest, or an extra key, are refused', () => {
+  const base = { profile: 'p', recorder: RECORDER };
+  const device = d => JSON.stringify({ ...base, device: d });
+  assert.doesNotThrow(() => parseSettings(device({ index: 0, stamp: STAMP })), 'settings from before');
+  assert.doesNotThrow(() => parseSettings(device({ index: 0, stamp: STAMP, id: 'a'.repeat(64), name: 'b'.repeat(64) })));
+  for (const bad of [{ id: 'Desk Mic One' }, { name: 'a'.repeat(63) }, { id: 'A'.repeat(64) }, { id: 5 }, { other: 'x' }]) assert.throws(() => parseSettings(device({ index: 0, stamp: STAMP, ...bad })), { message: 'settings' }, JSON.stringify(bad));
 });
 
 test('choose refuses a stale stamp, an out-of-range index, an unknown profile and a malformed call, writing nothing', async t => {

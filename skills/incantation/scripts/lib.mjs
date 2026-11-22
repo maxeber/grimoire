@@ -2,6 +2,7 @@
 // Nothing here reads the environment or the working folder: each caller hands
 // in the home folder, and the platform when it matters.
 
+import { createHmac, randomBytes } from 'node:crypto';
 import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { join, relative, isAbsolute, sep } from 'node:path';
 
@@ -13,6 +14,8 @@ export const runDir = home => join(stateDir(home), 'run');
 export const observeDir = home => join(stateDir(home), 'observe');
 export const settingsPath = home => join(stateDir(home), 'settings.json');
 export const statusPath = home => join(runDir(home), 'status');
+export const voicePath = home => join(runDir(home), 'voice'); // `muted` or `on`, while a listener runs (S5.6)
+export const keyPath = home => join(stateDir(home), 'key'); // the key the mic digests are made with (S13.5)
 export const levelsPath = home => join(runDir(home), 'levels');
 export const commandPath = home => join(runDir(home), 'command');
 
@@ -184,7 +187,18 @@ export const SETTINGS_KEYS = {
   engine: v => typeof v === 'string' && /^[a-z]{1,32}$/.test(v),
   port: v => Number.isInteger(v) && v >= 1024 && v <= 65535,
   profile: v => typeof v === 'string' && PROFILE.test(v),
-  device: v => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 2 && Number.isInteger(v.index) && v.index >= 0 && v.index <= 999 && typeof v.stamp === 'string' && /^[0-9a-f]{16}$/.test(v.stamp),
+  // The mic's id and name are kept as keyed digests, never as text (S13.5): #208's rule that no device name or id is in a file holds.
+  device: v =>
+    v !== null &&
+    typeof v === 'object' &&
+    !Array.isArray(v) &&
+    Object.keys(v).every(k => ['index', 'stamp', 'id', 'name'].includes(k)) &&
+    Number.isInteger(v.index) &&
+    v.index >= 0 &&
+    v.index <= 999 &&
+    typeof v.stamp === 'string' &&
+    /^[0-9a-f]{16}$/.test(v.stamp) &&
+    ['id', 'name'].every(k => !(k in v) || (typeof v[k] === 'string' && /^[0-9a-f]{64}$/.test(v[k]))),
   recorder: v => typeof v === 'string' && v.length <= 1024 && isAbsolute(v) && !v.includes('\0'),
   endOfSpeechMs: v => Number.isInteger(v) && v >= 300 && v <= 3000,
 };
@@ -232,6 +246,31 @@ export function readSettings(home, options = {}) {
   }
   return parseSettings(text);
 }
+
+// The key the mic's id and name digests are made with (S13.5, D14): 32 random
+// bytes, made once by `setup.mjs choose`, kept private in the state folder, so a
+// digest cannot be reversed by guessing device names. Null when there is none.
+export function readKey(home, options = {}) {
+  try {
+    if (!checkFile(keyPath(home), options)) return null;
+    const text = (readText(keyPath(home), 256) ?? '').trim();
+    return /^[0-9a-f]{64}$/.test(text) ? Buffer.from(text, 'hex') : null;
+  } catch {
+    return null;
+  }
+}
+
+// The key, made first when it is not there.
+export function ensureKey(home, options = {}) {
+  const have = readKey(home, options);
+  if (have) return have;
+  const key = randomBytes(32);
+  writePrivate(keyPath(home), `${key.toString('hex')}\n`, options);
+  return key;
+}
+
+// HMAC-SHA-256 of a device's id or name, in hex.
+export const deviceDigest = (key, text) => createHmac('sha256', key).update(String(text)).digest('hex');
 
 export const isWithin = inside;
 export const pathSep = sep;

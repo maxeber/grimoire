@@ -175,6 +175,9 @@ declare module 'claude-code' {
       micEase: { from: string; to: string; step: number }
       /** The 24 digits of the reading before micFrame's, or '' with none: the
        *  desktop picture draws the move from one to the other. Numbers only. */
-      micPrev: string    }
+      micPrev: string
+      /** Whether the listener's voice is muted, as run/voice says (`muted`
+       *  or `on`): a flag. A missing or unreadable file is a voice that is on. */
+      micVoiceMuted: boolean    }
   }
 }

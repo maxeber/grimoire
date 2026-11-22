@@ -250,6 +250,7 @@ import type { ContextOutlook, Finder, PrRow, ReadMemory, Spark, SummaryMemory } 
 import { registerWriter, writerEpoch, writerSession } from './writer.ts'
 import { commandNote, compactSign, endTurn, figuresOf, LEVEL3_ENDED_NOTE, LEVEL3_PRESSED_NOTE, newCycle, NOTE_PREFIX, SEND_TOOL, sendsMessage, setFigures, takeAfter, tally, turnEnd } from './reminder.ts'
 import { registerMic } from './mic-band.tsx'
+import { registerRelay, relayTurnStart } from './voice-relay.ts'
 import { DESCRIPTION as WARNING_DESCRIPTION, SCHEMA as WARNING_SCHEMA, STORE_KEY as WARNING_KEY, TOOL as WARNING_TOOL, ackFrom, registerWarning } from './warning.tsx'
 
 // The Brigade pane: one compact row per session a lead session started, in
@@ -3418,6 +3419,10 @@ const landed = (r: unknown) => !(typeof r === 'object' && r !== null && 'deny' i
 const cycle = newCycle()
 
 export const register: Register = on => {
+  // Incantation's relay and permission nudge, bound to the session that ran its listener
+  // (voice-relay.ts). Nothing is drawn, and no lead tool reads it. The engine takes one hook per
+  // event from a module, so the relay's turn start and turn end ride the hooks below.
+  registerRelay(on)
   // Every session's own usage summary, written from its steps and turn ends.
   registerWriter(on, e => {
     if (e.agentId !== undefined) return undefined
@@ -3729,6 +3734,8 @@ export const register: Register = on => {
   // is shown and listed, or gone. With no load waiting, or on a subagent's
   // turn, it asks the engine nothing. The level-3 note follows it (below).
   on('turn.start', async ($, e, next) => {
+    // The Incantation relay's flag for a lead turn that runs (voice-relay.ts); it cannot throw.
+    relayTurnStart(e)
     if (lateOffer && e.agentId === undefined) {
       try {
         await lateTurn($)

@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { advanceLine, commandFile, fullWidth, levelsFile } from './mic-view.ts'
+import { advanceLine, commandFile, fullWidth, levelsFile, voiceFile } from './mic-view.ts'
 import { orbSvg, phase } from './mic-svg.ts'
 
 // The Incantation mic band, driven the way the person sees it: the listener's
@@ -17,6 +17,7 @@ const ON_WINDOWS = /^file:\/\/\/[A-Za-z]:/.test(import.meta.url)
 const HOME = ON_WINDOWS ? 'C:\\Work\\owner' : '/work/owner'
 const LEVELS = levelsFile(HOME)
 const COMMAND = commandFile(HOME)
+const VOICE = voiceFile(HOME)
 const WAVE = '000012345678765432100000'
 
 function world(on: On) {
@@ -55,7 +56,7 @@ describe('mic band', () => {
       // With none listening the reads come at the slow beat, two seconds apart.
       await w.clock.advance(2250)
       expect(await ui.find({ type: 'Text', text: /mic: hearing/ })).toBeDefined()
-      expect(await ui.find({ key: 'mic-toggle', label: 'Mute' })).toBeDefined()
+      expect(await ui.find({ key: 'mic-toggle', label: 'Mute mic' })).toBeDefined()
       if (surface === 'terminal') {
         expect(await ui.find({ type: 'Text', text: /^[▁▂▃▄▅▆▇█]{80}$/ })).toBeDefined()
       } else {
@@ -120,13 +121,36 @@ describe('mic band', () => {
     levels(w, 'muted')
     await w.clock.advance(1000)
     expect(await ui.find({ type: 'Text', text: /mic: muted/ })).toBeDefined()
-    expect(await ui.find({ key: 'mic-toggle', label: 'Unmute' })).toBeDefined()
+    expect(await ui.find({ key: 'mic-toggle', label: 'Unmute mic' })).toBeDefined()
     const svg: any = await ui.find({ type: 'Svg' } as any)
     expect(String(svg.props.source)).toContain('#8a8f9c')
     await ui.press({ key: 'mic-toggle' })
     expect(w.writes).toEqual([[COMMAND, 'mute'], [COMMAND, 'unmute']])
     await ui.unmount()
   })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    test(`the band draws the working word and a voice button; a press writes mute-voice, and with run/voice muted unmute-voice (${surface})`, async ($, on) => {
+      const w = world(on)
+      const ui = await mount($, surface)
+      levels(w, 'working')
+      await w.clock.advance(1000)
+      expect(await ui.find({ type: 'Text', text: /mic: working/ })).toBeDefined()
+      expect(await ui.find({ key: 'voice-toggle', label: 'Mute voice' })).toBeDefined()
+      await ui.press({ key: 'voice-toggle' })
+      expect(w.writes).toEqual([[COMMAND, 'mute-voice']])
+      // The listener answers by writing run/voice; the band reads it on its next beat.
+      w.files.set(VOICE, 'muted\n')
+      await w.clock.advance(1000)
+      expect(await ui.find({ key: 'voice-toggle', label: 'Unmute voice' })).toBeDefined()
+      await ui.press({ key: 'voice-toggle' })
+      expect(w.writes).toEqual([[COMMAND, 'mute-voice'], [COMMAND, 'unmute-voice']])
+      // The mic button is the mic's alone: it still writes mute.
+      await ui.press({ key: 'mic-toggle' })
+      expect(w.writes.at(-1)).toEqual([COMMAND, 'mute'])
+      await ui.unmount()
+    })
+  }
 
   test('the band follows the file: a new word and new digits redraw, a removed file or an old stamp clears it', async ($, on) => {
     const w = world(on)

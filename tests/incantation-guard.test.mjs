@@ -62,6 +62,10 @@ test('each check fails with its fixed line and no value', async t => {
     [{}, { addresses: () => ['192.0.2.10'], tcpOpen: async () => true }, 'reach'],
     [{ settings: { recorder: win ? 'C:\\elsewhere\\ffmpeg.exe' : '/elsewhere/ffmpeg' } }, {}, 'recorder'],
     [{}, { pathValue: '' }, 'recorder'],
+    // The speech runtime (docs/spec/0001, S5.9, claim 15): an installed part with a
+    // missing or short file fails either engine; the sherpa engine also needs its core.
+    [{}, { checkRuntime: () => ({ damaged: ['hearing'], core: false, states: {} }) }, 'runtime'],
+    [{ settings: { engine: 'sherpa' } }, { engine: engine({ name: 'sherpa', health: async () => false }) }, 'runtime'],
   ];
   for (const [fx, over, key] of cases) {
     const f = fixture(fx);
@@ -70,6 +74,15 @@ test('each check fails with its fixed line and no value', async t => {
     assert.equal(line, LINES[key], `${key}: ${line}`);
     noValues(line);
   }
+});
+
+test('the sherpa engine opens no port, so the reach check does not run for it', async t => {
+  const f = fixture({ settings: { engine: 'sherpa' } });
+  t.after(f.remove);
+  const asked = [];
+  const line = await guard(f, { engine: engine({ name: 'sherpa' }), addresses: () => ['192.0.2.10'], tcpOpen: async (...a) => (asked.push(a), true) });
+  assert.equal(line, 'ok');
+  assert.deepEqual(asked, []);
 });
 
 test('the reach check asks every non-loopback address on the settings port', async t => {

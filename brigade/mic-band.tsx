@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On, Timer } from 'claude-code'
 
-import { EASE_MS, EASE_STEPS, SLOW_EVERY, TICK_MS, WORDS, advanceLine, colorAt, commandFile, fullWidth, homeFrom, labelOf, levelsFile, parseLevels, toggleFor } from './mic-view.ts'
+import { EASE_MS, EASE_STEPS, SLOW_EVERY, TICK_MS, WORDS, advanceLine, colorAt, commandFile, fullWidth, homeFrom, labelOf, levelsFile, parseLevels, toggleFor, voiceFile, voiceToggleFor } from './mic-view.ts'
 import type { Line, MicFrame, MicWord } from './mic-view.ts'
 import { orbSvg } from './mic-svg.ts'
 
@@ -21,6 +21,7 @@ import { orbSvg } from './mic-svg.ts'
 
 const frameAtom = atom({ plugin: 'grimoire', key: 'micFrame' } as const, null)
 const prevAtom = atom({ plugin: 'grimoire', key: 'micPrev' } as const, '')
+const voiceAtom = atom({ plugin: 'grimoire', key: 'micVoiceMuted' } as const, false)
 const easeAtom = atom({ plugin: 'grimoire', key: 'micEase' } as const, { from: 'listening', to: 'listening', step: EASE_STEPS })
 
 /** How far ahead of the clock each picture is laid out, ms: the desktop starts
@@ -55,12 +56,24 @@ async function tick($: EngineInterface, dir: string, live: () => boolean) {
     next = /ENOENT|no such file|not found/i.test(String((e as Error)?.message ?? e)) ? null : undefined
   }
   if (!live()) return
+  // The voice's own switch: a missing or unreadable file is a voice that is on.
+  let voiceMuted = false
+  try {
+    voiceMuted = String(await $.fs.read(voiceFile(dir))).trim() === 'muted'
+  } catch {
+    voiceMuted = false
+  }
+  if (voiceMuted !== Boolean(await read($, voiceAtom))) await update($, voiceAtom, () => voiceMuted)
   const was = (await read($, frameAtom)) as MicFrame | null
   if (next) seen = now
   if (next === undefined) next = was !== null && Math.abs(now - seen) <= 10_000 ? was : null
   quiet = next === null ? quiet + 1 : 0
   if (next === null && was === null) return
   if (next !== null && was !== null && next.word === was.word && next.digits === was.digits) return
+  // While Claude speaks the picture draws no loudness, so a new reading changes
+  // nothing in it; redrawing it anyway restarted its ripple four times a second,
+  // and a redraw that started late threw the ripple back.
+  if (next !== null && was !== null && next.word === 'speaking' && was.word === 'speaking') return
   // Every new reading is drawn (four a second), and nothing between but the
   // colour ease: on a change of word the ease redraws the same reading at 75 ms
   // steps, and the picture's clock holds through those redraws. A change of word
@@ -159,6 +172,7 @@ export function registerMic(on: On) {
       const word = wordOf(frame.word)
       const color = colorAt(wordOf(ease.from), wordOf(ease.to), Math.min(EASE_STEPS, Math.max(0, Math.trunc(Number(ease.step)) || 0)))
       const toggle = toggleFor(word)
+      const voiceToggle = voiceToggleFor(Boolean(await read($, voiceAtom)))
       const els = $.ui.resolve(e) as unknown as Record<string, (p: unknown) => unknown>
       // The picture is an Svg on every surface that has one (the desktop, the
       // editor, the mobile app); the terminal has none and draws two block rows.
@@ -175,21 +189,33 @@ export function registerMic(on: On) {
       const el = Number(await $.clock.now()) - shown.at
       return (
         <Box key="mic-band" flexDirection="column">
-          <Box key="mic-row" flexDirection="row" alignItems="center" gap="md">
+          <Box key="mic-row" flexDirection="row" alignItems="center" justifyContent="space-between" gap="md">
             <Text color={color} bold>
               {labelOf(word)}
             </Text>
-            <Button
-              key="mic-toggle"
-              label={toggle.label}
-              onPress={async () => {
-                // Only for a listener that is writing now: the file is the listener's own folder's.
-                const dir = await homeOf($)
-                const now = (await read($, frameAtom)) as MicFrame | null
-                if (dir === undefined || now === null) return
-                await $.fs.write(commandFile(dir), toggleFor(wordOf(now.word)).command)
-              }}
-            />
+            <Box key="mic-buttons" flexDirection="row" alignItems="center" gap="sm">
+              <Button
+                key="mic-toggle"
+                label={toggle.label}
+                onPress={async () => {
+                  // Only for a listener that is writing now: the file is the listener's own folder's.
+                  const dir = await homeOf($)
+                  const now = (await read($, frameAtom)) as MicFrame | null
+                  if (dir === undefined || now === null) return
+                  await $.fs.write(commandFile(dir), toggleFor(wordOf(now.word)).command)
+                }}
+              />
+              <Button
+                key="voice-toggle"
+                label={voiceToggle.label}
+                onPress={async () => {
+                  const dir = await homeOf($)
+                  const now = (await read($, frameAtom)) as MicFrame | null
+                  if (dir === undefined || now === null) return
+                  await $.fs.write(commandFile(dir), voiceToggleFor(Boolean(await read($, voiceAtom))).command)
+                }}
+              />
+            </Box>
           </Box>
           {!picture ? (
             <Box key="mic-wave" flexDirection="column" overflow="hidden">

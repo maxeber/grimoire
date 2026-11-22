@@ -5,6 +5,14 @@
 > "separate plugin" wording below are history: the skill is at `skills/incantation/`,
 > its eval cases at `evals/incantation/`, and it has no manifest or marketplace
 > entry of its own.
+>
+> **Superseded:** the evals were deleted (see
+> [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md)),
+> so `evals/incantation/` no longer exists.
+
+> **Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md)**
+> for the engine: the sherpa engine is now the default, and Voicebox is the
+> second engine. Where the two differ, 0001 holds.
 
 Draft 2.2, for issue #208, Thorough tier on the sensitive route (heard speech
 becomes input to a session with tools, so the security pair reviews it). It
@@ -145,6 +153,11 @@ Voicebox (S5); the capture adapter (S5.4); `setup.mjs` (S5.5); the always-on
 listener (S6); `guard.mjs` (S5.6); the skill, `tuning.md` and `observe.mjs`
 (S7); the eval cases; the README; a marketplace entry; the repo checks widened
 to `plugins/<name>/`; candidate threat-model entries (S10).
+
+> Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md):
+> the sherpa engine now ships as the default, with Voicebox kept as the second
+> engine, so the "second engine" exclusion and the "Voicebox only" scope below
+> no longer hold.
 
 Out: a second engine (the seam makes one possible, W5; none ships); changes to
 Voicebox; clearing Voicebox's history for the person (the machine's own, 1.7's
@@ -293,6 +306,11 @@ session. Its rows:
   listener lists the devices again; a changed stamp ends it with `listener
   error device`, and the README says to run setup again. No device name or id
   is kept in a file or printed to a session.
+
+  > Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md):
+  > the settings now keep keyed digests of the mic id and name, never the text,
+  > so a saved mic can be found again or replaced by a fallback; a fallback's
+  > name (cleaned and cut) is printed to the session when it is used.
 - **The recorder** is resolved once, at setup, and its real path is pinned in
   the settings. At start the listener resolves it again by the same rule and
   refuses a different real path (`listener error recorder`). On every
@@ -567,7 +585,7 @@ say-back alone played in between; any other count voids it); the typed-yes list 
 reverse, files sessions load or that run code later, the brigade lead role,
 unread commands, decisions the person's instructions keep, and now
 Incantation's settings and state folder); heard text never stands for typed
-words and never answers a permission prompt; "stop" or "that's all" ends the
+words (superseded: see T4's note: a clear yes now does) and never answers a permission prompt; "stop" or "that's all" ends the
 loop, "wait" halts.
 
 ## S8. Acceptance claims
@@ -867,7 +885,8 @@ The files:
   files)
 - tests: `tests/incantation-{gate,listen,guard,setup,capture,voicebox,observe,skill}.test.mjs`,
   a fake engine and a fake recorder, and #622's check-widening tests
-- the seven eval cases, `BUDGET` entry `incantation: 7`
+- the seven eval cases, `BUDGET` entry `incantation: 7` (Superseded: the evals
+  were deleted; see [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md))
 - `.claude-plugin/marketplace.json`, the second entry
 - the widened repo checks from #622 (`scripts/check.mjs`, the workflows,
   `athanor.json`, AGENTS.md's `scripts/` paragraph)
@@ -923,6 +942,11 @@ for a newer turn before acting) is deferred by the owner as a later polish.
   what the session may do. This loosens S7.3's list and S10's rows that rest
   on it; the owner signs that, and the threat model's classes are not edited
   here.
+
+  > Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md):
+  > a clear yes heard after a say-back now stands in for typing at a checkpoint,
+  > including the head chef's gates and a runtime install, and it still never
+  > answers a permission prompt on screen.
 - **T5. Noise filter.** A frame is voice only at 10 dB over the floor and at
   least -45 dBFS (a gated headset reads a floor near zero, so the relative
   test alone passes breaths); a turn holds 400 ms of voice; a turn whose whole
@@ -963,6 +987,9 @@ for a newer turn before acting) is deferred by the owner as a later polish.
   stop or an error. A dropped fragment, `quiet`, `stt-dropped`, `interrupted`,
   `mic-muted`, `mic-unmuted` and `dropped` ride in the next real delivery;
   quiet is `quiet <n>`, n stretches of 10 minutes.
+
+  > Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md):
+  > a `wait` now also ends on `progress-due`.
 - **T15. The mic band** (the owner's later ask, 2026-11-14). Rule 6c refuses a
   mod inside `plugins/incantation`, and the rule stands. The band is a module of
   grimoire's own mod, `brigade/mic-band.tsx`, called from `register.tsx` beside the
@@ -990,7 +1017,12 @@ for a newer turn before acting) is deferred by the owner as a later polish.
   `mute` or `unmute` to `run/command`. The listener looks for that file every
   250 ms, accepts a plain file of at most 16 bytes, written in the last 5 s, whose
   whole text is `mute` or `unmute`, removes it whatever it held, and acts as the
-  person's own mute does. The click file carries no token, so anything that can
+  person's own mute does.
+
+  > Superseded by [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md):
+  > the click file's whole text may now also be `mute-voice` or `unmute-voice`.
+
+  The click file carries no token, so anything that can
   write to the private run folder can mute or unmute; the token file is in the
   same folder, so it holds no one the folder did not already admit. This is a new
   way to unmute and the owner signs it. Measured here: the listener's write is

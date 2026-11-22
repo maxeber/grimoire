@@ -55,9 +55,9 @@ test('the state word changes colour in steps from the old word\'s colour to the 
 });
 
 test('the button says what it will do, and a click writes one word: mute, or unmute while muted', () => {
-  assert.deepEqual(toggleFor('listening'), { label: 'Mute', command: 'mute' });
-  assert.deepEqual(toggleFor('hearing'), { label: 'Mute', command: 'mute' });
-  assert.deepEqual(toggleFor('muted'), { label: 'Unmute', command: 'unmute' });
+  assert.deepEqual(toggleFor('listening'), { label: 'Mute mic', command: 'mute' });
+  assert.deepEqual(toggleFor('hearing'), { label: 'Mute mic', command: 'mute' });
+  assert.deepEqual(toggleFor('muted'), { label: 'Unmute mic', command: 'unmute' });
   assert.equal(labelOf('thinking'), 'mic: thinking');
 });
 

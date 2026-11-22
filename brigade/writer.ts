@@ -1,5 +1,6 @@
 import { atom, read } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
+import { relayTurnEnd } from './voice-relay.ts'
 
 import { dataPlace, placeSummary, statRejection } from './roster.ts'
 import type { StatAnswer } from './roster.ts'
@@ -245,6 +246,13 @@ export function registerWriter(on: On, afterTurn?: (e: { agentId?: string }) => 
     const r = await next(e)
     try {
       if (!stopped && e.agentId === undefined && memory.calls > 0) ask($, true)
+    } catch {
+      // The turn ends unchanged.
+    }
+    // Incantation's relay hears the turn's end too (voice-relay.ts): what was heard after the last
+    // tool step goes as a prompt now. It never throws into the turn.
+    try {
+      relayTurnEnd($, e)
     } catch {
       // The turn ends unchanged.
     }

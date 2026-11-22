@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Skill folder -> its budget. See the header before changing a number.
-const BUDGET = { contract: 6, 'head-chef': 46, incantation: 7 };
+const BUDGET = { contract: 6, 'head-chef': 46 };
 
 // The case count of each skill under an evals folder.
 function counts(evalsDir) {

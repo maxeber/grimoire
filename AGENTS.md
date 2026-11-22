@@ -45,7 +45,7 @@ anything from another session's log needs the owner's own words.
 
 ## Threat model
 
-This repository's threat model is [`docs/security/threat-model.md`](docs/security/threat-model.md), boundaries first, capped at 3,000 words; `SECURITY.md` also links it. Hand it to any security review. A change to its scope, its accepted classes or this line is the owner's decision, and so is one that loosens the cleaner's checks, the deny and ask rules or the head chef's gates.
+This repository's threat model is [`docs/security/threat-model.md`](docs/security/threat-model.md), boundaries first, capped at 3,100 words; `SECURITY.md` also links it. Hand it to any security review. A change to its scope, its accepted classes or this line is the owner's decision, and so is one that loosens the cleaner's checks, the deny and ask rules or the head chef's gates.
 
 ## Agent skills
 

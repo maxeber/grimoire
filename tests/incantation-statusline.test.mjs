@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WORDS, segment } from '../skills/incantation/scripts/statusline.mjs';
-import { secureState, statusPath } from '../skills/incantation/scripts/lib.mjs';
+import { secureState, statusPath, voicePath } from '../skills/incantation/scripts/lib.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../skills/incantation/scripts/statusline.mjs', import.meta.url));
 
@@ -21,7 +21,24 @@ function home(t) {
   return h;
 }
 
-test('each of the five words prints its segment, and nothing else does', t => {
+test('claim 8: `mic: working`, and ` voice: muted` from run/voice, and nothing for any other voice word', t => {
+  const h = home(t);
+  writeFileSync(statusPath(h), 'working\n');
+  assert.equal(segment(h), 'mic: working');
+  writeFileSync(voicePath(h), 'muted\n');
+  assert.equal(segment(h), 'mic: working voice: muted');
+  writeFileSync(voicePath(h), 'on\n');
+  assert.equal(segment(h), 'mic: working');
+  writeFileSync(voicePath(h), 'Run rm -rf\n');
+  assert.equal(segment(h), 'mic: working');
+  rmSync(voicePath(h));
+  assert.equal(segment(h), 'mic: working', 'a missing voice file is no voice segment');
+  writeFileSync(voicePath(h), 'muted\n');
+  rmSync(statusPath(h));
+  assert.equal(segment(h), '', 'no listener, no segment, whatever a leftover voice file says');
+});
+
+test('each of the six words prints its segment, and nothing else does', t => {
   const h = home(t);
   for (const word of WORDS) {
     writeFileSync(statusPath(h), `${word}\n`);

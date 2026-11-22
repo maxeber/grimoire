@@ -99,6 +99,9 @@ PATH, run `node scripts/check.mjs`. Never run athanor through `npx` or install
 it by name: the npm package called `athanor` is someone else's, and npm runs
 such a package without asking when no one is at a terminal.
 
+- To run one test file in the container, put the command after `--`:
+  `athanor run -- node --test tests/<file>.test.mjs`. It is not the check: a
+  pass there says nothing about the contract.
 - Stage new files, or pass `--untracked`, as in `athanor run check --untracked`.
   athanor runs the tracked files as they are in the working tree and leaves
   untracked ones out. `--untracked` adds untracked files that `.gitignore` does
@@ -220,7 +223,7 @@ not take, and `SECURITY.md` explains why that matters more than it looks.
 run only the suite while you work on it:
 
 ```bash
-node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/agent-check-guard.test.mjs tests/audit.test.mjs tests/brigade-decisions.test.mjs tests/brigade-quick.test.mjs tests/brigade-reminder.test.mjs tests/brigade-roster-rules.test.mjs tests/brigade-start.test.mjs tests/brigade-stop.test.mjs tests/brigade-view.test.mjs tests/brigade-warning.test.mjs tests/build-pages.test.mjs tests/case.test.mjs tests/check-agent-guard.test.mjs tests/check-allowances.test.mjs tests/check-baseline-rules.test.mjs tests/check-baselines.test.mjs tests/check-format.test.mjs tests/check-home-paths.test.mjs tests/check-home-shapes.test.mjs tests/check-load-surface.test.mjs tests/check-manifests.test.mjs tests/check-mod.test.mjs tests/check-paths.test.mjs tests/check-skill-files.test.mjs tests/check-test-step.test.mjs tests/check-tracked.test.mjs tests/check-tree.test.mjs tests/check-version.test.mjs tests/contract-interview.test.mjs tests/contract-page.test.mjs tests/contract-render.test.mjs tests/contract-schedules.test.mjs tests/doc-budget.test.mjs tests/eagle-eye-sheets.test.mjs tests/esc.test.mjs tests/eval-budget.test.mjs tests/groundtrack-fold.test.mjs tests/groundtrack-render.test.mjs tests/groundtrack-sheets.test.mjs tests/head-chef-evals.test.mjs tests/practice.test.mjs tests/registry.test.mjs tests/render.test.mjs tests/skillspector-gate.test.mjs tests/skillspector-probe.test.mjs tests/skillspector-strip-suppressed.test.mjs tests/spec-index.test.mjs tests/threat-model-cap.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test "tests/*.test.mjs"
 ```
 
 **The suite never reaches the network.** eagle-eye's edge audit is the one

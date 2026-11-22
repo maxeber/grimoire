@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Gate, HeardQueue, Joiner, KNOBS, formatHeard, isComplete, isFragment, isMuteWord, isStopWord, isUnmuteWord } from '../skills/incantation/scripts/gate.mjs';
+import { Gate, HeardQueue, Joiner, KNOBS, formatHeard, heardLines, isComplete, isFragment, isMuteWord, isStopWord, isUnmuteWord } from '../skills/incantation/scripts/gate.mjs';
 
 
 // Frames: 30 ms of a square wave, so its level is exactly the amplitude.
@@ -23,10 +23,14 @@ const UNDER_6 = 1995; // 5.999 dB over QUIET
 // A gate and a clock that feeds it: each call advances 30 ms.
 function rig(options = {}) {
   const gate = new Gate({ silenceMs: 300, ...options });
-  const r = { gate, t: options.t ?? 0, turns: [], barges: 0 };
+  const r = { gate, t: options.t ?? 0, turns: [], barges: 0, ends: [] };
   r.feed = (amp, n = 1) => {
     for (let i = 0; i < n; i++) {
-      for (const e of gate.frame(frame(amp), r.t)) (e.type === 'turn' ? r.turns.push(e) : r.barges++);
+      for (const e of gate.frame(frame(amp), r.t)) {
+        if (e.type === 'turn') r.turns.push(e);
+        else if (e.type === 'cut-over') r.ends.push(e);
+        else r.barges++;
+      }
       r.t += 30;
     }
   };
@@ -100,13 +104,68 @@ test('T5 and T17: a headset that gates the room to zero: a room at -70 dBFS open
   assert.equal(KNOBS.minVoiceDbfs, -55);
 });
 
-test('a turn is cut at 30 s and the rest goes on as the next turn', () => {
+test('a turn is cut at 30 s and the rest goes on as the next turn, marked as its continuation', () => {
   const r = rig();
   r.calibrate();
   r.feed(VOICE, 1100); // 33 s of voice
   r.feed(QUIET, 12);
   assert.equal(r.turns.length, 2);
   assert.ok(r.turns[0].pcm.length >= 960 * 990 && r.turns[0].pcm.length <= 960 * 1000);
+  assert.equal(r.turns[0].cut, true, 'the first part says it was cut');
+  assert.equal(r.turns[1].cut, false);
+  assert.equal(r.turns[1].continued, true, 'the rest says it continues a cut turn');
+  assert.equal(r.turns[0].chain, r.turns[1].chain, 'and both name the same chain');
+  assert.equal(r.turns[0].continued, false);
+});
+
+test('a turn nears its limit: the cut waits for a lull between words, not the middle of one, and the hard limit still holds', () => {
+  const r = rig();
+  r.calibrate();
+  r.feed(VOICE, 840); // 25.2 s of voice, past the soft limit, with no lull yet
+  assert.equal(r.turns.length, 0, 'a word is not cut for the soft limit alone');
+  r.feed(QUIET, 1); // a lull between words
+  assert.equal(r.turns.length, 1);
+  assert.equal(r.turns[0].cut, true);
+  r.feed(VOICE, 30);
+  r.feed(QUIET, 12);
+  assert.equal(r.turns[1].continued, true);
+  // Without any lull the hard limit cuts at 30 s as before.
+  const hard = rig();
+  hard.calibrate();
+  hard.feed(VOICE, 1000);
+  assert.equal(hard.turns.length, 1);
+});
+
+test('a turn that begins after the cut by more than the end-of-speech wait is not a continuation, and the gate says the chain is over', () => {
+  const r = rig({ silenceMs: 300 });
+  r.calibrate();
+  r.feed(VOICE, 1000); // cut at the hard limit
+  r.feed(QUIET, 15);
+  assert.deepEqual(r.ends.map(e => e.chain), [r.turns[0].chain], 'one end-of-chain event, once');
+  r.feed(VOICE, 20);
+  r.feed(QUIET, 12);
+  assert.equal(r.turns[1].continued, false);
+  assert.equal(r.turns[1].chain, undefined);
+});
+
+test('claim 6 (gate): a turn that begins while a reply plays, or within echoHoldMs of one, is flagged overlap; a later one is not', () => {
+  const r = rig();
+  r.calibrate();
+  r.play(1);
+  r.feed(VOICE, 10); // the person talks over a reply
+  r.play(0);
+  r.feed(QUIET, 12);
+  assert.equal(r.turns[0].overlap, true);
+  r.feed(QUIET, 5);
+  r.feed(VOICE, 10); // within 1.5 s of the reply's end
+  r.feed(QUIET, 12);
+  assert.equal(r.turns[1].overlap, true);
+  r.skip(KNOBS.echoHoldMs + 100);
+  r.feed(VOICE, 10);
+  r.feed(QUIET, 12);
+  assert.equal(r.turns[2].overlap, false);
+  assert.equal(KNOBS.echoHoldMs, 1500);
+  assert.equal(KNOBS.preRollFrames, 20, 'about 0.6 s kept from before a voice is confirmed');
 });
 
 test('T11: the mic is never closed to the session\'s own speech: a turn is heard while a reply plays, and right after it', () => {
@@ -239,6 +298,52 @@ test('T11: mute and unmute, as a whole turn, are the person\'s mic words', () =>
   for (const w of ['mute the build', 'please mute', 'unmute the volume on the video', 'mute mute', '']) assert.equal(isMuteWord(w) || isUnmuteWord(w), false, w);
   assert.equal(isMuteWord('unmute'), false);
   assert.equal(isUnmuteWord('mute'), false);
+});
+
+test('a turn that was cut is held for its continuation and joined to it, whatever its punctuation; nothing is lost and nothing waits for ever', () => {
+  const item = (text, extra = {}) => ({ text, at: 0, afterReply: false, exempt: false, ...extra });
+  const j = new Joiner();
+  // The first part ends a sentence, and is still held: its continuation is coming.
+  assert.deepEqual(j.offer(item('That is the first part.', { cut: true, chain: 1 }), 0), []);
+  assert.equal(j.nextAt(), KNOBS.cutJoinMs);
+  const out = j.offer(item('and here is the rest.', { continued: true, chain: 1 }), 5000);
+  assert.deepEqual(out.map(i => i.text), ['That is the first part. and here is the rest.']);
+  assert.equal(j.nextAt(), null);
+  // A reply to the session's speech is held too when it was cut, and its continuation joins it though it is marked afterReply.
+  assert.deepEqual(j.offer(item('first', { cut: true, chain: 2, afterReply: true }), 0), []);
+  const reply = j.offer(item('second.', { continued: true, chain: 2, afterReply: true }), 10);
+  assert.deepEqual(reply.map(i => [i.text, i.afterReply]), [['first second.', true]]);
+  // A chain of several cuts is one turn.
+  j.offer(item('one', { cut: true, chain: 3 }), 0);
+  assert.deepEqual(j.offer(item('two', { cut: true, continued: true, chain: 3 }), 10), []);
+  assert.deepEqual(j.offer(item('three.', { continued: true, chain: 3 }), 20).map(i => i.text), ['one two three.']);
+  // A continuation that never arrives: the held part goes when the chain is over, or at the bound.
+  j.offer(item('lonely part', { cut: true, chain: 4 }), 0);
+  assert.deepEqual(j.flush(5).map(i => i.text), ['lonely part'], 'the gate said the chain is over');
+  assert.equal(j.flush(6).length, 0);
+  j.offer(item('another', { cut: true, chain: 5 }), 0);
+  assert.deepEqual(j.due(KNOBS.cutJoinMs - 1), []);
+  assert.deepEqual(j.due(KNOBS.cutJoinMs).map(i => i.text), ['another']);
+  // A flush for another chain leaves a held part alone.
+  j.offer(item('held', { cut: true, chain: 6 }), 0);
+  assert.deepEqual(j.flush(5, 7), []);
+  assert.deepEqual(j.flush(5, 6).map(i => i.text), ['held']);
+});
+
+test('heard text longer than one line is split at word ends into several lines, none lost and none cut', () => {
+  const words = Array.from({ length: 300 }, (_, i) => `word${i}`).join(' ');
+  const lines = heardLines(words, true);
+  assert.ok(lines.length >= 3);
+  assert.match(lines[0], /^Heard \(after reply\): "/);
+  for (const l of lines.slice(1)) assert.match(l, /^Heard: "/);
+  const back = lines.map(l => l.replace(/^Heard(?: \(after reply\))?: "/, '').replace(/"$/, '')).join(' ');
+  assert.equal(back, words, 'every word, in order');
+  for (const l of lines) assert.ok(l.length <= KNOBS.maxText + 30);
+  assert.deepEqual(heardLines('short', false), ['Heard: "short"']);
+  assert.deepEqual(heardLines('say "hi"', false), ['Heard: "say \\"hi\\""']);
+  // One unbroken run longer than a line is cut at the line, and the rest goes on as its own line.
+  const run = heardLines('x'.repeat(1100), false);
+  assert.equal(run.map(l => l.length - 'Heard: ""'.length).reduce((a, b) => a + b, 0), 1100);
 });
 
 test('T10: a turn that stops mid-sentence is held and joined to the next; one that ends a sentence goes at once', () => {

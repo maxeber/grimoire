@@ -4,17 +4,18 @@
 // The listener (skills/incantation) writes ~/.grimoire/incantation/run/levels:
 // one line, `<epoch ms> <state word> <24 digits>`. The digits are the mic's
 // loudness, 0 to 8, one per quarter second: no audio and no text. The band
-// reads that line, and a click on its button writes `mute` or `unmute` to
-// run/command, which the listener reads once and removes. The mod holds no
-// path of the plugin and runs no process: it only reads and writes those two
+// reads that line and run/voice (`muted` or `on`), and a click on a button
+// writes one of four words, `mute`, `unmute`, `mute-voice` or `unmute-voice`,
+// to run/command, which the listener reads once and removes. The band holds no
+// path of the plugin and runs no process: it only reads and writes those
 // files in the person's own folder.
 
-export type MicWord = 'listening' | 'hearing' | 'thinking' | 'speaking' | 'muted'
+export type MicWord = 'listening' | 'hearing' | 'thinking' | 'working' | 'speaking' | 'muted'
 export type MicFrame = { stamp: number; word: MicWord; digits: string }
 
-export const WORDS: readonly MicWord[] = ['listening', 'hearing', 'thinking', 'speaking', 'muted']
+export const WORDS: readonly MicWord[] = ['listening', 'hearing', 'thinking', 'working', 'speaking', 'muted']
 export const BARS = 24
-const LINE = /^(\d{1,16}) (listening|hearing|thinking|speaking|muted) ([0-8]{24})\r?\n?$/
+const LINE = /^(\d{1,16}) (listening|hearing|thinking|working|speaking|muted) ([0-8]{24})\r?\n?$/
 
 /** A reading older than this is no reading: the listener has gone. */
 export const FRESH_MS = 10_000
@@ -56,6 +57,7 @@ export const HUES: Record<MicWord, string> = {
   listening: '#6f9bd1',
   hearing: '#7ec27e',
   thinking: '#d9b25b',
+  working: '#e09a5b',
   speaking: '#b490e0',
   muted: '#8a8f9c',
 }
@@ -73,7 +75,10 @@ export const colorAt = (from: MicWord, to: MicWord, step: number): string => mix
 export const labelOf = (word: MicWord): string => `mic: ${word}`
 /** What the button says, and the one word a click writes. */
 export const toggleFor = (word: MicWord): { label: string; command: 'mute' | 'unmute' } =>
-  word === 'muted' ? { label: 'Unmute', command: 'unmute' } : { label: 'Mute', command: 'mute' }
+  word === 'muted' ? { label: 'Unmute mic', command: 'unmute' } : { label: 'Mute mic', command: 'mute' }
+/** The second button: the listener's own voice, apart from the mic. */
+export const voiceToggleFor = (muted: boolean): { label: string; command: 'mute-voice' | 'unmute-voice' } =>
+  muted ? { label: 'Unmute voice', command: 'unmute-voice' } : { label: 'Mute voice', command: 'mute-voice' }
 
 const sepOf = (dir: string): string => (dir.includes('\\') ? '\\' : '/')
 const runFile = (home: string, name: string): string => {
@@ -82,6 +87,8 @@ const runFile = (home: string, name: string): string => {
 }
 export const levelsFile = (home: string): string => runFile(home, 'levels')
 export const commandFile = (home: string): string => runFile(home, 'command')
+/** `muted` or `on`: whether the listener's voice is muted, written by the listener. */
+export const voiceFile = (home: string): string => runFile(home, 'voice')
 
 /** The person's home folder from the engine's environment: an absolute path
  *  of sane length, else undefined. */

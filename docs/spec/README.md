@@ -13,5 +13,6 @@ None yet.
 
 ## All specs
 
+- [0001-incantation-from-the-prototype](0001-incantation-from-the-prototype.md) — a draft: the incantation skill gains the local sherpa engine, the echo stack, the relay and a clear spoken yes
 - [incantation](incantation.md) — a draft, not in force: the skill that speaks and listens through Voicebox
 - [groundtrack](groundtrack.md) — the skill that draws a plan or a piece of work as a call graph with traces

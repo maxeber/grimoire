@@ -5,7 +5,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureArgs, listDevices, listingLines, resolveRecorder, rowsFor, stampOf } from '../skills/incantation/scripts/capture/ffmpeg.mjs';
+import { captureArgs, fallbackName, listDevices, listingLines, pickDevice, resolveRecorder, rowsFor, stampOf } from '../skills/incantation/scripts/capture/ffmpeg.mjs';
+import { deviceDigest } from '../skills/incantation/scripts/lib.mjs';
 
 // What each row's listing command prints, on the stream it prints it to.
 const LISTINGS = {
@@ -119,4 +120,57 @@ test('a relative or current-folder entry is refused by the rule itself, though a
   for (const entry of ['.', '', 'bin', 'C:relative']) assert.equal(resolveRecorder({ platform: 'win32', pathValue: entry, startDir: 'C:\\proj', fs: win }), null, JSON.stringify(entry));
   const posix = fsOf({ ffmpeg: '/opt/ok/ffmpeg', 'bin/ffmpeg': '/opt/ok/ffmpeg', './ffmpeg': '/opt/ok/ffmpeg' });
   for (const entry of ['.', '', 'bin']) assert.equal(resolveRecorder({ platform: 'linux', pathValue: entry, startDir: '/proj', fs: posix }), null, JSON.stringify(entry));
+});
+
+// The mic to open (S5.5, claim 7): the saved one by id, then by name, wherever it
+// now sits; settings from before by stamp and index; else the first mic that is
+// not a loopback, said so. The id and name are compared as keyed digests (S13.5).
+const KEY = Buffer.alloc(32, 7);
+const dig = text => deviceDigest(KEY, text);
+const LISTS = {
+  win32: [
+    { name: 'Stereo Mix (Made Up Audio)', id: '@device_cm_{LOOP}' },
+    { name: 'Desk Mic One', id: '@device_cm_{ONE}' },
+    { name: 'Headset Mic Two', id: '@device_cm_{TWO}' },
+  ],
+  darwin: [
+    { name: 'BlackHole 2ch', id: ':0' },
+    { name: 'Desk Mic One', id: ':1' },
+    { name: 'Headset Mic Two', id: ':2' },
+  ],
+  linux: [
+    { name: 'Made Up Speakers', id: 'made_up.analog-stereo.monitor' },
+    { name: 'Desk Mic One', id: 'made_up.analog-mono' },
+    { name: 'Headset Mic Two', id: 'made_up.usb-mic' },
+  ],
+};
+const OLD = 'f'.repeat(16);
+
+for (const [platform, list] of Object.entries(LISTS)) {
+  test(`${platform}: pickDevice finds the saved mic by id, by name, by stamp and index, and falls back to a mic that is not a loopback`, () => {
+    const two = list[2];
+    // By id, wherever it sits now.
+    const moved = [list[2], list[0], list[1]];
+    assert.deepEqual(pickDevice(moved, { index: 2, stamp: OLD, id: dig(two.id), name: dig('another name') }, dig), { device: two, how: 'saved' });
+    // By name, when the id changed.
+    assert.deepEqual(pickDevice(list, { index: 0, stamp: OLD, id: dig('gone'), name: dig(two.name) }, dig), { device: two, how: 'saved' });
+    // Settings from before (no id, no name): the stamp and the index.
+    assert.deepEqual(pickDevice(list, { index: 2, stamp: stampOf(list) }, dig), { device: two, how: 'saved' });
+    assert.equal(pickDevice(list, { index: 2, stamp: OLD }, dig).how, 'fallback', 'a changed list and nothing else to look for');
+    // Gone: the first device that is not a loopback, never the loopback.
+    assert.deepEqual(pickDevice(list, { index: 1, stamp: OLD, id: dig('gone'), name: dig('also gone') }, dig), { device: list[1], how: 'fallback' });
+    // Only loopbacks: no device at all.
+    assert.deepEqual(pickDevice([list[0]], { index: 0, stamp: OLD, id: dig('gone') }, dig), { device: null, how: null });
+  });
+}
+
+test('a saved mic that is itself named like a loopback is still the one the person chose', () => {
+  const list = LISTS.win32;
+  assert.deepEqual(pickDevice(list, { index: 0, stamp: OLD, id: dig(list[0].id) }, dig), { device: list[0], how: 'saved' });
+});
+
+test('a fallback name that reaches the chat is kept to letters, digits, spaces and ()-_. and cut at 64', () => {
+  assert.equal(fallbackName('Mic "One" \\ (USB)_x-y.z\u0007 <b>'), 'Mic One (USB)_x-y.z b');
+  assert.equal(fallbackName('x'.repeat(80)).length, 64);
+  assert.equal(fallbackName('"\\'), 'another mic', 'a name with nothing left says so');
 });

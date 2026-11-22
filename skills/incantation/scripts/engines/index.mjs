@@ -5,6 +5,7 @@
 
 const ENGINES = Object.freeze({
   voicebox: () => import('./voicebox.mjs'),
+  sherpa: () => import('./sherpa.mjs'),
 });
 
 export const isEngine = name => typeof name === 'string' && Object.hasOwn(ENGINES, name);
