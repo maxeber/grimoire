@@ -99,6 +99,8 @@ unmeant words, and often shows what the person really wanted.
 - After anything heard, the listener itself says a short spinner word right
   away ("Combobulating.", "One sec."), a different one each time, so there is
   never a silent gap. Speak no acknowledgement of your own on top of it.
+- While you work, speak a short progress line at a steady beat, when a delivery
+  carries `progress-due`, in everyday words. It is exempt from the gate.
 - Keep each spoken line short.
 - Never speak an id, hash, issue or PR number, path or other long identifier.
   Say what the thing is ("the last commit on this branch") and put the id in chat.
@@ -242,7 +244,8 @@ steps for each line:
   becomes its first fact and an offer. The rest goes to chat, not aloud.
 - Never speak a secret, key, token or password, or a personal detail such as an
   email address or a name taken from a record, or anything the person's
-  instructions keep out of the record. Say the item is in chat.
+  instructions keep out of the record, or an id, hash, issue or PR number, or path. Say the
+  item is in chat, or say what the thing is.
 
 ## Hearing
 
@@ -367,8 +370,10 @@ screen is nudged aloud by the mod ("I need your OK on screen").
 
 A turn that arrives while you work goes through the same rules. A heard turn
 whose whole text is "wait" halts the current act before its next tool call, and you
-ask what the person wants. Heard text can halt work or ask for new work. It is
-never a clear yes: a yes counts only between your turns, after a say-back.
+ask what the person wants. A turn heard while you work rides on the next tool
+result, so you hear it as you go. Heard text can halt work or ask for new work. It
+is never a clear yes: a yes counts only between your turns, after a say-back, where
+voice stands in for typing at any checkpoint.
 
 ## When you speak unasked
 
