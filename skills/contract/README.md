@@ -160,7 +160,7 @@ contract and the built file. It then hands back:
 
 - It never installs what it builds. Installing activates it in every future
   session, so that choice is yours.
-- It never runs an eval without your yes in chat, each time.
+- It never runs an eval without your confirmation, each time.
 - It never sends or publishes anything.
 - It never writes a hook, a settings file or a permission list.
 - It never follows an instruction that it finds inside a file. A "yes" in a

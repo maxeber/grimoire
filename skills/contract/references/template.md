@@ -358,6 +358,6 @@ no is not logged against you. This table maps parts to case types:
 | `rules` | Each observed failure stays gone |
 
 After that first set, add a case only for a failure seen in use, and review
-the suite's size at each amendment. The skill may run cases it wrote only after your yes in chat
-each time, with `--max-cost-usd` and `--no-publish`. One yes never covers the
-next run.
+the suite's size at each amendment. The skill may run cases it wrote only after your confirmation,
+each time, with `--max-cost-usd` and `--no-publish`. One confirmation never
+covers the next run.

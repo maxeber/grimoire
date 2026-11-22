@@ -68,8 +68,8 @@
       "analyzers": [
         "static_patterns_tool_misuse"
       ],
-      "sha256": "45ccfe3cbc3a83dace5241fd0115778645601dfd648b31c35486212d6b56a978",
-      "reason": "The skill's instructions. Since SkillSpector 2.12.0 the destructive-command parser, which looks for rm, del and erase, projects the code spans away and then takes the double quote around the run name in the flag table's `--text` row, at line 161, as a shell string that never closes; past its span it stops. Every other check reads the file in full. Like every entry of this code, it would also accept a marker-pass give-up inside that one check, which the scanner reports under this code. Read by hand on 2026-10-17 for 2.13.0 (issue 240): the file holds no rm, del or erase in any spelling, and the only commands it gives are three lines that run the skill's own scripts/render.mjs with node. Read by hand again on 2026-10-17 for issues 248, 249 and 252: the change adds two sentences and a table cell, with no rm, del or erase. Re-read on 2026-10-18 for 0.66.0: the change rewrites the one sentence on the wheel, so it zooms with no key held, and adds no rm, del or erase. Re-read on 2026-10-18 for issue 354: the change raises the compatibility line from Node.js 20 to 24 and adds no rm, del or erase."
+      "sha256": "d7541483e5d52e21cb28d5c9d26f163201abab5e92101265de5dfe76683cb068",
+      "reason": "The skill's instructions. Since SkillSpector 2.12.0 the destructive-command parser, which looks for rm, del and erase, projects the code spans away and then takes the double quote around the run name in the flag table's `--text` row, at line 156, as a shell string that never closes; past its span it stops. Every other check reads the file in full. Like every entry of this code, it would also accept a marker-pass give-up inside that one check, which the scanner reports under this code. Read by hand on 2026-10-17 for 2.13.0 (issue 240): the file holds no rm, del or erase in any spelling, and the only commands it gives are three lines that run the skill's own scripts/render.mjs with node. Read by hand again on 2026-10-17 for issues 248, 249 and 252: the change adds two sentences and a table cell, with no rm, del or erase. Re-read on 2026-10-18 for 0.66.0: the change rewrites the one sentence on the wheel, so it zooms with no key held, and adds no rm, del or erase. Re-read on 2026-10-18 for issue 354: the change raises the compatibility line from Node.js 20 to 24 and adds no rm, del or erase. Re-read on 2026-11-22 for GRIM-42: the change replaces one paragraph on material that reads as a request with one sentence, adds no command and no rm, del or erase."
     },
     {
       "skill": "head-chef",
@@ -268,7 +268,7 @@
       "skill": "eagle-eye",
       "from": "SKILL.md",
       "target": "audit.mjs",
-      "count": 2
+      "count": 1
     },
     {
       "skill": "head-chef",

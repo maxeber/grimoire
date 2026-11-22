@@ -53,12 +53,6 @@ coupled (one choice changes what is possible in another), it says how many it
 sees and asks before it builds a box. Two independent choices never earn a
 box, and it stays out when you ask for the quick route.
 
-It can keep a usage log, one record per use, so you can see when it helps and
-when it should be retired. It asks before it writes anything, and stores your
-answer at once, so other sessions do not ask again. The log lives at
-`.grimoire/eagle-eye/log.jsonl` in your home folder, or at the path in
-`EAGLE_EYE_LOG`. A box you never answer is asked about at your next use.
-
 ## What the page tells you
 
 Seven findings. Six read the configuration you are looking at. The seventh

@@ -521,13 +521,6 @@ structure is checked. Its values are not.
 
 ## What a refusal says
 
-**Every refusal carries a path into the document**, so a tool locates the fault
-without reading the prose:
-
-```text
-greet.flightpath.json: graphs[0].entry: "nowhere" is not a node
-```
-
 **A refusal in a trace names the graph, the run and the move in words** after the
 path, because counting into two arrays to find `graphs[1].presets[0]` is work a
 person should not have to do:

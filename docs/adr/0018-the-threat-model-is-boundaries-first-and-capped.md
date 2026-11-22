@@ -1,5 +1,10 @@
 # The threat model is boundaries first, the machine is out of scope, and it is capped at 3,000 words
 
+> Partly superseded by [ADR 0020](0020-agents-md-no-longer-holds-the-loosening-rule.md):
+> the statement that a change loosening the cleaner's checks, the deny and ask
+> rules or the head chef's gates is a spec change under `AGENTS.md`. The rest
+> stands.
+
 Accepted, from issue 596 (ticket 3 of the-pact issue 542).
 
 The owner's words, 2026-11-12, on the-pact issue 542:

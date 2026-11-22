@@ -110,14 +110,6 @@ tour ends, the page puts back the reader's options.
 
 ## What the renderer checks (questions 3, 4)
 
-The renderer validates: a box-level `problem`, unique ids, exactly one
-`chosen` per row, a `short` on every option, edge targets that exist and sit
-in another row, a tier in {measured, sourced, argued}, a `src` on every
-non-argued edge, a why on every edge, and two or more presets of which one
-changes an option. `who`, `when` and a preset's `reframe` are optional, and a
-present one must not be blank. A `tour` is optional too. Each stop names a
-region the page has and a `now`, and its state must show its region.
-
 It warns on a row with no `problem`, on a row with no strawman, and on a
 strawman that is the chosen option.
 

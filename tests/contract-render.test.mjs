@@ -675,10 +675,7 @@ test('hiring.md refuses a quoted or control-character path before every command 
   assert.ok(!/node scripts\//.test(md), 'no command names the script relative to the working folder');
   // Every file of the skill is named under its base directory, kinds.json too.
   for (const m of md.matchAll(/scripts\/[a-z.]+/g)) assert.equal(md.slice(m.index - 23, m.index), '<skill base directory>/', `${m[0]} is named under the skill base directory`);
-  // The block's edit rules, and Reset's reach, as the block check holds them.
-  assert.match(md, /A rename names a\s+schedule, by part and kind, never one entry\./);
-  assert.match(md, /An add or a none goes only\s+in a part the level asks\./);
-  assert.match(md, /An answer or an edit may hold `restored`: the\s+page brought it back from the browser, and the person has not pressed\s+its Keep since\./);
+  // Reset's reach.
   assert.match(md, /Reset clears this draft's name and\s+type only\./);
   for (const c of commands) assert.ok(c.index > refusal, `${c[1]} comes after the refusal`);
   for (const c of commands) for (const p of c[1].matchAll(/'[^']*'/g)) assert.match(p[0], /^'<[^>]+>[^']*'$/, 'every path is a single-quoted placeholder');

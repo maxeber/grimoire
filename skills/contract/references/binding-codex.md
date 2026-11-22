@@ -1,9 +1,9 @@
 # Binding: Codex
 
 This file maps a contract's plain words to a Codex agent file. Read it when
-`tools` says the agent is built for Codex. Everything the file needs is in
-the contract, the template, the skill's steps, or here. A fact missing from
-all of them is a gap: stop and ask.
+`tools` says the agent is built for Codex. Ask, don't guess: a fact missing
+from the contract, the template, the skill's steps or here is a gap, as
+SKILL.md says.
 
 ## Contents
 

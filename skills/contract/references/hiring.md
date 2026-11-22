@@ -166,26 +166,8 @@ The person copies one fenced JSON block from the page and pastes it in
 chat. Write it as `answers.json` in the scratch folder, as `SKILL.md` says
 for the pasted block. Then check it.
 
-The block's keys are exactly these:
-
-- `format`: `1`.
-- `draft`: the SHA-256 of the draft's bytes.
-- `kinds`: the SHA-256 of `<skill base directory>/scripts/kinds.json`
-  that the page was made with.
-- `answers`: one entry for each clause the person touched. An entry holds
-  `id`, then `option` or `fields`, then `mark`. It may hold `chip`, `flag`
-  and `restored`. `chip` is the place of the reason the person tapped in
-  the question's `chips`, counting from 0, never its text.
-- `edits`: the person's folder edits, in order. Each has an `op`: `add`,
-  `rename`, `move`, `remove`, `rekind` or `none`. A rename names a
-  schedule, by part and kind, never one entry. An add or a none goes only
-  in a part the level asks. An answer or an edit may hold `restored`: the
-  page brought it back from the browser, and the person has not pressed
-  its Keep since. Typing in it, or tapping its chip or flag, leaves it
-  restored.
-
-The hashes bind the block to its draft and its kinds table. They prove
-nothing about who made the block.
+The block's two hashes, one of the draft and one of the kinds table, bind it
+to both. They prove nothing about who made the block.
 
 ## Reading the block back
 
@@ -233,14 +215,13 @@ hand-back. Reset clears this draft's name and type only. When the page
 said that Reset here does not clear earlier answers, render that earlier
 draft too, and press Reset there.
 
-Then delete the page and the answers file, as `SKILL.md` says for
-`--clean`:
+Then delete the page and the answers file:
 
 ```text
 node '<skill base directory>/scripts/render.mjs' --clean '<folder>'
 ```
 
-Offer to delete the draft too, as it says for `--clean --draft`:
+Offer to delete the draft too, as `SKILL.md` says for `--clean --draft`:
 
 ```text
 node '<skill base directory>/scripts/render.mjs' --clean '<folder>' --draft

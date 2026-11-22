@@ -19,6 +19,7 @@ const BUDGET = {
   'CONTEXT.md': 300,
   'CONTRIBUTING.md': 6300,
   'docs/agents/issue-tracker.md': 1300,
+  'docs/layout.md': 117,
   'docs/security/brigade.md': 36450, // raised from 35,500 for Incantation's relay and nudge rows; GRIM-40 says why
   'docs/security/checks.md': 7200,
   'docs/security/scanners.md': 5900,
@@ -26,6 +27,7 @@ const BUDGET = {
   'docs/security/hiring-interview.md': 900,
   'docs/practice-tests/eagle-eye.md': 2850,
   'skills/eagle-eye/CONTRACT.md': 3600,
+  'skills/eagle-eye/reference/audit.md': 999,
   'skills/head-chef/references/CONTRACT.md': 30000,
   'skills/contract/references/binding-claude.md': 1100,
   'skills/contract/references/binding-codex.md': 780,
