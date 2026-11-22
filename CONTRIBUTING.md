@@ -158,7 +158,7 @@ such a package without asking when no one is at a terminal.
 
 `.claude/settings.json` registers one Claude Code hook, `scripts/agent-check-guard.mjs`,
 which runs before every Bash and PowerShell call an agent makes in this
-repository. When the call is `node scripts/check.mjs` in any of its forms (the
+repository. When the call is `node scripts/check.mjs` or `node --test` in any of its forms (the
 plain, `./` and backslash paths, quoted or not, behind `cd`, `;`, `&&`, `&`,
 `FOO=1` or `timeout`) and `athanor` works on the machine, the hook refuses it
 and tells the agent to run `athanor run check`. The host check stays the
@@ -166,7 +166,7 @@ fallback for when athanor is missing or its run exits 124, 125 or 137, but
 not for a sha512 mismatch, which also exits 125: stop and tell the owner. When
 athanor is missing the hook lets the plain host check through, and there is
 nothing to name. When a run exits 124, 125 or 137, it adds
-`--host-fallback=<reason>` to the same command, with the reason and the exit
+`--host-fallback=<reason>` to the same command, last, after any test files, with the reason and the exit
 code in it in its own words (no path, token or pasted error text), and names
 that in its report. `node scripts/check.mjs` prints the reason as one note and
 runs as it always does. The flag is a way to
@@ -220,7 +220,7 @@ they exist: a test runner from npm would be the dependency this repository does
 not take, and `SECURITY.md` explains why that matters more than it looks.
 
 `node scripts/check.mjs` runs them, so there is no second command to forget. To
-run only the suite while you work on it:
+run only the suite while you work on it (agents: `athanor run --` in front):
 
 ```bash
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test "tests/*.test.mjs"

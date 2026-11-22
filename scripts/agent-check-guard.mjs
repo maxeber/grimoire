@@ -6,11 +6,13 @@
 // missing or a run ends with no result (exit 124, 125 or 137). An agent could
 // still skip that order and nothing showed it, so this refuses the host check
 // while athanor is on the machine, and says how to name the fallback:
-// `--host-fallback=<reason>` on the same command.
+// `--host-fallback=<reason>` on the same command. A direct `node --test` of the
+// tests, bare or behind `mise x --` or `npx`, is the same run in pieces and
+// gets the same refusal (GRIM-48).
 //
 // It does two things and no more. It reads the command as data, never runs it,
 // and never changes it. It runs one program, `athanor --version`, and only
-// when the command is the host check. It writes nothing and sends nothing.
+// when the command is a host run. It writes nothing and sends nothing.
 //
 // Everything that is not a refusal is silence: exit 0, nothing on standard
 // output, nothing on standard error. That is deliberate. A hook that answers
@@ -154,9 +156,11 @@ const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const NODE = /^node(?:\.exe)?$/i;
 const SCRIPT = /(?:^|\/)scripts\/check\.mjs$/i;
 
-// What one segment is: not the host check, the host check, or the host check
-// with a named fallback. A token ending in scripts/check.mjs as whole path
-// parts counts, in either slash, in any case; scripts/check.mjs.bak does not.
+// What one segment is: not a host run, a host run, or a host run with a named
+// fallback. A host run is the host check or a direct `node --test` (GRIM-48),
+// bare, behind `mise x --` or behind `npx`. For the check, a token ending in
+// scripts/check.mjs as whole path parts counts, in either slash, in any case;
+// scripts/check.mjs.bak does not.
 function classify(tokens) {
   let i = 0;
   for (;;) {
@@ -167,18 +171,38 @@ function classify(tokens) {
     else if (t === 'timeout') {
       i++;
       if (/^[\d.]+[smhd]?$/.test(tokens[i] ?? '')) i++;
+    } else if (t === 'mise' && (tokens[i + 1] === 'x' || tokens[i + 1] === 'exec')) {
+      // `mise x [tool@version ...] -- command`: the command follows the `--`.
+      const dashes = tokens.indexOf('--', i + 2);
+      if (dashes === -1) return 'other';
+      i = dashes + 1;
+    } else if (t === 'npx') {
+      i++;
+      while (tokens[i]?.startsWith('-')) i++;
     } else break;
   }
   const program = tokens[i].replace(/\\/g, '/').split('/').pop();
   if (!NODE.test(program)) return 'other';
   const rest = tokens.slice(i + 1);
-  if (!rest.some(t => !t.startsWith('-') && SCRIPT.test(t.replace(/\\/g, '/')))) return 'other';
+  const isCheck = rest.some(t => !t.startsWith('-') && SCRIPT.test(t.replace(/\\/g, '/')));
+  if (!isCheck && !runsTests(rest)) return 'other';
   return rest.some(t => t.startsWith(FLAG) && t.slice(FLAG.length).trim() !== '') ? 'named' : 'check';
+}
+
+// True when `--test` is one of node's own options: before the first word that
+// does not start with a dash, which is the script or the first test file. A
+// `--test` after the script's name belongs to the script.
+function runsTests(args) {
+  for (const t of args) {
+    if (t === '--test') return true;
+    if (!t.startsWith('-')) return false;
+  }
+  return false;
 }
 
 // The seam. Returns { reason } to refuse the call, and null for everything
 // else. `athanorPresent` is called, and awaited, only after a segment of the
-// command is the host check without a named fallback.
+// command is a host run without a named fallback.
 export async function decide(input, { athanorPresent }) {
   try {
     if (!input || typeof input !== 'object') return null;
