@@ -366,8 +366,12 @@ A listener older than a command closes the connection; the client then prints
 ### S5.4 A heard turn moves on (W8)
 
 When a turn is kept, a line still playing stops and every queued `say` is
-dropped (its caller gets `say-failed`); the next delivery carries
-`interrupted`. As the prototype has it, with `speechEpoch`.
+dropped (its caller gets `say-held`); the next delivery carries
+`interrupted`. As the prototype has it, with `speechEpoch`. A `say` that lands
+while a kept turn waits for its delivery, or while a held part of one waits for
+its rest, is answered `say-held` and plays nothing: the session wrote the line
+without that turn. The word is `say-failed` only when the line fails for another
+reason, as a barge-in or a stop.
 
 ### S5.5 Mic fallback and the settings (W4)
 
@@ -721,7 +725,7 @@ a claim says otherwise.
 5. With the status `working` and no line or turn for `progressMs`, a `wait`
    ends with `progress-due`, again after another `progressMs`, and not after a
    line was spoken or a turn heard (fake clock).
-6. A kept turn during a line stops it, drops queued says with `say-failed`, and
+6. A kept turn during a line stops it, drops queued says with `say-held`, and
    the next delivery says `interrupted`.
 7. `pickDevice` finds the saved mic by id digest, by name digest, by stamp and
    index for old settings, and falls back to a non-loopback device with

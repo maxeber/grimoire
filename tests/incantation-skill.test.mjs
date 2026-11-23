@@ -116,8 +116,12 @@ test('T18: the session speaks through the listener, the line in a file it wrote 
   assert.match(speaking, /so the words never pass through a command/);
   assert.match(speaking, /write the one line to a new file,\s+`~\/\.grimoire\/incantation\/observe\/say-<8 hex>\.txt`/);
   assert.match(speaking, /`node <skill base>\/scripts\/listen\.mjs say <8 hex>`/);
-  for (const reply of ['speaking', 'say-refused', 'say-busy', 'say-failed', 'say-no-player']) assert.ok(speaking.includes(`\`${reply}\``), reply);
+  for (const reply of ['speaking', 'say-refused', 'say-busy', 'say-failed', 'say-held', 'say-no-player']) assert.ok(speaking.includes(`\`${reply}\``), reply);
   assert.match(speaking, /Never speak through Voicebox's own tools/);
+  assert.match(speaking, /\*\*A held line\.\*\* `say-held` means the listener kept a turn you have not read,\s+and it played nothing/, 'GRIM-53: what to do with a held line');
+  assert.match(speaking, /Read the turn when it reaches you, then decide again/);
+  assert.match(speaking, /A held line is not a\s+play/);
+  assert.match(section('## Start', '## Speaking'), /If the answer is `say-held`, the person spoke\s+first/, 'the greeting is not a failure when held');
   assert.match(speaking, /Before every say, run\s+`node <skill base>\/scripts\/listen\.mjs idle`/, 'T12');
   assert.match(speaking, /One fact per turn/, 'T7');
   assert.match(speaking, /then one offer of the next/, 'T7');

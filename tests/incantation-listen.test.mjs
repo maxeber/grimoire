@@ -1091,7 +1091,7 @@ test('follow-up 1: a quick turn inside the echo window still gets a cue, and our
   assert.doesNotMatch(out, /One sec/, 'our own word is not a turn');
 });
 
-test('follow-up 2: a say queued behind a playing line holds while a new turn is being heard, and plays when it is dropped or fails when a turn lands', async t => {
+test('follow-up 2: a say queued behind a playing line holds while a new turn is being heard, and plays when it is dropped or is held when a turn lands', async t => {
   const r = await live(t, { engineOptions: { text: texts('you', 'Hold on.') } });
   r.push(1000, 34);
   const channel = readChannel(r.home);
@@ -1121,7 +1121,7 @@ test('follow-up 2: a say queued behind a playing line holds while a new turn is 
   assert.equal(r.player.plays.length, 3, 'held');
   r.push(3163, 5);
   r.push(1000, 15);
-  assert.equal(await fourth, 'say-failed\n', 'a turn landed: the line is stale');
+  assert.equal(await fourth, 'say-held\n', 'a turn landed: the line is stale');
   assert.equal(r.player.plays.length, 3);
 });
 
@@ -1199,7 +1199,7 @@ test('claim 5: a repeat of working does not push the beat back', async t => {
   assert.equal(await pending, 'progress-due\n');
 });
 
-test('claim 6: a kept turn during a line stops it, drops the lines queued behind it with say-failed, and the next delivery says interrupted', async t => {
+test('claim 6: a kept turn during a line stops it, drops the lines queued behind it with say-held, and the next delivery says interrupted', async t => {
   const r = await live(t, { engineOptions: { text: 'Hold on.' } });
   r.push(1000, 34);
   const channel = readChannel(r.home);
@@ -1211,7 +1211,7 @@ test('claim 6: a kept turn during a line stops it, drops the lines queued behind
   r.push(1000, 15);
   await tick(80);
   assert.equal(r.player.stops, 1, 'the line in the player is stopped');
-  assert.equal(await queued, 'say-failed\n', 'the queued line never plays');
+  assert.equal(await queued, 'say-held\n', 'the queued line never plays');
   assert.equal(r.player.plays.length, 1);
   const out = await wait(r.home);
   assert.match(out, /^Heard \(after reply\): "Hold on\."$/m);
@@ -1293,7 +1293,7 @@ test('bug b: idle holds while a turn is being heard and returns once it has been
   assert.equal(r.engine.calls, 1, 'idle came back after the text was settled, not before');
 });
 
-test('bug b: a say waits while the person is mid-sentence and then speaks when that turn was a fragment; when the turn is kept the line is stale and fails', async t => {
+test('bug b: a say waits while the person is mid-sentence and then speaks when that turn was a fragment; when the turn is kept the line is stale and is held', async t => {
   const r = await live(t, { engineOptions: { text: texts('you', 'Hold on.') } });
   r.push(1000, 34);
   const channel = readChannel(r.home);
@@ -1316,7 +1316,7 @@ test('bug b: a say waits while the person is mid-sentence and then speaks when t
   assert.equal(r.player.plays.length, 1);
   r.push(3163, 5);
   r.push(1000, 15);
-  assert.equal(await stale, 'say-failed\n', 'what they said is newer than the line');
+  assert.equal(await stale, 'say-held\n', 'what they said is newer than the line');
   assert.equal(r.player.plays.length, 1, 'never played');
 });
 
@@ -1398,4 +1398,69 @@ test('claim 12 (listener side): the click file accepts mute-voice and unmute-voi
   writeFileSync(click, 'unmute-voice');
   await tick(400);
   assert.equal(voiceOf(r.home), 'on');
+});
+
+// GRIM-53: a line written before the session has seen a heard turn is not played over it.
+
+test('GRIM-53: a say that lands while a kept turn is undelivered is held and plays nothing; once a wait delivers the turn, a say plays', async t => {
+  const r = await live(t, { engineOptions: { text: 'Actually, make it the other file.' } });
+  r.turn(); // kept and queued; no wait has delivered it
+  await tick(80);
+  const channel = readChannel(r.home);
+  assert.equal(await say(channel, 'Running the tests now.', 3000), 'say-held\n', 'the line was written without the turn in hand');
+  assert.equal(r.player.plays.length, 0, 'nothing plays');
+  assert.equal(r.engine.synthesized.length, 0, 'and no audio is made');
+  const out = await wait(r.home);
+  assert.match(out, /^Heard: "Actually, make it the other file\."$/m, 'the turn is still delivered');
+  assert.match(out, /^plays 0$/m, 'a held line is no play');
+  assert.equal(await say(channel, 'Switching to the other file.', 3000), 'speaking\n', 'with the turn seen, the session may speak');
+  assert.equal(r.player.plays.length, 1);
+});
+
+test('GRIM-53: a line already waiting when a kept turn lands is held, and a held line counts no play', async t => {
+  const r = await live(t, { engineOptions: { text: 'Hold on, wrong branch.' } });
+  const channel = readChannel(r.home);
+  r.push(1000, 34);
+  r.push(3163, 5); // the person is mid-sentence
+  const line = say(channel, 'Merging it now.', 3000);
+  await tick(150);
+  assert.equal(r.player.plays.length, 0, 'nothing plays over them');
+  r.push(3163, 5);
+  r.push(1000, 15); // the turn is kept
+  assert.equal(await line, 'say-held\n', 'the session is told the line was held');
+  assert.equal(r.player.plays.length, 0);
+  assert.match(await wait(r.home), /^plays 0$/m, 'a held line is no play');
+});
+
+test('GRIM-53: a line whose audio is still being made when a kept turn lands is held, and nothing plays', async t => {
+  const slow = () => new Promise(res => setTimeout(() => res(Buffer.from('RIFF-slow-audio')), 300));
+  const r = await live(t, { engineOptions: { text: 'Wait, not that one.', synth: slow } });
+  const line = say(readChannel(r.home), 'Deleting it now.', 3000);
+  await tick(60); // the engine is still making the audio
+  r.turn(); // a turn is kept meanwhile
+  assert.equal(await line, 'say-held\n');
+  assert.equal(r.player.plays.length, 0);
+});
+
+test('GRIM-53: a say that lands while the first part of a turn waits for its rest is held at once', async t => {
+  const r = await live(t, { engineOptions: { text: 'the first part with no end' }, knobs: { joinMs: 5000 } });
+  r.turn(); // kept, but it ends on no sentence mark: held for its rest, so not yet queued
+  await tick(150);
+  assert.equal(await raced(say(readChannel(r.home), 'Running it now.', 3000), 500), 'say-held\n', 'held at once, not waiting for the rest');
+  assert.equal(r.player.plays.length, 0);
+});
+
+test('GRIM-53: the say command prints say-held for a held line, and deletes its file', async t => {
+  const r = await live(t, { engineOptions: { text: 'Actually, stop.' } });
+  r.turn();
+  await tick(80);
+  const file = join(observeDir(r.home), 'say-abcd1236.txt');
+  writeFileSync(file, 'A line the turn overtook.');
+  const out = await new Promise(res => {
+    const env = { ...process.env, HOME: r.home, USERPROFILE: r.home };
+    execFile(process.execPath, [LISTEN, 'say', 'abcd1236'], { env, encoding: 'utf8', timeout: 15_000 }, (e, stdout) => res(stdout));
+  });
+  assert.equal(out, 'say-held\n', 'not "listener: not running"');
+  assert.equal(existsSync(file), false);
+  assert.equal(r.player.plays.length, 0);
 });

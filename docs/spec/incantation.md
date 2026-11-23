@@ -920,7 +920,8 @@ pair. behaviour-lens waits for Test.
 
 Asks 1 to 14 on #208, built on #626's branch, which stays a draft. Where a
 line here and an earlier section differ, this section holds. Item 15 (check
-for a newer turn before acting) is deferred by the owner as a later polish.
+for a newer turn before acting) is deferred by the owner as a later polish; before speaking, the
+listener now holds a line that a kept turn overtook (S5.4 of 0001).
 
 - **T1. `/incantation install`** runs the whole setup in the chat: devices,
   voices, save, (T18: no MCP registration now) an optional status
@@ -1133,7 +1134,8 @@ for a newer turn before acting) is deferred by the owner as a later polish.
     channel as `say <token> <byte count>` and the bytes. The words are never in a
     command (claim 15 holds). One fixed line comes back: `speaking` once the
     player has started, `say-refused` (empty, over 800 characters, or the file
-    unreadable), `say-busy` (three queued), `say-failed`, `say-no-player`.
+    unreadable), `say-busy` (three queued), `say-failed`, `say-held` (a turn was kept that the
+    session has not read; nothing plays), `say-no-player`.
   - **What the listener owns.** Start and end of each reply, so the status word,
     `plays`, the gate's playback mark and `idle` (T12) follow the real audio.
     Talking over a reply (360 ms of voice, as T8) ends the player, drops what is
