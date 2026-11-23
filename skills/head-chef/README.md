@@ -139,7 +139,7 @@ or type `/brigade` to open it.
   decides everything but what your user-level instructions file keeps for you, which it sends you as to-dos; at 3 it runs
   toward your goal and lists each decision in the Decisions tab for you to
   review. At levels 2 and 3 it follows your user-level instructions file:
-  at level 2, what that file keeps for you waits. At level 3, inside the goal, the lead and its members stop for nothing: what the file keeps for you, its hard stops included, the lead decides itself, logs with an "Owner's call:" flag and tells you after. Only Claude's own guardrails and the harness stop them: a permission prompt, a classifier block, a tool that refuses. Cleanup and a fresh session a context figure prompts are
+  at level 2, what that file keeps for you waits. At level 3, inside the goal, the lead and its members stop for nothing: what the file keeps for you, a guard's stop included, the lead decides itself, logs with an "Owner's call:" flag and tells you after. Only Claude's own guardrails and the harness stop them: a permission prompt, a classifier block, a tool that refuses. Cleanup and a fresh session a context figure prompts are
   the skill's stops: at level 2 each waits for your confirmation, and at level
   3 each is logged and flagged.
 
