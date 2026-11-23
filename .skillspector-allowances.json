@@ -243,8 +243,8 @@
       "analyzers": [
         "static_patterns_tool_misuse"
       ],
-      "sha256": "40f1a9a2632170cf631412fd3af05bc12896a8a950e1d5ec912dc7be75d00bbe",
-      "reason": "The runtime installer, which /incantation install runs on the person's clear yes: it downloads pinned files over https, checks each against its size and sha256, unpacks npm archives with a reader that refuses links and escapes, and runs the person's own uv with an argument list to make one venv. The destructive-command parser stops partway through a long expression and marks the file partial for that one check; every other check reads it in full. Read by hand on 2026-11-22 (GRIM-36): the file holds no eval, no Function constructor and no shell string; its only removals are recursive deletes of folders it made itself under the runtime folder (the partial and staging folders, a part's old folder, the venv and its manifest), by paths built from the runtime folder and the pins table and never from a downloaded name; it starts only uv, shell false, with a named environment, and sends no cookie, token or Authorization header."
+      "sha256": "58663a7e8852abaa7c5be57fc869a993b642922eebb0e70bb3c3651535ffc6d6",
+      "reason": "The runtime installer, which /incantation install runs on the person's clear yes: it downloads pinned files over https, checks each against its size and sha256, unpacks npm archives with a reader that refuses links and escapes, and runs the person's own uv with an argument list to make one venv. The destructive-command parser stops partway through a long expression and marks the file partial for that one check; every other check reads it in full. Read by hand on 2026-11-22 (GRIM-36): the file holds no eval, no Function constructor and no shell string; its only removals are recursive deletes of folders it made itself under the runtime folder (the partial and staging folders, a part's old folder, the venv and its manifest), by paths built from the runtime folder and the pins table and never from a downloaded name; it starts only uv, shell false, with a named environment, and sends no cookie, token or Authorization header. Re-read on 2026-11-23 (GRIM-56): the plan and the install now read the OS release from Node's os module and give an upstream reason for a missing addon or Python layer; the change adds no removal, no program start, no eval and no shell string. Re-read on 2026-11-23 (GRIM-56, review): the install checks the platform's Python gap before uv, and still adds no removal, program start, eval or shell string."
     },
     {
       "skill": "incantation",
@@ -253,8 +253,8 @@
       "analyzers": [
         "static_patterns_tool_misuse"
       ],
-      "sha256": "e7dfb5c3ac6b27bfa13c45623ded54af3fb1b7c52d74d6a25ce6cd61e15e296f",
-      "reason": "The table of pinned files for the runtime installer: each file's source, size and sha256, the hosts a redirect may reach and the one Python version. It is data only. The destructive-command parser stops partway through its long expressions and marks the file partial for that one check; every other check reads it in full. Read by hand on 2026-11-22 (GRIM-36): the file holds no code that runs a program, deletes a file, reads the network or the environment, and no eval, no Function constructor and no shell string."
+      "sha256": "c149786caf780934c1a5265311dcbfff7f69eec3ce9fe1e43cb765628c897e9f",
+      "reason": "The table of pinned files for the runtime installer: each file's source, size and sha256, the hosts a redirect may reach and the one Python version. It is data only. The destructive-command parser stops partway through its long expressions and marks the file partial for that one check; every other check reads it in full. Read by hand on 2026-11-22 (GRIM-36): the file holds no code that runs a program, deletes a file, reads the network or the environment, and no eval, no Function constructor and no shell string. Re-read on 2026-11-23 (GRIM-56): it adds three lock names, two addon archives, the macOS release floors and the upstream gap reasons, all data, and still holds no such code."
     }
   ],
   "references": [

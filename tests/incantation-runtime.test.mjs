@@ -410,3 +410,105 @@ test('claim 15: nothing installed reads as absent for every part, and nothing is
     f.remove();
   }
 });
+
+// ---- platforms (GRIM-56) -------------------------------------------------
+
+const LOCK_TEXT = name => readFileSync(new URL(`../skills/incantation/scripts/runtime/${name}`, import.meta.url), 'utf8');
+const pinned = text => [...text.matchAll(/^([a-z0-9-]+)==(\S+) \\$/gm)].map(m => `${m[1]}==${m[2]}`);
+// A lock's pins and hashes, by package, with uv's "via" comments dropped.
+const lockBody = text => {
+  const out = new Map();
+  let pkg = null;
+  for (const line of text.split('\n')) {
+    const head = line.match(/^([a-z0-9-]+==\S+) \\$/);
+    if (head) out.set((pkg = head[1]), []);
+    else if (pkg && /--hash=sha256:/.test(line)) out.get(pkg).push(line.trim().replace(/ \\$/, ''));
+  }
+  return out;
+};
+
+test('GRIM-56: every platform with a lock has a pinned addon, and the locks pin the same packages bar the Intel Mac onnxruntime', () => {
+  assert.deepEqual(Object.keys(LOCKS).sort(), ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-x64']);
+  for (const key of Object.keys(LOCKS)) assert.ok(ARCHIVES.some(a => a.platform === key), `no addon pinned for ${key}`);
+  const base = lockBody(LOCK_TEXT(LOCKS['linux-x64']));
+  assert.ok(base.has('onnxruntime==1.32.0'));
+  for (const key of ['win32-x64', 'linux-arm64', 'darwin-arm64']) assert.deepEqual(lockBody(LOCK_TEXT(LOCKS[key])), base, key);
+  const intel = lockBody(LOCK_TEXT(LOCKS['darwin-x64']));
+  for (const [p, hashes] of base) if (!p.startsWith('onnxruntime==')) assert.deepEqual(intel.get(p), hashes, p);
+  const name = p => p.split('==')[0];
+  const added = pinned(LOCK_TEXT(LOCKS['darwin-x64'])).filter(p => !base.has(p)).map(name).sort();
+  assert.deepEqual(added, ['coloredlogs', 'humanfriendly', 'mpmath', 'onnxruntime', 'sympy']);
+  assert.ok(intel.has('onnxruntime==1.23.2'));
+});
+
+test('GRIM-56: on Apple Silicon, Intel macOS and Linux ARM the plan holds the whole runtime', () => {
+  const f = fixture();
+  try {
+    for (const [p, a, release] of [['darwin', 'arm64', '23.0.0'], ['darwin', 'x64', '22.6.0'], ['linux', 'arm64', '6.8.0']]) {
+      const lines = planRuntime({ home: f.home, platform: p, arch: a, release, uv: UV }).lines;
+      for (const part of ['addon', 'hearing', 'speaking', 'detector', 'python', 'turn', 'phonon']) assert.ok(lines.some(l => new RegExp(`^${part} missing \\d+ MB$`).test(l)), `${p}-${a} ${part}: ${lines.join(' | ')}`);
+    }
+  } finally {
+    f.remove();
+  }
+});
+
+test('GRIM-56: below the wheels\' macOS floor the plan names the floor and its upstream reason, and plans no turn or Phonon model', () => {
+  const f = fixture();
+  try {
+    for (const [a, release, floor, why] of [['arm64', '22.6.0', 'macOS 14', /onnxruntime 1\.32\.0/], ['x64', '21.6.0', 'macOS 13', /onnxruntime 1\.23\.2/]]) {
+      const lines = planRuntime({ home: f.home, platform: 'darwin', arch: a, release, uv: UV }).lines;
+      const py = lines.find(l => l.startsWith('python '));
+      assert.ok(py.startsWith(`python unavailable needs ${floor}: `) && why.test(py), py);
+      assert.ok(lines.includes('turn skipped no python layer') && lines.includes('phonon skipped no python layer'), lines.join(' | '));
+      assert.ok(lines.some(l => /^addon missing \d+ MB$/.test(l)));
+    }
+  } finally {
+    f.remove();
+  }
+});
+
+test('GRIM-56: Windows on ARM and a platform nothing ships for say why the addon is missing, not only "choose Voicebox"', () => {
+  const f = fixture();
+  try {
+    const arm = planRuntime({ home: f.home, platform: 'win32', arch: 'arm64', uv: UV }).lines;
+    assert.ok(arm.some(l => /^addon unavailable sherpa-onnx-node \S+ publishes no Windows on ARM addon; choose Voicebox$/.test(l)), arm.join(' | '));
+    const bsd = planRuntime({ home: f.home, platform: 'freebsd', arch: 'x64', uv: UV }).lines;
+    assert.ok(bsd.some(l => /^addon unavailable sherpa-onnx-node \d\S* publishes no addon for freebsd-x64; choose Voicebox$/.test(l)), bsd.join(' | '));
+    assert.ok(bsd.includes('python unavailable no pinned wheels for freebsd-x64'), bsd.join(' | '));
+  } finally {
+    f.remove();
+  }
+});
+
+test('GRIM-56: install below the floor skips the Python layer with the floor\'s reason, and the core still installs', async () => {
+  const f = fixture();
+  try {
+    const calls = [];
+    const floor = { [KEY]: { release: 99, name: 'Test OS 99', why: 'the test wheel needs it' } };
+    const { lines, code } = await install(f, { pins: { ...PINS, PYTHON_FLOOR: floor }, release: '20.1.0', runUv: fakeUv(calls) });
+    assert.equal(code, 0);
+    assert.ok(lines.includes('python skipped needs Test OS 99: the test wheel needs it'), lines.join(' | '));
+    for (const l of ['turn skipped no python layer', 'phonon skipped no python layer', 'addon ok', 'hearing ok', 'speaking ok', 'detector ok']) assert.ok(lines.includes(l), `${l}: ${lines.join(' | ')}`);
+    assert.equal(calls.filter(c => c.args[0] === 'pip').length, 0);
+    // With no uv as well, the floor is still the reason given.
+    const h = fixture();
+    try {
+      const noUv = await install(h, { pins: { ...PINS, PYTHON_FLOOR: floor }, release: '20.1.0', pathValue: '' });
+      assert.ok(noUv.lines.includes('python skipped needs Test OS 99: the test wheel needs it'), noUv.lines.join(' | '));
+    } finally {
+      h.remove();
+    }
+    // At the floor, the same table installs the Python layer.
+    const g = fixture();
+    try {
+      const at = await install(g, { pins: { ...PINS, PYTHON_FLOOR: floor }, release: '99.0.0', runUv: fakeUv(calls) });
+      assert.ok(at.lines.includes('python ok'), at.lines.join(' | '));
+      assert.ok(calls.some(c => c.args[0] === 'pip'));
+    } finally {
+      g.remove();
+    }
+  } finally {
+    f.remove();
+  }
+});

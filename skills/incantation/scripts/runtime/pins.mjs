@@ -20,8 +20,40 @@ export const HOSTS = Object.freeze(['huggingface.co', 'us.aws.cdn.hf.co', 'regis
 /** The one CPython uv is asked for, and the one index it may read. */
 export const PYTHON = Object.freeze({ version: '3.12.12', index: 'https://pypi.org/simple' });
 
-/** Lock files, one per platform that has wheels for every package. */
-export const LOCKS = Object.freeze({ 'win32-x64': 'lock-win32-x64.txt', 'linux-x64': 'lock-linux-x64.txt' });
+/** Lock files, one per platform that has wheels for every package. Each is the
+ *  output of `uv pip compile --no-config --index-url https://pypi.org/simple
+ *  --generate-hashes --only-binary :all: --python-version 3.12 --python-platform
+ *  <target> requirements.in`, its two header lines dropped, where requirements.in
+ *  holds the lock's own pins. The targets are x86_64-pc-windows-msvc,
+ *  x86_64-manylinux_2_28, aarch64-manylinux_2_28, and aarch64-apple-darwin and
+ *  x86_64-apple-darwin with MACOSX_DEPLOYMENT_TARGET set to the PYTHON_FLOOR
+ *  release below: uv's default macOS target, 13.0, finds no onnxruntime 1.32.0
+ *  wheel. Intel Macs pin onnxruntime 1.23.2, the last release with an Intel Mac
+ *  wheel, which brings coloredlogs, humanfriendly, sympy and mpmath. */
+export const LOCKS = Object.freeze({
+  'win32-x64': 'lock-win32-x64.txt',
+  'linux-x64': 'lock-linux-x64.txt',
+  'linux-arm64': 'lock-linux-arm64.txt',
+  'darwin-arm64': 'lock-darwin-arm64.txt',
+  'darwin-x64': 'lock-darwin-x64.txt',
+});
+
+/** The oldest OS a platform's wheels install on: `release` is the major number
+ *  of `os.release()` (Darwin 23 is macOS 14), with the OS's name and the
+ *  upstream reason the plan gives below it. */
+export const PYTHON_FLOOR = Object.freeze({
+  'darwin-arm64': { release: 23, name: 'macOS 14', why: 'onnxruntime 1.32.0 publishes its Apple Silicon wheel for macOS 14 and later only' },
+  'darwin-x64': { release: 22, name: 'macOS 13', why: 'onnxruntime 1.23.2, the last release with an Intel Mac wheel, needs macOS 13' },
+});
+
+/** The upstream reason a platform has no pinned build of a part, where it is
+ *  more than "nothing is published for it". */
+export const GAPS = Object.freeze({
+  'win32-arm64': {
+    addon: 'sherpa-onnx-node 1.13.8 publishes no Windows on ARM addon',
+    python: 'not pinned, as the core has no addon here',
+  },
+});
 
 // The npm tarballs: archives, checked whole, then unpacked; each file they
 // yield is checked again. dest is under the runtime folder.
@@ -109,6 +141,42 @@ export const ARCHIVES = Object.freeze([
         ["libsherpa-onnx-cxx-api.dylib", 161936, '370e7b9e4a198dde7d07390c4aa8a49b0840974271065632fbacbde99a1a615c'],
         ["package.json", 1460, '70ac867468808896163ec3739879efd7a393157cf0bfebf2801e531642c14d95'],
         ["sherpa-onnx.node", 644448, 'e37e09b2b21e0b07abf0c37d7423884a8ff161fdba8c67407bc99bfe99af8a55'],
+      ],
+    },
+    {
+      name: 'sherpa-onnx-darwin-x64',
+      url: '/sherpa-onnx-darwin-x64/-/sherpa-onnx-darwin-x64-1.13.8.tgz',
+      platform: 'darwin-x64',
+      dest: 'node_modules/sherpa-onnx-darwin-x64',
+      size: 11191481,
+      sha256: '3e583d3423160cb8a0f9316008e293ad9a6b66c63e1966ad399a88300390fbaa',
+      sha512: '7BLRpjM6w4f9W46/nmkmq8lEKUayhebvcpslCVQ+6QN2uReYlZEMDZlSpXMjme+hUFrPfRz8P3UNq8ep/4d19g==',
+      files: [
+        ["README.md", 94, '7404cc01ddc4bd97dd9722686b44944a5ca88c619cc263988da273e7e67e16d2'],
+        ["index.js", 48, '3f0b863d77823f79278c60fae2473c62f7009b2f73ad4541ead097b1c2ade995'],
+        ["libonnxruntime.dylib", 32315856, '2bf27180c09e6fd3f407c9ab25205ebf1ff95f2d53bfa35e35409b5849e0ac70'],
+        ["libsherpa-onnx-c-api.dylib", 4594168, '7e9a3df88aed001c9dba2f2bdeceac6045613b6c573bd0223e92b898a04bf283'],
+        ["libsherpa-onnx-cxx-api.dylib", 124592, 'e30ba3a85aaa3c235d94dbe10bc21889eed817a39f0b4b8fe7f62693cecb3978'],
+        ["package.json", 1456, 'a86b80c7ae03875dad47010aa1ea2ebb4d0e659cad51b3a575f10102824a68f9'],
+        ["sherpa-onnx.node", 642472, '73bd986df350a4dda71f081d898aa4bc6ef3f4e105c025b92a4e766360f07972'],
+      ],
+    },
+    {
+      name: 'sherpa-onnx-linux-arm64',
+      url: '/sherpa-onnx-linux-arm64/-/sherpa-onnx-linux-arm64-1.13.8.tgz',
+      platform: 'linux-arm64',
+      dest: 'node_modules/sherpa-onnx-linux-arm64',
+      size: 13910679,
+      sha256: 'e1671ad6e94e51947229a5736d06022780f3fba967da8d917173cd9765902ee8',
+      sha512: 'Tlg7a70b/Wge3OF8IgTHF9jhSVCsLyKQKhwc4BsJ5A+dL/SrFtGBjzuHp4XeLhiiOT7afCxX5PdSn/D4c8Lnuw==',
+      files: [
+        ["README.md", 94, '7404cc01ddc4bd97dd9722686b44944a5ca88c619cc263988da273e7e67e16d2'],
+        ["index.js", 48, '3f0b863d77823f79278c60fae2473c62f7009b2f73ad4541ead097b1c2ade995'],
+        ["libonnxruntime.so", 34606912, 'cfc800d4438f15e8d9017521326776ca7117d8783cb847ccccc2fc61ac4d540f'],
+        ["libsherpa-onnx-c-api.so", 4613032, 'd1b41ded09e00017b37375584792cf697dad8bf35ccd787706acdbc4c7afc912'],
+        ["libsherpa-onnx-cxx-api.so", 281200, '49fe5a314d4fc4f13d0a036d26cdea228fb6504547022013350855881bff5b59'],
+        ["package.json", 1458, '21465fab6ac026040f5599281e7f304a760958fd251602aff557274b31513ebf'],
+        ["sherpa-onnx.node", 804112, 'ae1459b87db45cdc756b45e1cb495466225f62d2dd63eb35bf225196bf20900a'],
       ],
     },
 ]);

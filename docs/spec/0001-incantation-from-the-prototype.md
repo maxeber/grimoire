@@ -470,7 +470,7 @@ POSIX):
 | Core: hearing | Parakeet TDT 0.6b v2, int8: encoder, decoder, joiner, tokens | 660 MB | CC-BY-4.0 (README attributes it) |
 | Core: speaking | Kokoro 1.0 multi-lang, full fp32: model, voices, tokens, `lexicon-us-en.txt`, `espeak-ng-data/`, `dict/` | 393 MB | Apache-2.0; `espeak-ng-data/` and the espeak-ng code the addon carries are GPL-3.0-or-later |
 | Core: speech detector | `silero_vad.onnx` | 0.6 MB | MIT |
-| Python layer | one venv `py/` from `uv`, CPython 3.12: `livekit` 1.3.0, `onnxruntime` 1.32.0, `numpy` 2.5.5, `ptts` 0.7.1 and their dependencies | 190 MB | Apache-2.0, MIT, BSD |
+| Python layer | one venv `py/` from `uv`, CPython 3.12: `livekit` 1.3.0, `onnxruntime` 1.32.0 (1.23.2 on Intel Macs, the last release with an Intel Mac wheel, with `coloredlogs`, `humanfriendly`, `sympy` and `mpmath`), `numpy` 2.5.5, `ptts` 0.7.1 and their dependencies | 190 MB | Apache-2.0, MIT, BSD |
 | Python layer: end of turn | `smart-turn-v3.2-cpu.onnx`, from `pipecat-ai/smart-turn-v3` at commit `f766f81d` (the build records the full hash) | 9 MB | BSD-2-Clause |
 | Python layer: Phonon | the Everly voice and model `ptts` loads, kept under `runtime/hf/` | 104 MB | as its model card says |
 
@@ -529,7 +529,9 @@ lists each pin it could not cross-check against a published hash.
 - **Python packages** install with `uv pip install --require-hashes
   --only-binary :all: --no-deps -r <lock>`, into the venv at `runtime/py`, from
   a lock file per platform in `scripts/runtime/`, made with `uv pip compile
-  --generate-hashes --python-version 3.12 --python-platform <p>`. A package
+  --generate-hashes --python-version 3.12 --python-platform <p>`, on macOS
+  with `MACOSX_DEPLOYMENT_TARGET` set to the platform's wheel floor
+  (`PYTHON_FLOOR` in `pins.mjs`). A package
   with no wheel for a platform means that platform runs without the Python
   layer; there is no source build. `uv` is the person's own install, found
   like the recorder (absolute PATH entries, never the working folder or the

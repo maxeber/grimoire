@@ -13,15 +13,16 @@
 import { createHash } from 'node:crypto';
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeSync } from 'node:fs';
 import { request as httpsRequest, Agent } from 'node:https';
+import { release as osRelease } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { resolveRecorder } from '../capture/ffmpeg.mjs';
 import { secureFolder, stateDir, writePrivate } from '../lib.mjs';
-import { ARCHIVES, FILES, HOSTS, LOCKS, PYTHON, SOURCES } from './pins.mjs';
+import { ARCHIVES, FILES, GAPS, HOSTS, LOCKS, PYTHON, PYTHON_FLOOR, SOURCES } from './pins.mjs';
 
 // The table a call reads; a test hands in a small one of its own.
-const PINS = Object.freeze({ ARCHIVES, FILES, LOCKS });
+const PINS = Object.freeze({ ARCHIVES, FILES, LOCKS, PYTHON_FLOOR, GAPS });
 
 export const PARTS = Object.freeze(['addon', 'hearing', 'speaking', 'detector', 'python', 'turn', 'phonon']);
 export const CORE = Object.freeze(['addon', 'hearing', 'speaking', 'detector']);
@@ -93,6 +94,24 @@ export function specOf(part, key, pins = PINS) {
   return { supported: true, units, bytes: units.reduce((n, u) => n + u.files.reduce((m, f) => m + f.size, 0), 0) };
 }
 
+/** Why the platform has no pinned addon, with the upstream reason. */
+export function addonGap(key, pins = PINS) {
+  if (pins.GAPS?.[key]?.addon) return pins.GAPS[key].addon;
+  const node = pins.ARCHIVES.find(a => a.platform === null);
+  const version = node?.url.match(/-(\d[^/]*)\.tgz$/)?.[1];
+  return `${node ? [node.name, version].filter(Boolean).join(' ') : 'the addon'} publishes no addon for ${key}`;
+}
+
+/** Why the Python layer cannot install here, or null when it can: no lock for
+ *  the platform, or an OS older than its wheels' floor. `release` is
+ *  `os.release()`'s answer. */
+export function pythonGap(key, release, pins = PINS) {
+  if (!Object.hasOwn(pins.LOCKS, key)) return pins.GAPS?.[key]?.python ?? `no pinned wheels for ${key}`;
+  const floor = pins.PYTHON_FLOOR?.[key];
+  if (floor && !(Number.parseInt(String(release), 10) >= floor.release)) return `needs ${floor.name}: ${floor.why}`;
+  return null;
+}
+
 const mb = bytes => Math.max(1, Math.ceil(bytes / 1_000_000));
 
 // ---- state of a part on disk --------------------------------------------
@@ -160,8 +179,9 @@ export function findUv({ platform, pathValue, startDir, fs }) {
 /** The plan, as lines: each part's state and download size, whether uv was
  *  found, what is lost without it, the total, the peak disk use and the time
  *  at 10 MB/s, and every host that will be contacted. */
-export function planRuntime({ home, platform, arch, uv, pins = PINS }) {
+export function planRuntime({ home, platform, arch, uv, release = osRelease(), pins = PINS }) {
   const key = platformKey(platform, arch);
+  const noPython = pythonGap(key, release, pins);
   const lines = [];
   let download = 0;
   let unpacked = 0;
@@ -169,11 +189,15 @@ export function planRuntime({ home, platform, arch, uv, pins = PINS }) {
     const spec = specOf(part, key, pins);
     const state = partState(home, part, key, pins);
     if (part === 'addon' && !spec.supported) {
-      lines.push('addon unavailable no pinned build for this platform; choose Voicebox');
+      lines.push(`addon unavailable ${addonGap(key, pins)}; choose Voicebox`);
       continue;
     }
-    if (part === 'python' && !spec.supported) {
-      lines.push('python unavailable no pinned wheels for this platform');
+    if (part === 'python' && noPython) {
+      lines.push(`python unavailable ${noPython}`);
+      continue;
+    }
+    if ((part === 'turn' || part === 'phonon') && noPython) {
+      lines.push(`${part} skipped no python layer`);
       continue;
     }
     const layerNeedsUv = LAYER.includes(part) && !uv;
@@ -383,7 +407,8 @@ export async function installRuntime(o) {
   };
   const uv = findUv({ platform, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs });
   const pins = o.pins ?? PINS;
-  const plan = planRuntime({ home, platform, arch, uv, pins });
+  const release = o.release ?? osRelease();
+  const plan = planRuntime({ home, platform, arch, uv, release, pins });
   const free = (o.free ?? freeBytes)(home);
   if (free < plan.peak * 1.1) return { lines: ['install: not enough free disk space on the home drive'], code: 1 };
   const root = runtimeDir(home);
@@ -496,17 +521,19 @@ export async function installRuntime(o) {
   for (const part of PARTS) {
     const spec = specOf(part, key, pins);
     if (part === 'addon' && !spec.supported) {
-      say('addon failed no pinned build for this platform');
+      say(`addon failed ${addonGap(key, pins)}`);
       failed = true;
       continue;
     }
     if (LAYER.includes(part)) {
-      if (!uv) {
-        say(`${part} skipped no uv`);
+      // The platform's own gap comes first, as in the plan: uv would not help.
+      const noPython = part === 'python' && pythonGap(key, release, pins);
+      if (noPython) {
+        say(`python skipped ${noPython}`);
         continue;
       }
-      if (part === 'python' && !spec.supported) {
-        say('python skipped no pinned wheels for this platform');
+      if (!uv) {
+        say(`${part} skipped no uv`);
         continue;
       }
       if ((part === 'turn' || part === 'phonon') && partState(home, 'python', key, pins) !== 'ok') {

@@ -1,0 +1,90 @@
+# Install Incantation's speech runtime on the platforms no maintainer machine
+# covers, and start each part once.
+#
+# The unit tests in check.yml prove the installer against fakes. They cannot
+# prove that the pinned addon loads on macOS or Linux on ARM, or that a lock's
+# wheels install on that OS. This job runs `setup.mjs runtime plan`, `install`
+# and `verify` for real, then starts the addon and the three Python workers
+# once each. It fails when the plan or the install leaves out any part.
+#
+# **Free runners only.** GitHub-hosted standard runners cost nothing on a
+# public repository: macos-15 (Apple Silicon), macos-15-intel, ubuntu-24.04-arm
+# and ubuntu-24.04. No larger runner.
+#
+# **When it runs.** By hand, or on a pull request that changes the runtime's
+# pins or this file. Each job downloads about 1.2 GB from the hosts the plan
+# names, so it does not run on every pull request. It is not a required check.
+#
+# **Not on the publishing path.** `contents: read`, no secret. The installer
+# sends no token (docs/spec/0001, S5.9).
+
+name: incantation-platforms
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - skills/incantation/scripts/runtime/**
+      - skills/incantation/scripts/engines/*-worker.py
+      - skills/incantation/scripts/setup.mjs
+      - .github/workflows/incantation-platforms.yml
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    # Named, so a step runs with pipefail and a failed command before `tee`
+    # fails the step.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # persist-credentials: false. Nothing here runs a git command.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Node 24 is the floor (CONTRIBUTING.md).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          check-latest: true
+      # uv at an exact version, with no cache: the installer builds the venv
+      # from the lock's hashes alone.
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.7'
+          enable-cache: false
+      # The installer runs a uv only from a folder that no one else can write,
+      # and each folder above it must be the same (README, "Finding ffmpeg").
+      # The runner's tool cache fails that rule, so copy uv into a private folder.
+      - name: Put uv where the installer trusts it
+        run: |
+          install -d -m 0755 "$HOME/uv-bin"
+          install -m 0755 "$(command -v uv)" "$HOME/uv-bin/uv"
+          echo "$HOME/uv-bin" >> "$GITHUB_PATH"
+      - name: Plan
+        run: |
+          node skills/incantation/scripts/setup.mjs runtime plan | tee plan.txt
+          test "$(grep -cE '^(addon|hearing|speaking|detector|python|turn|phonon) missing [0-9]+ MB$' plan.txt)" = 7
+          grep -qx 'uv found' plan.txt
+      - name: Install
+        run: |
+          node skills/incantation/scripts/setup.mjs runtime install | tee install.txt
+          test "$(grep -cE '^(addon|hearing|speaking|detector|python|turn|phonon) ok$' install.txt)" = 7
+      - name: Verify
+        run: node skills/incantation/scripts/setup.mjs runtime verify
+      # Each worker writes its ready mark and exits when its stdin closes.
+      - name: Start each part once
+        run: |
+          R="$HOME/.grimoire/incantation/runtime"
+          E=skills/incantation/scripts/engines
+          node -e 'require(process.argv[1])' "$R/node_modules/sherpa-onnx-node"
+          test "$("$R/py/bin/python" -I "$E/turn-worker.py" "$R/smart-turn/smart-turn-v3.2-cpu.onnx" </dev/null | head -c 4)" = TRN1
+          test "$("$R/py/bin/python" -I "$E/aec-worker.py" </dev/null | head -c 4)" = AEC1
+          HF_HOME="$R/hf" HF_HUB_OFFLINE=1 "$R/py/bin/python" -I "$E/phonon-worker.py" </dev/null | grep -q '"ready": true'
