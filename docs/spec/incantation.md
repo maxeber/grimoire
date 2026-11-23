@@ -464,8 +464,9 @@ reply" after a playback.
   whatever answers on a stale port reaches the session with nothing. When no
   listener answers within 3 s (no `listen.json`, or the port refuses), `wait`
   prints `listener error ended`.
-- **Stop.** `stop` sends `stop <token>` on the channel; the listener kills its
-  recorder, waits for it to exit, answers `stopped`, and exits. `stop` prints
+- **Stop.** `stop` sends `stop <token>` on the channel; the listener ends its
+  recorder (SIGINT on macOS, whose capture ignores SIGTERM; SIGTERM elsewhere;
+  SIGKILL when it is still running 2 s later), waits for it to exit, answers `stopped`, and exits. `stop` prints
   `listener stopped` only on that answer, and `listener: not running` when
   nothing answered. No PID is signalled and no process is inspected. A
   listener that cannot be reached that way is gone or is not this account's.

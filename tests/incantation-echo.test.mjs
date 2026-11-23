@@ -142,10 +142,10 @@ test('claim 9: the steady player writes what is due, hands the reference out at 
   const ref = [];
   const started = [];
   const player = makeStreamPlayer({ ffplay: 'ffplay', cwd: 'STATE', exists: always, spawn: (file, args, opts) => (started.push(opts), child), onWrite: s => ref.push(...s), timers: false, latencyMs: 0, leadMs: 0 });
-  assert.equal(started[0].cwd, 'STATE', 'ffplay starts in the state folder, not the session\'s');
-  assert.equal(started[0].shell, false);
   const line = player.play(wav(new Array(2400).fill(1000), OUT_RATE)); // 100 ms
   for (let i = 0; i < 6; i++) player.pump(30);
+  assert.equal(started[0].cwd, 'STATE', 'ffplay starts in the state folder, not the session\'s');
+  assert.equal(started[0].shell, false);
   assert.equal(await line.done, 'ended');
   assert.ok(written.length > 0);
   assert.equal(ref.length, 2880, 'six 30 ms frames of reference at 16 kHz, silence between lines included');
@@ -157,6 +157,44 @@ test('claim 9: the steady player writes what is due, hands the reference out at 
   assert.equal(player.play(Buffer.from('not a wav')), null);
   player.close();
   assert.equal(wavSamples(Buffer.from('x')), null);
+});
+
+// GRIM-57, macOS: every line was silent. A copy of this player was heard when
+// ffplay started with the mic already open and the stream ran 300 ms ahead.
+// The listener started ffplay before the mic, and its first mic frame put the
+// stream only one frame ahead, where it stayed.
+test('claim 9: the pumped player starts ffplay on the first mic frame', () => {
+  const spawned = [];
+  const player = makeStreamPlayer({ ffplay: 'ffplay', exists: always, spawn: (...a) => (spawned.push(a), fakeChild()), timers: false });
+  assert.ok(player.play(wav(new Array(2400).fill(1000), OUT_RATE)), 'a line is accepted before the mic has started');
+  assert.equal(spawned.length, 0, 'ffplay waits for the mic, so it opens the output device the open mic leaves');
+  player.pump(30);
+  player.pump(30);
+  assert.equal(spawned.length, 1, 'one ffplay, started by the first frame');
+  player.close();
+});
+
+test('claim 9: the pumped player runs the lead ahead of the mic from the first frame on', async () => {
+  const written = [];
+  const child = fakeChild(d => written.push(d));
+  const player = makeStreamPlayer({ ffplay: 'ffplay', exists: always, spawn: () => child, timers: false, leadMs: 300 });
+  player.play(wav(new Array(24000).fill(1000), OUT_RATE));
+  player.pump(30);
+  const bytes = () => written.reduce((n, d) => n + d.length, 0);
+  await new Promise(r => setImmediate(r));
+  assert.equal(bytes(), ((330 * OUT_RATE) / 1000) * 2, 'the first frame writes the frame and the 300 ms lead');
+  for (let i = 0; i < 10; i++) player.pump(30);
+  await new Promise(r => setImmediate(r));
+  assert.equal(bytes(), ((630 * OUT_RATE) / 1000) * 2, 'each frame after adds exactly its length, so the lead holds');
+  player.close();
+});
+
+test('claim 9: a player closed before the mic started never starts ffplay', () => {
+  const spawned = [];
+  const player = makeStreamPlayer({ ffplay: 'ffplay', exists: always, spawn: (...a) => (spawned.push(a), fakeChild()), timers: false });
+  player.close();
+  player.pump(30);
+  assert.equal(spawned.length, 0);
 });
 
 test('claim 9: the speech detector is off with no model, and answers per frame with one', () => {

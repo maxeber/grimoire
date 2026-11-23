@@ -15,6 +15,13 @@
 # pins or this file. Each job downloads about 1.2 GB from the hosts the plan
 # names, so it does not run on every pull request. It is not a required check.
 #
+# **The plumbing job** runs on the two macOS runners only. It checks the
+# listener's macOS paths with real processes: the listener's tests on darwin,
+# the recorder's stop with a real child, and the steady player feeding a real
+# ffplay. The runners have no speaker and no Bluetooth, so ffplay plays to SDL's
+# dummy audio driver: this proves the plumbing, never that a person hears a
+# line (GRIM-57).
+#
 # **Not on the publishing path.** `contents: read`, no secret. The installer
 # sends no token (docs/spec/0001, S5.9).
 
@@ -27,6 +34,8 @@ on:
       - skills/incantation/scripts/runtime/**
       - skills/incantation/scripts/engines/*-worker.py
       - skills/incantation/scripts/setup.mjs
+      - skills/incantation/scripts/stream.mjs
+      - skills/incantation/scripts/listen.mjs
       - .github/workflows/incantation-platforms.yml
 
 permissions:
@@ -88,3 +97,82 @@ jobs:
           test "$("$R/py/bin/python" -I "$E/turn-worker.py" "$R/smart-turn/smart-turn-v3.2-cpu.onnx" </dev/null | head -c 4)" = TRN1
           test "$("$R/py/bin/python" -I "$E/aec-worker.py" </dev/null | head -c 4)" = AEC1
           HF_HOME="$R/hf" HF_HUB_OFFLINE=1 "$R/py/bin/python" -I "$E/phonon-worker.py" </dev/null | grep -q '"ready": true'
+
+  plumbing:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          check-latest: true
+      - name: The listener's tests, on darwin
+        run: node --test tests/incantation-listen.test.mjs tests/incantation-echo.test.mjs
+      # A real child that ends on SIGINT, and one that ignores it, so the
+      # signal and the SIGKILL after the grace are delivered for real.
+      - name: stopRecorder with a real child
+        run: |
+          node --input-type=module -e '
+          import { spawn } from "node:child_process";
+          import { stopRecorder } from "./skills/incantation/scripts/listen.mjs";
+          const run = async (handler, grace) => {
+            const child = spawn(process.execPath, ["-e", `process.on("SIGTERM", () => {}); process.on("SIGINT", ${handler}); process.stdout.write("up"); setInterval(() => {}, 1000);`], { stdio: ["ignore", "pipe", "ignore"] });
+            await new Promise(r => child.stdout.once("data", r));
+            const exited = new Promise(r => child.once("exit", (code, signal) => r(signal ?? code)));
+            const t = Date.now();
+            await stopRecorder(child, exited, { platform: "darwin", graceMs: grace });
+            return { how: await exited, ms: Date.now() - t };
+          };
+          const polite = await run("() => process.exit(0)", 2000);
+          if (polite.how !== 0 || polite.ms > 1500) throw new Error(`SIGINT did not end it: ${JSON.stringify(polite)}`);
+          const stubborn = await run("() => {}", 300);
+          if (stubborn.how !== "SIGKILL") throw new Error(`no SIGKILL: ${JSON.stringify(stubborn)}`);
+          console.log("stopRecorder: SIGINT ends a recorder, SIGKILL ends one that ignores it");
+          '
+      - name: Install ffmpeg, with ffplay
+        run: |
+          brew install ffmpeg
+          test -x "$(brew --prefix)/bin/ffplay"
+      # SDL's dummy driver takes audio at a device's pace with no device. The
+      # player starts ffplay on the first frame; a one-second line, pumped by
+      # 30 ms frames on a real clock, must settle ended (not failed) with
+      # ffplay running, and close must end ffplay.
+      - name: The steady player feeds a real ffplay
+        env:
+          SDL_AUDIODRIVER: dummy
+        run: |
+          FFPLAY="$(brew --prefix)/bin/ffplay" node --input-type=module -e '
+          import { execFileSync } from "node:child_process";
+          import { makeStreamPlayer, OUT_RATE } from "./skills/incantation/scripts/stream.mjs";
+          const running = () => { try { execFileSync("pgrep", ["-x", "ffplay"]); return true; } catch { return false; } };
+          const wav = Buffer.alloc(44 + OUT_RATE * 2);
+          wav.write("RIFF", 0, "latin1");
+          wav.write("WAVE", 8, "latin1");
+          wav.writeUInt16LE(1, 20);
+          wav.writeUInt16LE(1, 22);
+          wav.writeUInt32LE(OUT_RATE, 24);
+          wav.writeUInt16LE(16, 34);
+          for (let i = 0; i < OUT_RATE; i++) wav.writeInt16LE(Math.round(8000 * Math.sin(i / 10)), 44 + i * 2);
+          const player = makeStreamPlayer({ ffplay: process.env.FFPLAY, timers: false, leadMs: 300 });
+          if (!player) throw new Error("no player for " + process.env.FFPLAY);
+          const line = player.play(wav);
+          if (running()) throw new Error("ffplay started before the first frame");
+          const clock = setInterval(() => player.pump(30), 30);
+          const outcome = await Promise.race([line.done, new Promise(r => setTimeout(() => r("timeout"), 5000))]);
+          if (outcome !== "ended") throw new Error("the line settled " + outcome);
+          if (!running()) throw new Error("ffplay is not running after the line");
+          clearInterval(clock);
+          player.close();
+          await new Promise(r => setTimeout(r, 1000));
+          if (running()) throw new Error("ffplay outlived close");
+          console.log("steady player: ffplay started on the first frame, took a line, and ended on close");
+          '

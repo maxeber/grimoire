@@ -55,13 +55,7 @@ const FFPLAY_STREAM = ['-hide_banner', '-nodisp', '-loglevel', 'quiet', '-f', 's
  *  the caller's timer (or a test). */
 export function makeStreamPlayer({ ffplay, cwd, spawn = nodeSpawn, exists = existsSync, now = () => Date.now(), onWrite = () => {}, latencyMs = 400, leadMs = 100, tickMs = 20, timers = true } = {}) {
   if (!ffplay || !exists(ffplay)) return null;
-  let child;
-  try {
-    // `cwd` is the state folder (never the session's folder, where a planted DLL could be found by name).
-    child = spawn(ffplay, FFPLAY_STREAM, { shell: false, windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'], ...(cwd ? { cwd } : {}) });
-  } catch {
-    return null;
-  }
+  let child = null;
   let dead = false;
   const lines = [];
   const t0 = now();
@@ -74,9 +68,21 @@ export function makeStreamPlayer({ ffplay, cwd, spawn = nodeSpawn, exists = exis
     dead = true;
     for (const l of lines.splice(0)) l.settle('failed');
   };
-  child.on('error', die);
-  child.on('exit', die);
-  child.stdin.on('error', die);
+  // ffplay starts with the first write, not before. A pumped player's first
+  // write comes with the mic's first frame, so ffplay opens the output device
+  // that is in use once the mic is open. On macOS, opening a Bluetooth headset's
+  // mic switches its output, and an ffplay started before that played nothing.
+  const start = () => {
+    try {
+      // `cwd` is the state folder (never the session's folder, where a planted DLL could be found by name).
+      child = spawn(ffplay, FFPLAY_STREAM, { shell: false, windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'], ...(cwd ? { cwd } : {}) });
+    } catch {
+      return die();
+    }
+    child.on('error', die);
+    child.on('exit', die);
+    child.stdin.on('error', die);
+  };
   // Writes up to `ms` of stream time plus the lead. Driven by the mic (`pump`),
   // the player and the reference share the sound card's clock; the timer is
   // only for a player nobody pumps.
@@ -86,6 +92,8 @@ export function makeStreamPlayer({ ffplay, cwd, spawn = nodeSpawn, exists = exis
     const at = micMs ?? now() - t0;
     const due = Math.floor(((at + leadMs) * OUT_RATE) / 1000) - written;
     if (due <= 0) return;
+    if (!child) start();
+    if (dead) return;
     const out = new Int16Array(due);
     let k = 0;
     while (k < due && lines.length) {
@@ -129,7 +137,9 @@ export function makeStreamPlayer({ ffplay, cwd, spawn = nodeSpawn, exists = exis
     /** One mic frame more: the stream advances by exactly its length. */
     pump(frameMs = 30) {
       if (micMs === null) {
-        micMs = Math.round((written * 1000) / OUT_RATE) - leadMs; // carry on where the timer left off
+        // Carry on where the timer left off; with nothing written yet, the mic's
+        // time starts now, and this frame's write puts the lead ahead of it.
+        micMs = written ? Math.round((written * 1000) / OUT_RATE) - leadMs : 0;
         clearInterval(timer);
       }
       micMs += frameMs;
@@ -161,8 +171,8 @@ export function makeStreamPlayer({ ffplay, cwd, spawn = nodeSpawn, exists = exis
     close() {
       clearInterval(timer);
       try {
-        child.stdin.end();
-        child.kill();
+        child?.stdin.end();
+        child?.kill();
       } catch {}
       die();
     },

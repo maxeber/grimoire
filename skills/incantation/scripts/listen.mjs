@@ -177,6 +177,21 @@ function sendSay(channel, text, timeoutMs = 0) {
 
 const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms).unref())]);
 
+// Ends the recorder: its stop signal, then SIGKILL if it has not exited within
+// the grace. macOS's avfoundation capture ignores SIGTERM and ends on SIGINT;
+// one that outlived the listener kept the mic open with parent PID 1 (GRIM-57).
+export async function stopRecorder(child, exited, { platform = process.platform, graceMs = 2000 } = {}) {
+  const within = ms => Promise.race([exited.then(() => true), new Promise(r => setTimeout(() => r(false), ms).unref())]);
+  try {
+    child.kill(platform === 'darwin' ? 'SIGINT' : 'SIGTERM');
+  } catch {}
+  if (await within(graceMs)) return;
+  try {
+    child.kill('SIGKILL');
+  } catch {}
+  await within(1000);
+}
+
 // The listener. Everything a test replaces comes in through `options`: the
 // engine, the recorder (its listing and its spawn), the parent, a clock and
 // the knobs. The command line passes only `home`. Resolves { done, stop } once
@@ -441,10 +456,7 @@ export async function startListener(options = {}) {
       loopback.close?.();
       turnJudge.close?.();
       stream?.close();
-      if (child && childExited) {
-        child.kill();
-        await Promise.race([childExited, new Promise(r => setTimeout(r, 2000).unref())]);
-      }
+      if (child && childExited) await stopRecorder(child, childExited, { platform });
       if (waiter) {
         // A stop the person asked for is no error.
         waiter.end(reason === 'stopped' ? 'stopped\n' : `listener error ${reason}\n`);
