@@ -568,7 +568,9 @@ spoken and shown in chat, and a clear yes answers it.
 
 **At start,** `scripts/guard.mjs` checks that each installed part's files are
 present with their pinned sizes (not their hashes: 1 GB is too slow for every
-start); `verify` is the full check. A program of the person's account can
+start); `verify` is the full check. The parts it requires follow the voice: the
+core with Kokoro for a Kokoro voice, and the core with Phonon in place of Kokoro
+for a Phonon voice, which never loads Kokoro. A program of the person's account can
 change a file after install; that is the machine's own, as with ffmpeg.
 
 **Update.** When a release changes the pins, the guard's line names

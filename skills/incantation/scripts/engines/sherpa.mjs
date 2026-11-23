@@ -171,7 +171,7 @@ export function makeEngine({ port, profile, home = homedir(), platform = process
     tailMs: VALUES.tailMs.value,
     // Cheap: the core files are there. Loading is warm()'s job, off the guard's clock.
     async health() {
-      if (!checkRuntime(home, key, pins).core) return false;
+      if (!checkRuntime(home, key, pins, phononVoice ? 'phonon' : 'kokoro').core) return false;
       return phononVoice ? exists(pythonExe(home, platform)) : true;
     },
     transcribe,

@@ -81,7 +81,8 @@ async function check(o) {
   }
   // An installed part with a missing or short file is a fault for either engine
   // (sizes only; `setup.mjs runtime verify` re-hashes). The sherpa engine also
-  // needs the whole core.
+  // needs the parts its voice runs on: Kokoro for a Kokoro voice, Phonon for a
+  // Phonon voice.
   const runtime = (o.checkRuntime ?? checkRuntime)(o.home, platformKey(platform, o.arch ?? process.arch));
   if (runtime.damaged.length) fail('runtime');
   if (!(await engine.health())) fail(engine.name === 'sherpa' ? 'runtime' : 'health');

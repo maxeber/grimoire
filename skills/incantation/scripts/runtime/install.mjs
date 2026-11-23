@@ -28,6 +28,15 @@ export const PARTS = Object.freeze(['addon', 'hearing', 'speaking', 'detector', 
 export const CORE = Object.freeze(['addon', 'hearing', 'speaking', 'detector']);
 export const LAYER = Object.freeze(['python', 'turn', 'phonon']);
 
+// The parts a voice needs to run, which is what the guard asks of the runtime.
+// A Kokoro voice needs the core, with Kokoro as its speaking part. A Phonon
+// voice never loads Kokoro, so it asks for Phonon's own part in its place; the
+// engine's health checks its interpreter.
+export const NEEDS = Object.freeze({
+  kokoro: CORE,
+  phonon: Object.freeze(['addon', 'hearing', 'detector', 'phonon']),
+});
+
 // What a person loses without the Python layer, said in the plan (S5.9).
 export const LOST_WITHOUT_UV = 'without uv: no echo cancelling (use a headset), no end-of-turn hold, no Phonon voice';
 
@@ -158,12 +167,14 @@ export function partState(home, part, key, pins = PINS) {
   return !any ? 'absent' : bad ? 'damaged' : 'ok';
 }
 
-/** The guard's check: the first part that is installed but short or changed in
- *  size, else whether every core part is there. */
-export function checkRuntime(home, key, pins = PINS) {
+/** The guard's check: each part that is installed but short or changed in
+ *  size, and whether every part the voice's engine needs is there. `voice` is
+ *  'kokoro' (the default) or 'phonon'; a part that engine never loads does not
+ *  count, so a Phonon voice runs with no Kokoro on disk. */
+export function checkRuntime(home, key, pins = PINS, voice = 'kokoro') {
   const states = Object.fromEntries(PARTS.map(p => [p, partState(home, p, key, pins)]));
   const damaged = PARTS.filter(p => states[p] === 'damaged');
-  return { states, damaged, core: CORE.every(p => states[p] === 'ok') };
+  return { states, damaged, core: (NEEDS[voice] ?? CORE).every(p => states[p] === 'ok') };
 }
 
 // ---- finding uv ----------------------------------------------------------

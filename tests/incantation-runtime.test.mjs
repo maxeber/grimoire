@@ -399,6 +399,25 @@ test('claim 15: verify re-hashes (a same-size change is caught); the guard check
   }
 });
 
+test('claim 15: core counts only the parts the voice needs: Kokoro for a Kokoro voice, Phonon for a Phonon voice (issue 674)', async () => {
+  const f = fixture();
+  try {
+    await install(f);
+    const kokoro = join(runtimeDir(f.home), 'kokoro');
+    assert.equal(checkRuntime(f.home, KEY, PINS).core, true);
+    rmSync(kokoro, { recursive: true });
+    assert.deepEqual(checkRuntime(f.home, KEY, PINS).damaged, []);
+    assert.equal(checkRuntime(f.home, KEY, PINS).core, false, 'a Kokoro voice, the default, needs Kokoro');
+    assert.equal(checkRuntime(f.home, KEY, PINS, 'kokoro').core, false);
+    assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, true, 'a Phonon voice runs without Kokoro');
+    rmSync(join(runtimeDir(f.home), 'hf'), { recursive: true });
+    assert.deepEqual(checkRuntime(f.home, KEY, PINS).damaged, []);
+    assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, false, 'a Phonon voice needs Phonon');
+  } finally {
+    f.remove();
+  }
+});
+
 test('claim 15: nothing installed reads as absent for every part, and nothing is damaged', () => {
   const f = fixture();
   try {

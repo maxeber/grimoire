@@ -134,7 +134,9 @@ one line per file and one result per part (`ok`, `skipped <why>`, `failed
 <file>`); it refuses to start when the free space on your home drive is short.
 `setup.mjs runtime verify` re-hashes every installed file; at each start the guard
 checks only that each file is there at its pinned size, and its line names
-`/incantation install`, which fetches only the parts whose pins changed. The
+`/incantation install`, which fetches only the parts whose pins changed. With a
+Phonon voice (Everly) the guard asks for Phonon in place of Kokoro, so the Kokoro
+files need not be on disk; `setup.mjs runtime install` still fetches both. The
 runtime lives under `~/.grimoire/incantation/runtime/` and nowhere else.
 
 | Part | About | Licence |

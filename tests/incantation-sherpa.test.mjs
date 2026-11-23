@@ -171,6 +171,23 @@ test('claim 16: health is false until every core part is installed with its pinn
   }
 });
 
+test('claim 16: a Phonon voice is healthy with no Kokoro on disk, and a Kokoro voice is not (issue 674)', async () => {
+  const f = fixture();
+  try {
+    const engine = (profile, exists = () => true) => makeEngine({ port: 17493, profile, home: f.home, pins: PINS, exists });
+    installFake(f.home, ['addon', 'hearing', 'detector', 'phonon']);
+    assert.equal(await engine('everly').health(), true, 'Phonon never loads Kokoro');
+    assert.equal(await engine('bella').health(), false, 'a Kokoro voice still needs the Kokoro part');
+    assert.equal(await engine('everly', () => false).health(), false, 'a Phonon voice still needs the runtime interpreter');
+    rmSync(join(runtimeDir(f.home), 'phonon'), { recursive: true });
+    assert.equal(await engine('everly').health(), false, 'a Phonon voice needs Phonon itself');
+    installFake(f.home, ['speaking']);
+    assert.equal(await engine('bella').health(), true, 'Kokoro alone serves a Kokoro voice');
+  } finally {
+    f.remove();
+  }
+});
+
 test('claim 17: the engine table holds sherpa and voicebox and nothing else', async () => {
   assert.ok(isEngine('sherpa') && isEngine('voicebox'));
   assert.ok(!isEngine('whisper') && !isEngine('__proto__') && !isEngine(undefined));
