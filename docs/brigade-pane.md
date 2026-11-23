@@ -128,7 +128,7 @@ At the foot of the Decisions view, the autonomy slider sets how far the lead
 may go on its own. At 1 Manual the lead asks you on every decision. At 2 Auto
 it decides everything but what your user-level instructions file keeps for
 you, and sends you that as to-dos while it carries on. At 3 Turbo (Turbo mode before 0.113.0), once you
-press 3 or type `/brigade level 3 <goal>` at the prompt or from your phone,
+press 3 or type `/brigade turbo <goal>` at the prompt or from your phone,
 it runs toward your goal: it checks whether the goal is met, and if not,
 continues, until it is met or you say otherwise. A press counts at once; the
 lead asks for a goal in its chat when there is none, and acts at Auto until it has one. At levels 2 and 3 the
@@ -137,10 +137,10 @@ waits for you, as a to-do; at level 3, inside the goal, nothing waits, and the l
 decides it, flagged "Owner's call:", stopped only by Claude's own guardrails and the harness. Cleanup's yes is yours in chat at levels 1 and 2, and at level 3 your user-level
 instructions file decides it; a fresh session a context
 figure prompts waits for you at level 2, and is logged and flagged at level 3.
-Only your press or your own `/brigade level 1`, `/brigade level
-2` or `/brigade level 3 <goal>` moves the level, and
+Only your press or your own `/brigade manual`, `/brigade auto [goal]`
+or `/brigade turbo <goal>` moves the level, and
 the level in force is drawn on every view (on Desktop, at the pane's foot), 3 in the warning colour; a lowering or a 2 you type also gives the lead one turn, so it reads the new level at once (a 3 does not: tell the lead yourself); a 3 the
-command set shows its goal under the slider. Each move
+command set shows its goal under the slider (an Auto goal reaches the lead through `read_autonomy` and is not drawn). Each move
 is logged as your own decision ("Owner"). The level is the last one set, held
 in the mod's memory; a stored copy in plugin state serves one job, a reload,
 and something else rewriting it changes nothing (since 0.116.0; before that,

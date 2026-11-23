@@ -997,34 +997,45 @@ const fixedOf = (raw) => {
   return r.value.log.entries[0];
 };
 
-test('C3: the grammar takes level 1, level 2 and level 3 with a goal, and refuses everything else with a fixed line', () => {
-  assert.deepEqual(parseLevelCommand('level 1'), { level: 1 });
-  assert.deepEqual(parseLevelCommand('  level   2  '), { level: 2 });
-  assert.deepEqual(parseLevelCommand('Level 3 grimoire#464 build'), { level: 3, goal: 'grimoire#464 build' });
+const MODES = '/brigade manual, /brigade auto [goal] or /brigade turbo <goal>';
+
+test('GRIM-54: the grammar takes manual, auto with an optional goal and turbo with a goal, and refuses everything else with a fixed line', () => {
+  assert.deepEqual(parseLevelCommand('manual'), { level: 1 });
+  assert.deepEqual(parseLevelCommand('  auto  '), { level: 2 });
+  assert.deepEqual(parseLevelCommand('AUTO grimoire#464 build'), { level: 2, goal: 'grimoire#464 build' });
+  assert.deepEqual(parseLevelCommand('Turbo grimoire#464 build'), { level: 3, goal: 'grimoire#464 build' });
   // The goal is cleaned as oneLine cleans: controls become spaces, hidden characters go, runs of space fold.
-  assert.deepEqual(parseLevelCommand('level 3 issue\u{0}464\n on\u{200B}e   repo'), { level: 3, goal: 'issue 464 one repo' });
-  // Not a level command: today's /brigade path.
-  for (const args of ['', '   ', 'open', 'levels 3', 'levelx', 'go level 3']) {
+  assert.deepEqual(parseLevelCommand('turbo issue\u{0}464\n on\u{200B}e   repo'), { level: 3, goal: 'issue 464 one repo' });
+  assert.deepEqual(parseLevelCommand('auto issue\u{0}464\n on\u{200B}e   repo'), { level: 2, goal: 'issue 464 one repo' });
+  // An auto whose goal cleans to nothing is a bare auto.
+  for (const args of ['auto \u{200B}\u{200C}', 'auto \u{1}\u{2}', 'auto    ']) assert.deepEqual(parseLevelCommand(args), { level: 2 }, JSON.stringify(args));
+  // Not a mode command: today's /brigade path.
+  for (const args of ['', '   ', 'open', 'automatic', 'autox goal', 'manuals', 'turbos x', 'go turbo x', 'levels 3']) {
     assert.equal(parseLevelCommand(args), undefined, args);
     assert.equal(isLevelCommand(args), false, args);
   }
-  for (const args of ['level', ' LEVEL 3 x', 'level 9']) assert.equal(isLevelCommand(args), true, args);
-  for (const bad of [undefined, null, 3, ['level 3']]) assert.equal(isLevelCommand(bad), false, String(bad));
-  for (const args of ['level', 'level 4', 'level 0', 'level three', 'level 1 now', 'level 2 issue 464', 'level -1', 'level 3x goal']) {
-    assert.deepEqual(parseLevelCommand(args), { refused: LEVEL_REPLIES.usage }, args);
+  for (const args of ['manual', ' AUTO x', 'turbo', 'level', 'level 3 x']) assert.equal(isLevelCommand(args), true, args);
+  for (const bad of [undefined, null, 3, ['turbo x']]) assert.equal(isLevelCommand(bad), false, String(bad));
+  // `level` stays no alias: every form is refused, with the NEXT line naming the three modes.
+  for (const args of ['level', 'level 1', 'level 2', 'level 3 goal', 'Level 9']) {
+    assert.deepEqual(parseLevelCommand(args), { refused: LEVEL_REPLIES.levelGone }, args);
   }
-  for (const args of ['level 3', 'level 3    ', 'level 3 \u{200B}\u{200C}', 'level 3 \u{1}\u{2}']) {
+  for (const args of ['manual now', 'manual issue 464']) assert.deepEqual(parseLevelCommand(args), { refused: LEVEL_REPLIES.usage }, args);
+  for (const args of ['turbo', 'turbo    ', 'turbo \u{200B}\u{200C}', 'turbo \u{1}\u{2}']) {
     assert.deepEqual(parseLevelCommand(args), { refused: LEVEL_REPLIES.needsGoal }, JSON.stringify(args));
   }
   // 300 characters after cleaning hold; 301 refuse, and the refusal holds none of the value.
   const g300 = 'g'.repeat(300);
-  assert.deepEqual(parseLevelCommand(`level 3 ${g300}`), { level: 3, goal: g300 });
-  assert.deepEqual(parseLevelCommand(`level 3 ${g300}h`), { refused: LEVEL_REPLIES.goalLong });
+  assert.deepEqual(parseLevelCommand(`turbo ${g300}`), { level: 3, goal: g300 });
+  assert.deepEqual(parseLevelCommand(`auto ${g300}`), { level: 2, goal: g300 });
+  assert.deepEqual(parseLevelCommand(`turbo ${g300}h`), { refused: LEVEL_REPLIES.goalLong });
+  assert.deepEqual(parseLevelCommand(`auto ${g300}h`), { refused: LEVEL_REPLIES.goalLong });
   // Astral characters count as one each, as oneLine counts them.
-  assert.deepEqual(parseLevelCommand(`level 3 ${'\u{1F600}'.repeat(300)}`), { level: 3, goal: '\u{1F600}'.repeat(300) });
+  assert.deepEqual(parseLevelCommand(`turbo ${'\u{1F600}'.repeat(300)}`), { level: 3, goal: '\u{1F600}'.repeat(300) });
   assert.equal(LEVEL_REPLIES.goalLong, 'Not set: a goal holds at most 300 characters');
-  assert.equal(LEVEL_REPLIES.needsGoal, 'Not set: a 3 needs a goal: /brigade level 3 <the goal, by repository and issue>');
-  assert.equal(LEVEL_REPLIES.usage, 'Not set: type /brigade level 1, /brigade level 2 or /brigade level 3 <goal>');
+  assert.equal(LEVEL_REPLIES.needsGoal, 'Not set: Turbo needs a goal: /brigade turbo <the goal, by repository and issue>');
+  assert.equal(LEVEL_REPLIES.usage, `Not set: that is not a mode command.\nNEXT: type ${MODES}`);
+  assert.equal(LEVEL_REPLIES.levelGone, `Not set: /brigade level is gone.\nNEXT: type ${MODES}`);
 });
 
 test("C2: the gate takes only a run the engine stamps as the owner's Enter or a Remote Control message", () => {
@@ -1034,7 +1045,7 @@ test("C2: the gate takes only a run the engine stamps as the owner's Enter or a 
     assert.equal(levelOriginAllowed({ kind, name: 'other' }), false, kind);
   }
   for (const bad of [undefined, null, 'composer', {}, [], { kind: ['composer'] }]) assert.equal(levelOriginAllowed(bad), false, JSON.stringify(bad));
-  assert.equal(LEVEL_REPLIES.notTyped, 'Not set: /brigade level counts only when the owner types it at the prompt or sends it from the phone.');
+  assert.equal(LEVEL_REPLIES.notTyped, 'Not set: /brigade manual, /brigade auto and /brigade turbo count only when the owner types them at the prompt or sends them from the phone.');
 });
 
 test('S4.1 (C4, C5, C7, C8): a 3 counts as set by the command only while its time is the press time, the level in force is 3 and no raise is in flight', () => {
@@ -1043,16 +1054,27 @@ test('S4.1 (C4, C5, C7, C8): a 3 counts as set by the command only while its tim
   assert.equal(commandHolds({ commanded: undefined, pressAt: NOW, level: 3, raising: false }), false);
   assert.equal(commandHolds({ commanded, pressAt: NOW + 1, level: 3, raising: false }), false);
   assert.equal(commandHolds({ commanded, pressAt: undefined, level: 3, raising: false }), false);
-  assert.equal(commandHolds({ commanded, pressAt: NOW, level: 2, raising: false }), false);
   assert.equal(commandHolds({ commanded, pressAt: NOW, level: 1, raising: false }), false);
   assert.equal(commandHolds({ commanded, pressAt: NOW, level: 3, raising: true }), false);
+});
+
+test("GRIM-54: an Auto goal counts as set by the command while the level in force is 2 and no raise is in flight, with no press time", () => {
+  const commanded = { at: NOW, goal: 'issue 464' };
+  assert.equal(commandHolds({ commanded, pressAt: undefined, level: 2, raising: false }), true);
+  assert.equal(commandHolds({ commanded, pressAt: NOW, level: 2, raising: false }), true);
+  assert.equal(commandHolds({ commanded: undefined, pressAt: undefined, level: 2, raising: false }), false);
+  assert.equal(commandHolds({ commanded, pressAt: undefined, level: 2, raising: true }), false);
+  assert.equal(commandHolds({ commanded, pressAt: undefined, level: 1, raising: false }), false);
 });
 
 test("C1, C15: the command's Owner entry has its own fixed shape, holds no goal, and draws as Owner only when this pane wrote it", () => {
   const e = fixedOf(commandEntry(3));
   assert.deepEqual([e.source, e.question, e.options, e.pick, e.why, e.undo, e.revisit, e.answers], [
-    'owner', 'Autonomy level', ['1 Manual', '2 Auto', '3 Turbo'], '3 Turbo', "Set by the owner's command", 'Type /brigade level 1, or move the slider', '', '',
+    'owner', 'Autonomy level', ['1 Manual', '2 Auto', '3 Turbo'], '3 Turbo', "Set by the owner's command", 'Type /brigade manual, or move the slider', '', '',
   ]);
+  // A log written before the mode names holds the old undo, read and never written.
+  for (const l of [1, 2, 3]) assert.equal(inFixedShape({ ...fixedOf(commandEntry(l)), undo: 'Type /brigade level 1, or move the slider' }), true, String(l));
+  assert.equal(inFixedShape({ ...fixedOf(ownerEntry(2)), undo: 'Type /brigade level 1, or move the slider' }), false);
   for (const l of [1, 2, 3]) assert.equal(inFixedShape(fixedOf(commandEntry(l))), true, String(l));
   assert.ok('value' in checkLog(JSON.stringify({ ...emptyLog(null), next: 2, entries: [e] })));
   assert.equal(sourceLabel(e, 'lead-a', true), 'Owner');

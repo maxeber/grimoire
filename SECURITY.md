@@ -406,7 +406,7 @@ foot of the Decisions tab. What follows from it:
 **Since 0.84.0 the owner sets the lead's autonomy level** (spec 402, ticket
 4). A slider at the foot of the Decisions tab has three stops, 1 Manual, 2
 Auto and 3 Turbo (Turbo mode before 0.113.0), and only the owner sets
-a level above 1: by a press on it or, since 0.99.0, by the level command. **A
+a level above 1: by a press on it or, since 0.99.0, by a mode command. **A
 level 3 lets the lead merge pull requests, post, waive reviews and settle
 security findings toward the goal without a per-act word from the owner**,
 as far as the owner's user-level instructions file allows (since head-chef
@@ -424,8 +424,8 @@ trust and keeps its own checkout and origin checks. The command now opens the pa
 as any unknown arguments do, and the mod clears an old `startFolders` key once at
 load, only when one is present. Rows are in the [row 15 section](docs/security/brigade.md#row-15).
 
-**Since 0.99.0 (issue 464) the owner can type `/brigade level 1`, `/brigade
-level 2` or `/brigade level 3 <goal>`** at the prompt or from the phone over
+**Since 0.99.0 (issue 464; renamed in GRIM-54) the owner can type `/brigade manual`, `/brigade
+auto [goal]` or `/brigade turbo <goal>`** at the prompt or from the phone over
 Remote Control. The mod acts on it only when the engine stamps the run as the
 owner's Enter or a Remote Control message, so a run the engine stamps as
 anything else sets nothing. Whether another plugin, or the model itself, can run
@@ -452,10 +452,10 @@ private work, a merge that changes the threat model's scope or accepted classes,
 and an edit to its scope, its naming line, or an accepted class that widens the level-3 leave. The control is the
 log and the flag, which the owner reviews after the fact; the log rests on
 the decision files, whose planting by another plugin is still an open
-issue of the threat model. A 3 it sets carries its goal, which is
+issue of the threat model. A 3 it sets, or a 2 with a goal, carries its goal, which is
 cleaned, held to 300 characters and not screened for
 secrets; both sit in the module's memory, never in plugin state, and a
-compaction keeps them. Any slider press, another level command, a
+compaction keeps them. Any slider press, another mode command, a
 reload, a clear or a resume the engine reports, or a read under another
 session id ends it. The
 mod offers a fifth tool, `read_autonomy`, wherever it offers `set_roster`:
@@ -499,7 +499,7 @@ The pane draws the level in force on every tab, level 3 in the warning colour,
 and since 0.88.0 the band above the lead's prompt draws a 3 in force, with its
 press time and a Dismiss, on the terminal and Desktop only. What follows from it:
 - **What the log reveals:** each entry's level, and the times of the owner's
-  slider moves and level commands, and of the reloads, which show roughly when
+  slider moves and mode commands, and of the reloads, which show roughly when
   the owner let the lead run alone. Owner, Pane and alarm entries never drop.
 - **Who can move it:** another plugin can read `autonomy`, and so learn when
   the owner let the lead run alone, and can press the slider, and so raise the
@@ -513,7 +513,7 @@ press time and a Dismiss, on the terminal and Desktop only. What follows from it
   instructions file, and its answer for a pressed 3 says the lead acts at 3
   toward the goal in the owner's words in the chat. Since 0.99.0 a plugin that
   hooks command runs, and possibly one that hooks prompt submits, can turn a
-  `/brigade` the owner types into a level command with a goal of its own,
+  `/brigade` the owner types into a mode command with a goal of its own,
   which lasts through compactions. The slider box and the band show a command 3
   as it landed; the command's reply is no check, since a plugin that rewrote
   the command can rewrite its reply too.
@@ -522,7 +522,7 @@ press time and a Dismiss, on the terminal and Desktop only. What follows from it
   transcript, and `read_autonomy`'s names a 3's press time, where they stay
   after the log is deleted. Since 0.88.0 the band above the lead's prompt
   draws a 3 and its press time in the tree that other plugins' band hooks see.
-  Since 0.99.0 a 3 the level command set carries its goal, the owner's own
+  Since 0.99.0 a goal the mode command set (a 3's; an Auto's too, since GRIM-54) is the owner's own
   unscreened text: other plugins' prompt and command hooks see it as typed;
   `read_autonomy`'s answers and the command's reply put it in the transcript,
   again after each compaction; and the slider box draws it on every surface,
@@ -587,7 +587,7 @@ folder (since head-chef 1.0.0 no longer each turn): only digit-named `.json` fil
 The pane's own read of those files, with its stronger checks, is above. head-chef runs no script of its own. What leaves the session:
 sessions post their own milestone content, signed, on records that may be
 public, and the owner's own process, not the skill, sets what they post; on
-the owner's own words in its chat, or at a level 3, a press or the level command, toward the owner's goal and as the owner's user-level instructions file allows, or at levels 2 and 3 as that file allows, the head chef merges, closes, edits,
+the owner's own words in its chat, or at a level 3, a press or the turbo command, toward the owner's goal and as the owner's user-level instructions file allows, or at levels 2 and 3 as that file allows, the head chef merges, closes, edits,
 deletes or labels a record, files an issue or posts a comment, and at levels 2 and 3 each such post it makes on its own pick opens with a fixed line naming it so (issue 438, proposed); the head
 chef's own questions and decisions go by message only; and Remote Control,
 while it is on,

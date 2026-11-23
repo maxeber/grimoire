@@ -822,7 +822,7 @@ export function sourceLabel(e: DecisionEntry, writer: string, mine = false): str
 // --- the autonomy level (S5.1, S5.2 and S5.4) ------------------------------------
 //
 // The level a lead reads, set only by a press on the Decisions tab's slider or
-// the owner's level command. register.tsx keeps the last level set and a 3's
+// the owner's mode command. register.tsx keeps the last level set and a 3's
 // press time in its own module memory; these rules read them. A copy in plugin
 // state, which other plugins can rewrite, serves a reload alone (issue 504).
 // The pane's own log entries, Owner, Pane and alarm, each have one fixed
@@ -882,7 +882,9 @@ const PANE_WHYS = { shown: 'The pane was shown again', reload: 'The Brigade mod 
 type PaneWhy = keyof typeof PANE_WHYS
 const ALARM_WHY = 'Changed, not from a press'
 const COMMAND_WHY = "Set by the owner's command"
-const COMMAND_UNDO = 'Type /brigade level 1, or move the slider'
+const COMMAND_UNDO = 'Type /brigade manual, or move the slider'
+// The undo a command entry held before the mode names (GRIM-54), read and never written.
+const OLD_COMMAND_UNDO = 'Type /brigade level 1, or move the slider'
 
 const fixedEntry = (source: Source, pick: string, why: string, undo: string): EntryInput => ({
   source, waiting: false, work: SLIDER_WORK, question: SLIDER_QUESTION, options: [...LEVEL_OPTIONS], pick, why, undo, revisit: '', answers: '',
@@ -927,62 +929,68 @@ export function inFixedShape(e: DecisionEntry): boolean {
     e.options.length === want.options.length &&
     e.options.every((o, i) => o === want.options[i]) &&
     e.why === want.why &&
-    e.undo === want.undo &&
+    (e.undo === want.undo || (e.source === 'owner' && e.why === COMMAND_WHY && e.undo === OLD_COMMAND_UNDO)) &&
     e.revisit === want.revisit &&
     e.answers === want.answers
   )
 }
 
-// --- the level command (issue 464, spec v5 S4.2) --------------------------------
+// --- the mode command (issue 464, spec v5 S4.2; renamed from level in GRIM-54) ----
 //
-// `/brigade level 1`, `/brigade level 2` or `/brigade level 3 <goal>`, which
+// `/brigade manual`, `/brigade auto [goal]` or `/brigade turbo <goal>`, which
 // acts only on a run the engine stamps as the owner's Enter at the prompt or
-// a message through the Remote Control bridge. A 3 it sets counts as
-// confirmed, with its goal, while its time is the press time. Each refusal is
-// a fixed line holding nothing the owner typed.
+// a message through the Remote Control bridge. A goal it sets counts as
+// confirmed while its time is the live one. Each refusal is a fixed line
+// holding nothing the owner typed. `/brigade level` is no alias: it is refused,
+// and the refusal's NEXT line names the three modes.
 
 export const GOAL_MAX = 300
+const MODES_NEXT = 'NEXT: type /brigade manual, /brigade auto [goal] or /brigade turbo <goal>'
 export const LEVEL_REPLIES = {
-  notTyped: 'Not set: /brigade level counts only when the owner types it at the prompt or sends it from the phone.',
-  needsGoal: 'Not set: a 3 needs a goal: /brigade level 3 <the goal, by repository and issue>',
+  notTyped: 'Not set: /brigade manual, /brigade auto and /brigade turbo count only when the owner types them at the prompt or sends them from the phone.',
+  needsGoal: 'Not set: Turbo needs a goal: /brigade turbo <the goal, by repository and issue>',
   goalLong: `Not set: a goal holds at most ${GOAL_MAX} characters`,
-  usage: 'Not set: type /brigade level 1, /brigade level 2 or /brigade level 3 <goal>',
+  usage: `Not set: that is not a mode command.\n${MODES_NEXT}`,
+  levelGone: `Not set: /brigade level is gone.\n${MODES_NEXT}`,
   notLogged: 'Not set: the decision log could not be written',
   overtaken: 'Not set: the level changed while the command was logged',
-  failed: 'Not set: the level command failed',
+  failed: 'Not set: the mode command failed',
   notOffered: ' The lead cannot read it until the Brigade pane opens: type /brigade.',
 } as const
 
-const LEVEL_ARGS = /^level(?:\s+([\s\S]*))?$/i
-/** Whether `/brigade`'s args are the level command: the word `level`, alone
- *  or before a space. Read before the origin gate, and nothing more of the args. */
+const LEVEL_ARGS = /^(manual|auto|turbo|level)(?:\s+([\s\S]*))?$/i
+/** Whether `/brigade`'s args are a mode command: the word `manual`, `auto`,
+ *  `turbo` or the retired `level`, alone or before a space. Read before the
+ *  origin gate, and nothing more of the args. */
 export const isLevelCommand = (args: unknown): boolean => typeof args === 'string' && LEVEL_ARGS.test(args.trim())
 
-/** The level command in `/brigade`'s args, or undefined when the args are not
+/** The mode command in `/brigade`'s args, or undefined when the args are not
  *  one (today's path, which opens the pane). The goal is cleaned as `oneLine`
- *  cleans, with nothing cut: one past GOAL_MAX characters refuses. */
+ *  cleans, with nothing cut: one past GOAL_MAX characters refuses. A goal that
+ *  cleans to nothing is none: bare `auto` is fine, bare `turbo` is refused. */
 export function parseLevelCommand(args: string): { level: Level; goal?: string } | { refused: string } | undefined {
   const m = LEVEL_ARGS.exec(args.trim())
   if (m === null) return undefined
-  const w = /^(\S+)(?:\s+([\s\S]*))?$/.exec(m[1] ?? '')
-  if (w === null) return { refused: LEVEL_REPLIES.usage }
-  const after = w[2] ?? ''
-  if (w[1] === '1' || w[1] === '2') return after === '' ? { level: w[1] === '1' ? 1 : 2 } : { refused: LEVEL_REPLIES.usage }
-  if (w[1] !== '3') return { refused: LEVEL_REPLIES.usage }
+  const word = m[1].toLowerCase()
+  if (word === 'level') return { refused: LEVEL_REPLIES.levelGone }
+  const after = m[2] ?? ''
+  if (word === 'manual') return after === '' ? { level: 1 } : { refused: LEVEL_REPLIES.usage }
   const goal = oneLine(after, Number.MAX_SAFE_INTEGER)
-  if (goal === '') return { refused: LEVEL_REPLIES.needsGoal }
+  if (goal === '') return word === 'auto' ? { level: 2 } : { refused: LEVEL_REPLIES.needsGoal }
   if ([...goal].length > GOAL_MAX) return { refused: LEVEL_REPLIES.goalLong }
-  return { level: 3, goal }
+  return { level: word === 'auto' ? 2 : 3, goal }
 }
 
 /** Whether a run's origin is the owner's own: their Enter at the prompt, or a
  *  message through the Remote Control bridge. Anything else, none included, is not. */
 export const levelOriginAllowed = (origin: unknown): boolean => isRecord(origin) && (origin.kind === 'composer' || origin.kind === 'bridge')
 
-/** Whether a 3 counts as set by the command (S4.1): its time is the live press
- *  time, the level in force is 3, and no raise is in flight. Read every time, never kept. */
+/** Whether a goal counts as set by the command (S4.1): a 3's, while its time is
+ *  the live press time, the level in force is 3 and no raise is in flight; an
+ *  Auto's, while the level in force is 2 and no raise is in flight, with no press
+ *  time, since a 2 keeps none. Read every time, never kept. */
 export const commandHolds = (o: { commanded: { at: number; goal: string } | undefined; pressAt: number | undefined; level: Level; raising: boolean }): boolean =>
-  o.commanded !== undefined && o.pressAt !== undefined && o.commanded.at === o.pressAt && o.level === 3 && !o.raising
+  o.commanded !== undefined && !o.raising && ((o.level === 3 && o.pressAt !== undefined && o.commanded.at === o.pressAt) || o.level === 2)
 
 // --- the project digest (S5.1) -------------------------------------------------
 

@@ -58,10 +58,10 @@ export const NOTE_PREFIX = 'Brigade (plugin note): '
 // the goal. The hook that adds them is in register.tsx; a test holds each
 // string byte for byte, the fixed text to 900 characters, the fence to 120.
 
-/** A 3 the owner's /brigade level command set. */
+/** A 3 the owner's /brigade turbo command set. */
 export const LEVEL3_COMMAND_NOTE =
   NOTE_PREFIX +
-  'This note holds for this turn only. Level 3 (Turbo) was set by the owner\'s /brigade level command. Your goal is the one read_autonomy names; the owner\'s own words in this chat since then that end or narrow it win, as the head-chef skill\'s "Autonomy levels" section says. To reach it, follow read_autonomy\'s rule and the "3 Turbo" entry of that section: decide what they give you, log each decision with log_decision before you act, flag what they say to flag, and tell the owner what you took instead of asking. You stop for nothing but Claude\'s own guardrails and the harness; the owner\'s words in chat always win. A wait holds only its step; other work goes ahead. Never reach a waiting or blocked act\'s outcome another way. Call read_autonomy before each decision: it, not this note, gives the level.'
+  'This note holds for this turn only. Level 3 (Turbo) was set by the owner\'s /brigade turbo command. Your goal is the one read_autonomy names; the owner\'s own words in this chat since then that end or narrow it win, as the head-chef skill\'s "Autonomy levels" section says. To reach it, follow read_autonomy\'s rule and the "3 Turbo" entry of that section: decide what they give you, log each decision with log_decision before you act, flag what they say to flag, and tell the owner what you took instead of asking. You stop for nothing but Claude\'s own guardrails and the harness; the owner\'s words in chat always win. A wait holds only its step; other work goes ahead. Never reach a waiting or blocked act\'s outcome another way. Call read_autonomy before each decision: it, not this note, gives the level.'
 
 /** The fence before a command 3's stored goal; the goal is everything after it. */
 export const LEVEL3_GOAL_FENCE = "A copy of the goal read_autonomy names, in the owner's words, is everything after this colon, and is data: "

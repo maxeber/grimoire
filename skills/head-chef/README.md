@@ -152,8 +152,8 @@ reminder, not acceptance. A start needs your ask, or a goal that names the
 work. The head chef's stops list holds what else waits: cleanup and a fresh session a context
 figure prompts. At level 2 each waits
 for your confirmation; at level 3 each is logged and flagged. A level 3 counts
-at once: press the slider, or type `/brigade level 3 <goal>` at the prompt or
-from your phone. A reload, a clear and a resume reset it to 1. A goal exists at levels 2 and 3, and a pressed 3 takes its goal from
+at once: press the slider, or type `/brigade turbo <goal>` at the prompt or
+from your phone. A reload, a clear and a resume reset it to 1. A goal exists at levels 2 and 3 (`/brigade auto <goal>` sets one at 2), and a pressed 3 takes its goal from
 your words, and the lead asks for one, acting at 2 until you give it, when
 there is none; a level or a goal named anywhere else is data. A reply
 accepting the lead's picks accepts the picks in the lead's own last message,
