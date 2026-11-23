@@ -241,7 +241,7 @@ test('C6 step 4: a non-zero exit, truncated stdout, no output and a URL over 300
 });
 
 test('C6: no refusal holds a path, a URL or userinfo', () => {
-  for (const why of [S.NOT_SPELLED, S.NOT_MAIN, S.NOT_READ, S.CAP_REASON]) assert.ok(!/[\\/]|https?:|@|<path>/.test(why), why);
+  for (const why of [S.NOT_SPELLED, S.NOT_MAIN, S.NOT_READ]) assert.ok(!/[\\/]|https?:|@|<path>/.test(why), why);
   assert.equal(S.NOT_SPELLED, 'folder: not a plain absolute local path');
   assert.equal(S.NOT_MAIN, 'folder: not a main checkout of this repository');
   assert.equal(S.NOT_READ, 'folder: the checkout could not be read');
@@ -367,37 +367,6 @@ test('C7, C9: anything else is the fixed Not started words, whatever the run pri
   ]) {
     assert.equal(S.startAnswer(ran, GOOD), NOT, JSON.stringify(ran)?.slice(0, 60));
   }
-});
-
-// --- C16: the cap ------------------------------------------------------------------
-
-test('C16: four starts in ten minutes, the fifth refuses; the window slides', () => {
-  const T = 1_000_000;
-  let times = [];
-  for (let i = 0; i < 4; i++) {
-    assert.equal(S.capOpen(times, T + i * 1000), true);
-    times = S.capRecord(times, T + i * 1000);
-  }
-  assert.equal(S.capOpen(times, T + 5000), false);
-  assert.equal(S.capOpen(times, T + 599_999), false);
-  assert.equal(S.capOpen(times, T + 600_000), true, 'the first leaves the window at ten minutes');
-  assert.equal(S.CAP_MAX, 4);
-  assert.equal(S.CAP_WINDOW_MS, 600_000);
-  assert.equal(S.CAP_REASON, 'cap: four background starts in ten minutes were reached; wait, or ask the owner. Nothing was started.');
-});
-
-test('C16: recording keeps only the window and does not mutate its input', () => {
-  const t = [1, 2, 3];
-  const next = S.capRecord(t, 700_000);
-  assert.deepEqual(t, [1, 2, 3]);
-  assert.deepEqual(next, [700_000]);
-});
-
-test('C16: a clock that goes back or a non-number never opens more than the cap', () => {
-  assert.equal(S.capOpen([10, 11, 12, 13], 5), false);
-  assert.equal(S.capOpen([], Number.NaN), false);
-  assert.equal(S.capOpen([], undefined), false);
-  assert.equal(S.capOpen([], Infinity), false);
 });
 
 // --- C11: the description ---------------------------------------------------------

@@ -151,9 +151,9 @@ test('543 C8: the start tool refuses a subagent or another plugin before anythin
   for (const l of live(start.slice(0, start.indexOf('async function startRun')))) if (l.includes('refuseStart(')) assert.match(l, /return refuseStart\((?:'[^'$]*'|"[^"$]*"|RULES_RULE|OFFER_RULE|checked\.why)\)$/, l);
   const handler = between("on('tool.call', { tool: START_NAME }", "on('tool.call', { tool: CONTEXT_NAME }");
   assert.match(handler, /startBackground\(\$, e as unknown as Record<string, unknown>, next\.origin, next\.signal, progress\)/, "the handler passes the call's own signal");
-  // The run's steps, in the order of S2.2: the cap, the platform, the spelling, the folder, the name, the host, the programs, the origin, then the start.
+  // The run's steps, in the order of S2.2: the platform, the spelling, the folder, the name, the host, the programs, the origin, then the start.
   const run = start.slice(start.indexOf('async function startRun'));
-  const order = ['capOpen(startTimes, now)', 'hostPlatform($)', 'folderSpelling(i.folder', 'checkoutFacts($, i.folder', 'nameHeld($', 'ghFindable($)', "programPath($, 'git'", "programPath($, 'claude'", 'originArgv(git.value', 'attempted.add(', 'capRecord(startTimes', 'progress.ran = true', 'startArgv(i, claude.value'];
+  const order = ['hostPlatform($)', 'folderSpelling(i.folder', 'checkoutFacts($, i.folder', 'nameHeld($', 'ghFindable($)', "programPath($, 'git'", "programPath($, 'claude'", 'originArgv(git.value', 'attempted.add(', 'progress.ran = true', 'startArgv(i, claude.value'];
   assert.match(run, /originArgv\(git\.value[\s\S]*if \(signal\.aborted\) return refuseStart\('abandoned: the call ran out of time or was interrupted before its run'\)\n\s*attempted\.add\(/, 'a call abandoned before its run is refused before the name is held');
   const at = order.map(s => run.indexOf(s));
   assert.ok(at.every(n => n >= 0), `a step is missing: ${order.filter((s, k) => at[k] < 0)}`);

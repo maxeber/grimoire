@@ -1,6 +1,6 @@
 # Contract: head-chef
 
-Version: 2.8.0
+Version: 2.9.0
 Kind: skill
 Level: Thorough
 
@@ -1028,8 +1028,8 @@ A start whose route the owner's words did not name is a background session with 
 2. **Name the session yourself,** as "Names" below says. You send to it by
    this name.
 3. **Settle what the tool cannot know.** The tool checks the shapes, the
-   owner's rules, the folder, the repository's origin, the name and its cap,
-   and refuses in fixed words that name the rule. It cannot know the three
+   owner's rules, the folder, the repository's origin and the name, and
+   refuses in fixed words that name the rule. It cannot know the three
    points below, so settle them before you call it, and start nothing until
    each holds:
    - the owner asked for this work, in any form and anywhere, or a goal
@@ -1135,8 +1135,7 @@ Home: `references/starting.md`, the section "When a start is refused". Carries o
   A folder that is not a plain absolute local path, not a main checkout, or
   could not be read: say so in one line. The pane closed or the tool
   not offered: the owner types `/brigade`. A name already used: pick another.
-  The cap of four starts in ten minutes: wait or ask the owner. The lead name:
-  it is your own session name, exactly. Offer the Desktop start as the other
+  The lead name: it is your own session name, exactly. Offer the Desktop start as the other
   route: a click in the desktop app, or the owner's words naming it. Start it
   that way only on those words. Retry the start in no other form, never type
   `claude --bg`, and start nothing by another route.

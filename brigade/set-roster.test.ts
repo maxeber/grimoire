@@ -22,7 +22,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { RECORDED } from './recorded-stats.ts'
-import { CAP_REASON, DESCRIPTION as START_DESCRIPTION, NAME_REASONS, NOT_MAIN, NOT_READ, NOT_SPELLED, NOT_STARTED } from './start.ts'
+import { DESCRIPTION as START_DESCRIPTION, NAME_REASONS, NOT_MAIN, NOT_READ, NOT_SPELLED, NOT_STARTED } from './start.ts'
 import { ASK_FORM, ASK_NO_STOP, ASK_TYPES, STOP_KINDS, sha256Hex } from './decisions.ts'
 import { LEVEL3_COMMAND_NOTE, LEVEL3_ENDED_NOTE, LEVEL3_GOAL_FENCE, commandNote, LEVEL3_PRESSED_NOTE } from './reminder.ts'
 
@@ -10243,20 +10243,19 @@ test('578 C3: each note refusal answers in fixed words, never quotes the note, a
   expect(runs()).toEqual([])
 })
 
-test('578 C7: rule 5 refuses a note naming a live session or a card title, passes the new member\'s and the lead\'s own names, and a refusal keeps neither the name nor the cap', async ($, on) => {
+test('578 C7: rule 5 refuses a note naming a live session or a card title, passes the new member\'s and the lead\'s own names, and a refusal does not hold the name', async ($, on) => {
   const { w, runs } = await startWorld(on, $)
   const claudes = () => runs().filter(a => a[0] === exe('claude')).length
   const named = refusedStart('note: names a session or a card')
   expect((await call($, { cards: [card('Build the start')], todos: [] })).ok).toBe(true)
   liveRows(w, [{ name: LEAD_NAME, status: 'idle', sessionId: SID, cwd: 'C:\\work' }, { name: 'grimoire-601', status: 'idle', sessionId: '99999999-8888-7777-6666-555555555555', cwd: 'C:\\work' }])
-  // Five refusals leave the cap whole and the name unheld: four starts then still go.
+  // Five refusals leave the name unheld: it then still starts.
   for (const note of ['Work with grimoire 601 here.', 'Work with GRIMOIRE 601 here.', 'Go with build the start here.', 'Go with Grimoire-601; now.', 'Use (grimoire-601) here.']) {
     expect((await startTool($, { note })).text).toBe(named)
   }
   expect(claudes()).toBe(0)
   expect((await startTool($, { note: 'Work with delta and head chef here.' })).ok).toBe(true)
-  for (const name of ['a2', 'a3', 'a4']) expect((await startTool($, { name })).ok).toBe(true)
-  expect(claudes()).toBe(4)
+  expect(claudes()).toBe(1)
 })
 
 test('543 C5/C13: two concurrent calls with one name start one, and set_roster answers while a start is pending', async ($, on) => {
@@ -10289,12 +10288,9 @@ test('543 C9: a start that exits non-zero, prints no id, is cut short or rejects
     expect(r.text).toBe(NOT_STARTED)
     expect(r.text).not.toContain('secret')
     expect(claudes()).toBe(cases.findIndex(c => c[1] === name) + 1)
-    // A name whose run failed stays held: a retry refuses and runs nothing. (The fourth attempt
-    // would meet the cap first, which is checked before the name.)
-    if (name !== 'four') {
-      expect((await startTool($, { name })).text).toBe(refusedStart(NAME_REASONS.attempted))
-      expect(claudes()).toBe(cases.findIndex(c => c[1] === name) + 1)
-    }
+    // A name whose run failed stays held: a retry refuses and runs nothing.
+    expect((await startTool($, { name })).text).toBe(refusedStart(NAME_REASONS.attempted))
+    expect(claudes()).toBe(cases.findIndex(c => c[1] === name) + 1)
   }
 })
 
@@ -10308,20 +10304,14 @@ test('543 C9: a start whose run rejects answers Not started, with nothing from t
   expect(runs().filter(a => a[0] === exe('claude')).length).toBe(1)
 })
 
-test('543 C16: the fifth start inside ten minutes refuses; a failed start counts; a refused call does not; the window moves on', async ($, on) => {
-  const { w, out, runs } = await startWorld(on, $)
+test('GRIM-47: no cap on starts: six inside a minute, a failed one among them, all reach the run', async ($, on) => {
+  const { out, runs } = await startWorld(on, $)
   const claudes = () => runs().filter(a => a[0] === exe('claude')).length
-  expect((await startTool($, { effort: 'turbo' })).ok).toBe(false)
   out.start = () => ({ exitCode: 1, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false })
   expect((await startTool($, { name: 'a1' })).text).toBe(NOT_STARTED)
   out.start = argv => asRun(`backgrounded · ab12cd34 · ${argv[3]}\n`)
-  for (const name of ['a2', 'a3', 'a4']) expect((await startTool($, { name })).ok).toBe(true)
-  expect(claudes()).toBe(4)
-  expect((await startTool($, { name: 'a5' })).text).toBe(`start_background_session refused: ${CAP_REASON}`)
-  expect(claudes()).toBe(4)
-  await w.clock.advance(10 * 60 * 1000 + 1)
-  expect((await startTool($, { name: 'a5' })).ok).toBe(true)
-  expect(claudes()).toBe(5)
+  for (const name of ['a2', 'a3', 'a4', 'a5', 'a6']) expect((await startTool($, { name })).ok).toBe(true)
+  expect(claudes()).toBe(6)
 })
 
 test('543 C10: the tool writes no file, no store key and no roster, and a start leaves the roster reminder owing', async ($, on) => {

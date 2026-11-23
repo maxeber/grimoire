@@ -66,15 +66,12 @@ import {
 import { ENVELOPE as STOP_ENVELOPE, fromEngine, stopAnswer, stopTarget } from './stop.ts'
 import { CHANGED as QUICK_CHANGED, DRAFT as QUICK_DRAFT, FILL_FAILED as QUICK_FILL_FAILED, boxIsBlank, quickAction, quickDigest, quickPress, quickSurface } from './quick.ts'
 import {
-  CAP_REASON,
   DESCRIPTION as START_DESCRIPTION,
   NOT_MAIN,
   NOT_READ,
   NOT_STARTED,
   ORIGIN_TIMEOUT_MS,
   START_TIMEOUT_MS,
-  capOpen,
-  capRecord,
   checkInputs,
   folderSpelling,
   mainCheckout,
@@ -2873,10 +2870,9 @@ const refuseStart = (rule: string) => ({
   deny: `start_background_session refused: ${rule}${rule.endsWith('Nothing was started.') ? '' : '. Nothing was started.'}`,
 })
 
-// The names this load tried to start, lower case, and the times its runs
-// began. Module memory only: nothing else is kept, and a reload starts both over.
+// The names this load tried to start, lower case. Module memory only: nothing
+// else is kept, and a reload starts it over.
 const attempted = new Set<string>()
-let startTimes: number[] = []
 let starting: Promise<unknown> = Promise.resolve()
 function startTurn<T>(work: () => Promise<T>): Promise<T> {
   const run = starting.then(work, work)
@@ -3007,17 +3003,14 @@ async function startBackground($: EngineInterface, e: Record<string, unknown>, o
 }
 
 async function startRun($: EngineInterface, i: StartInputs, sessions: Awaited<ReturnType<typeof readSessions>>, signal: AbortSignal, progress: { ran: boolean }) {
-  // (1) the cap
-  const now = await $.clock.now()
-  if (!capOpen(startTimes, now)) return { deny: `start_background_session refused: ${CAP_REASON}` }
-  // (2) the host's platform and the folder's spelling: strings only, no file system.
+  // (1) the host's platform and the folder's spelling: strings only, no file system.
   const platform = await hostPlatform($)
   const spelled = folderSpelling(i.folder, platform)
   if ('why' in spelled) return refuseStart(spelled.why)
-  // (3) the first reads under the folder
+  // (2) the first reads under the folder
   const facts = await checkoutFacts($, i.folder, platform)
   if ('reply' in facts) return refuseStart(facts.reply === 'unreadable' ? NOT_READ : NOT_MAIN)
-  // (4) the name is fresh
+  // (3) the name is fresh
   const { cards } = await read($, roster)
   const held = await nameHeld($, i.folder, i.name, platform)
   const fresh = nameFresh(i.name, {
@@ -3029,26 +3022,25 @@ async function startRun($: EngineInterface, i: StartInputs, sessions: Awaited<Re
     sessionsComplete: sessions !== undefined && sessions.complete && !sessions.fileGone,
   })
   if ('why' in fresh) return refuseStart(fresh.why)
-  // (4b) a note names no live session and no card (issue 578, rule 5); the lists are the ones read above, before any state is kept
+  // (3b) a note names no live session and no card (issue 578, rule 5); the lists are the ones read above, before any state is kept
   if (i.note !== undefined) {
     const named = noteNames(i.note, [...cards.map(c => c.title), ...(sessions?.rows.map(r => r.name) ?? [])], [i.name, i.lead])
     if ('why' in named) return refuseStart(named.why)
   }
-  // (5) the pane's host and PATH rule
+  // (4) the pane's host and PATH rule
   if (!(await ghFindable($))) return refuseStart('host: the host or its PATH could not be trusted to look programs up')
-  // (6) the programs, by absolute path
+  // (5) the programs, by absolute path
   const git = await programPath($, 'git', platform, i.folder)
   if ('why' in git) return refuseStart(git.why)
   const claude = await programPath($, 'claude', platform, i.folder)
   if ('why' in claude) return refuseStart(claude.why)
-  // (7) the origin read and its match: git keeps -C and takes no working folder
+  // (6) the origin read and its match: git keeps -C and takes no working folder
   const origin = await $.process.run(originArgv(git.value, i.folder), { timeoutMs: ORIGIN_TIMEOUT_MS }).catch(() => undefined)
   const matched = originMatch(origin, i.repository)
   if ('why' in matched) return refuseStart(matched.why)
-  // (8) the start: held against a second try and counted before it runs, whatever it answers
+  // (7) the start: held against a second try before it runs, whatever it answers
   if (signal.aborted) return refuseStart('abandoned: the call ran out of time or was interrupted before its run')
   attempted.add(i.name.toLowerCase())
-  startTimes = capRecord(startTimes, now)
   progress.ran = true
   const ran = await $.process.run(startArgv(i, claude.value), { cwd: i.folder, timeoutMs: START_TIMEOUT_MS }).catch(() => undefined)
   return { result: startAnswer(ran, i, platform) }

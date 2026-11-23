@@ -25,10 +25,6 @@ export const NOT_READ = 'folder: the checkout could not be read'
 export const NOT_STARTED =
   'Not started: claude did not run, did not exit 0, or printed no job id. It may have started: tell the owner, who can check `claude agents`, and retry nothing.'
 
-export const CAP_MAX = 4
-export const CAP_WINDOW_MS = 10 * 60 * 1000
-export const CAP_REASON = 'cap: four background starts in ten minutes were reached; wait, or ask the owner. Nothing was started.'
-
 export const ORIGIN_TIMEOUT_MS = 15000
 export const START_TIMEOUT_MS = 60000
 
@@ -344,18 +340,4 @@ export function startAnswer(ran: unknown, input: Inputs, platform: Platform = 'w
   const m = /^backgrounded · ([0-9a-f]{8}) · (.+)$/.exec(lines[0])
   if (m === null || m[2] !== input.name) return NOT_STARTED
   return `Started ${input.name}: job ${m[1]}. Folder: ${worktreeFolder(input.folder, input.name, platform)}. Branch: ${worktreeBranch(input.name)}. Write its card with set_roster; the tool wrote none.`
-}
-
-// --- the cap (S2.5) ----------------------------------------------------------------------------
-
-/** Whether another start may reach the run: fewer than four inside ten minutes.
- *  A clock that is not a number opens nothing. */
-export function capOpen(times: readonly number[], now: number): boolean {
-  if (typeof now !== 'number' || !Number.isFinite(now)) return false
-  return times.filter(t => now - t < CAP_WINDOW_MS).length < CAP_MAX
-}
-
-/** The times after a start reached the run: the window's, and this one. */
-export function capRecord(times: readonly number[], now: number): number[] {
-  return [...times.filter(t => now - t < CAP_WINDOW_MS), now]
 }
