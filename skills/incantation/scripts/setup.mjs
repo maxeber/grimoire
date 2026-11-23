@@ -5,18 +5,18 @@
 //   node setup.mjs devices                              the stamp and each microphone, by index
 //   node setup.mjs profiles                             Voicebox's profiles, by id
 //   node setup.mjs choose <index> <stamp> <profile id>  checks all three, pins ffmpeg, writes the settings
-//   node setup.mjs runtime plan | install | verify     the speech runtime (docs/spec/0001, S5.9)
+//   node setup.mjs runtime plan | install [engine] | verify   the speech runtime (docs/spec/0001, S5.9)
 
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
-import { findUv, installRuntime, planRuntime, verifyRuntime } from './runtime/install.mjs';
+import { findUv, installRuntime, OMITTED, planRuntime, verifyRuntime } from './runtime/install.mjs';
 import { listDevices, listingLines, resolveRecorder, stampOf } from './capture/ffmpeg.mjs';
 import { loadEngine } from './engines/index.mjs';
 import { SETTINGS_DEFAULTS, SETTINGS_KEYS, cleanText, deviceDigest, ensureKey, runDir, secureState, settingsPath, writePrivate } from './lib.mjs';
 
 export const LINES = {
-  usage: 'usage: setup.mjs devices | profiles | choose <index> <stamp> <profile id> | runtime plan | install | verify',
+  usage: 'usage: setup.mjs devices | profiles | choose <index> <stamp> <profile id> | runtime plan [kokoro | phonon] | install [kokoro | phonon] | verify',
   recorder: 'setup: ffmpeg was not found in a trusted folder on PATH. See README step 1.',
   devices: 'setup: ffmpeg listed no microphone. See README step 4.',
   stale: 'setup: the microphone list changed since you listed it. Run setup.mjs devices again.',
@@ -42,17 +42,21 @@ const runUv = (file, args, { cwd, env }) =>
     ),
   );
 
-// `setup.mjs runtime plan | install | verify` (S5.9). plan and verify print
+// `setup.mjs runtime plan | install [kokoro | phonon] | verify` (S5.9). The engine
+// leaves out the speaking part the other one alone needs; with none, every part is
+// planned and fetched. plan and verify print
 // their lines at once; install prints a line per file and per part through
 // `o.log` as it goes (it runs as a background command) and returns none of its
 // own then.
 async function runtimeCommand(args, o, platform) {
   const arch = o.arch ?? process.arch;
-  if (args.length !== 1 || !['plan', 'install', 'verify'].includes(args[0])) return { lines: [LINES.usage], code: 2 };
+  if (!['plan', 'install', 'verify'].includes(args[0]) || args.length > (args[0] === 'verify' ? 1 : 2)) return { lines: [LINES.usage], code: 2 };
+  const engine = args[1];
+  if (engine !== undefined && !Object.hasOwn(OMITTED, engine)) return { lines: [LINES.usage], code: 2 };
   if (args[0] === 'verify') return verifyRuntime({ home: o.home, platform, arch });
   const find = () => findUv({ platform, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs });
-  if (args[0] === 'plan') return { lines: planRuntime({ home: o.home, platform, arch, uv: find() }).lines, code: 0 };
-  const done = await installRuntime({ home: o.home, platform, arch, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs, env: o.env ?? process.env, runUv: o.runUv ?? runUv, transport: o.transport, free: o.free, log: o.log });
+  if (args[0] === 'plan') return { lines: planRuntime({ home: o.home, platform, arch, uv: find(), engine }).lines, code: 0 };
+  const done = await installRuntime({ home: o.home, platform, arch, engine, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs, env: o.env ?? process.env, runUv: o.runUv ?? runUv, transport: o.transport, free: o.free, log: o.log });
   return { lines: o.log ? [] : done.lines, code: done.code };
 }
 

@@ -85,6 +85,10 @@ test('choose refuses a stale stamp, an out-of-range index, an unknown profile an
     [['choose', '0', STAMP, '../x'], LINES.profile],
     [['choose', '0', STAMP], LINES.usage],
     [['choose', '-1', STAMP, 'made-up-profile-1'], LINES.usage],
+    [['runtime', 'plan', 'whisper'], LINES.usage],
+    [['runtime', 'install', 'kokoro', 'phonon'], LINES.usage],
+    [['runtime', 'verify', 'phonon'], LINES.usage],
+    [['runtime'], LINES.usage],
   ];
   for (const [argv, line] of cases) {
     const r = await setup(argv);

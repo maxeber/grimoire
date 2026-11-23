@@ -126,17 +126,21 @@ it now sits in the device list. If your microphones change, run
 
 ### The runtime
 
-`setup.mjs runtime plan` lists each part, whether it is there and its download
+`setup.mjs runtime plan <engine>` lists each part, whether it is there and its download
 size, whether `uv` was found, the total, the peak disk use (download plus
-unpacked) and the time at 10 MB/s, and every host it will contact. `setup.mjs
-runtime install` then fetches what is missing, as a background command printing
+unpacked) and the time at 10 MB/s, and every host it will contact. The engine is `kokoro` or
+`phonon`, and the part the other one alone needs, its voice files, is left out:
+the install asks which you want first, so you download one voice engine and not
+both. With no engine named the plan covers every part. `setup.mjs
+runtime install <engine>` then fetches what is missing, as a background command printing
 one line per file and one result per part (`ok`, `skipped <why>`, `failed
 <file>`); it refuses to start when the free space on your home drive is short.
 `setup.mjs runtime verify` re-hashes every installed file; at each start the guard
 checks only that each file is there at its pinned size, and its line names
 `/incantation install`, which fetches only the parts whose pins changed. With a
 Phonon voice (Everly) the guard asks for Phonon in place of Kokoro, so the Kokoro
-files need not be on disk; `setup.mjs runtime install` still fetches both. The
+files need not be on disk. The Phonon engine needs `uv`; the plan says so and
+the install fails without it, so choose `kokoro` then. The
 runtime lives under `~/.grimoire/incantation/runtime/` and nowhere else.
 
 | Part | About | Licence |

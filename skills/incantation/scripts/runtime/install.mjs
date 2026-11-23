@@ -28,6 +28,14 @@ export const PARTS = Object.freeze(['addon', 'hearing', 'speaking', 'detector', 
 export const CORE = Object.freeze(['addon', 'hearing', 'speaking', 'detector']);
 export const LAYER = Object.freeze(['python', 'turn', 'phonon']);
 
+// The voice engine a person picks before the plan: what each one leaves out. A
+// Kokoro voice never loads Phonon's model, and a Phonon voice never loads
+// Kokoro's. The Python layer and the end-of-turn model stay for both: echo
+// cancelling and the end-of-turn hold do not depend on the voice. With no
+// engine named, the plan and the install cover every part.
+export const OMITTED = Object.freeze({ kokoro: Object.freeze(['phonon']), phonon: Object.freeze(['speaking']) });
+const omitted = (engine, part) => OMITTED[engine]?.includes(part) ?? false;
+
 // The parts a voice needs to run, which is what the guard asks of the runtime.
 // A Kokoro voice needs the core, with Kokoro as its speaking part. A Phonon
 // voice never loads Kokoro, so it asks for Phonon's own part in its place; the
@@ -189,8 +197,10 @@ export function findUv({ platform, pathValue, startDir, fs }) {
 
 /** The plan, as lines: each part's state and download size, whether uv was
  *  found, what is lost without it, the total, the peak disk use and the time
- *  at 10 MB/s, and every host that will be contacted. */
-export function planRuntime({ home, platform, arch, uv, release = osRelease(), pins = PINS }) {
+ *  at 10 MB/s, and every host that will be contacted. `engine` ('kokoro' or
+ *  'phonon') leaves out the part the other engine alone needs; with none named,
+ *  every part is planned. */
+export function planRuntime({ home, platform, arch, uv, engine, release = osRelease(), pins = PINS }) {
   const key = platformKey(platform, arch);
   const noPython = pythonGap(key, release, pins);
   const lines = [];
@@ -199,6 +209,10 @@ export function planRuntime({ home, platform, arch, uv, release = osRelease(), p
   for (const part of PARTS) {
     const spec = specOf(part, key, pins);
     const state = partState(home, part, key, pins);
+    if (omitted(engine, part)) {
+      lines.push(`${part} skipped not needed by the ${engine} engine`);
+      continue;
+    }
     if (part === 'addon' && !spec.supported) {
       lines.push(`addon unavailable ${addonGap(key, pins)}; choose Voicebox`);
       continue;
@@ -209,11 +223,13 @@ export function planRuntime({ home, platform, arch, uv, release = osRelease(), p
     }
     if ((part === 'turn' || part === 'phonon') && noPython) {
       lines.push(`${part} skipped no python layer`);
+      if (part === 'phonon' && engine === 'phonon') lines.push('phonon engine unavailable here; choose the kokoro engine');
       continue;
     }
     const layerNeedsUv = LAYER.includes(part) && !uv;
     if (layerNeedsUv) {
       lines.push(`${part} skipped no uv`);
+      if (part === 'phonon' && engine === 'phonon') lines.push('phonon engine unavailable without uv; choose the kokoro engine');
       continue;
     }
     if (state === 'ok') {
@@ -405,7 +421,9 @@ const safeRel = rel => rel.split('/').every(p => p && p !== '..' && !/[\\:\0]/.t
 
 /** Installs the runtime. `o`: home, platform, arch, pathValue, startDir, env,
  *  transport, runUv (file, args, { cwd, env }) -> { code, stdout }, fs (for
- *  finding uv), free (bytes), log (a line at a time, as each part finishes).
+ *  finding uv), free (bytes), engine ('kokoro' or 'phonon': the part the other
+ *  engine alone needs is left out; none named, every part), log (a line at a
+ *  time, as each part finishes).
  *  Returns { lines, code }. One line per part: ok, skipped <why> or failed
  *  <file>; the lines are also handed to `o.log` as they come. */
 export async function installRuntime(o) {
@@ -419,7 +437,8 @@ export async function installRuntime(o) {
   const uv = findUv({ platform, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs });
   const pins = o.pins ?? PINS;
   const release = o.release ?? osRelease();
-  const plan = planRuntime({ home, platform, arch, uv, release, pins });
+  const engine = o.engine;
+  const plan = planRuntime({ home, platform, arch, uv, engine, release, pins });
   const free = (o.free ?? freeBytes)(home);
   if (free < plan.peak * 1.1) return { lines: ['install: not enough free disk space on the home drive'], code: 1 };
   const root = runtimeDir(home);
@@ -531,24 +550,35 @@ export async function installRuntime(o) {
 
   for (const part of PARTS) {
     const spec = specOf(part, key, pins);
+    if (omitted(engine, part)) {
+      say(`${part} skipped not needed by the ${engine} engine`);
+      continue;
+    }
     if (part === 'addon' && !spec.supported) {
       say(`addon failed ${addonGap(key, pins)}`);
       failed = true;
       continue;
     }
+    // A part the chosen engine cannot run without is a failure when it is
+    // skipped, as a missing addon is: the person picked it, so the install
+    // must not end as if it had worked.
+    const skip = why => {
+      say(`${part} skipped ${why}`);
+      if (part === 'phonon' && engine === 'phonon') failed = true;
+    };
     if (LAYER.includes(part)) {
       // The platform's own gap comes first, as in the plan: uv would not help.
       const noPython = part === 'python' && pythonGap(key, release, pins);
       if (noPython) {
-        say(`python skipped ${noPython}`);
+        skip(noPython);
         continue;
       }
       if (!uv) {
-        say(`${part} skipped no uv`);
+        skip('no uv');
         continue;
       }
       if ((part === 'turn' || part === 'phonon') && partState(home, 'python', key, pins) !== 'ok') {
-        say(`${part} skipped no python layer`);
+        skip('no python layer');
         continue;
       }
     }

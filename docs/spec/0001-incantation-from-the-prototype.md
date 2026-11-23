@@ -553,13 +553,20 @@ lists each pin it could not cross-check against a published hash.
   route, at the owner's choice).
 
 **The install flow.** `/incantation install` gains one step, before the
-microphone: **Runtime.** `setup.mjs runtime plan` prints, per part, whether it
+microphone: **Runtime.** The session first asks which voice engine the person
+wants, Kokoro or Phonon, and recommends Kokoro. `setup.mjs runtime plan <engine>`
+then prints, per part, whether it
 is there and its download size, the peak disk use (download plus unpacked),
 the expected time at 10 MB/s, every host it will contact, and whether `uv` was
 found (no `uv`: the Python layer is skipped and the line says what is lost:
-echo cancelling, the end-of-turn hold, Phonon). The install refuses to start when
+echo cancelling, the end-of-turn hold, Phonon). The engine's own voice files are
+planned and fetched and the other engine's are not ("skipped not needed"); the
+Python layer and the end-of-turn model stay for both. With the Phonon engine and
+no `uv`, or no Python layer on the platform, the plan says to choose Kokoro and
+the install fails; named with no engine, the plan and install cover every part.
+The install refuses to start when
 free space on the home drive is short. The session says the plan back with its size, and on
-a clear yes runs `setup.mjs runtime install` as a background command (core,
+a clear yes runs `setup.mjs runtime install <engine>` as a background command (core,
 then the Python layer when `uv` is there), which prints a progress line per
 file and then one line per part (`ok`, `skipped <why>`, `failed <file>`). A
 later `setup.mjs runtime verify` re-hashes everything and prints the same
@@ -765,11 +772,13 @@ a claim says otherwise.
     planted in the working folder and the environment change no request, and
     neither does a `.python-version` or `pyproject.toml` in the session's
     folder.
-11. `setup.mjs runtime plan` prints each part's state and size, peak disk use,
+11. `setup.mjs runtime plan <engine>` prints each part's state and size, peak disk use,
     every host, and whether `uv` was found, and with no `uv` names what is
     lost; `install` refuses when disk is short; `verify` re-hashes; the guard fails
     with a fixed line naming `/incantation install` when an installed part's
-    file is missing or the wrong size.
+    file is missing or the wrong size. With an engine named, the other engine's
+    voice files are neither planned nor fetched, and the guard asks only for the
+    parts the chosen voice runs on.
 12. `engines/sherpa.mjs` with a fake addon and worker: `warm()` loads and runs
     each model once; `transcribe` and `synthesize` return text and a WAV;
     `profiles()` lists `bella` and, when Phonon is installed, `everly`; no

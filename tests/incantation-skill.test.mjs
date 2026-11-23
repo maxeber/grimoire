@@ -49,7 +49,8 @@ const ALLOWED = [
   /^observe\.mjs add <8 hex>$/,
   /^observe\.mjs freeze <n>$/,
   /^setup\.mjs (devices|profiles)$/,
-  /^setup\.mjs runtime (plan|install|verify)$/,
+  /^setup\.mjs runtime verify$/,
+  /^setup\.mjs runtime (plan|install) <engine>$/,
   /^setup\.mjs choose <index> <stamp> <profile id>$/,
   /^statusline\.mjs$/,
 ];
@@ -95,7 +96,9 @@ test('setup.mjs is run in the Install section and nowhere else', () => {
   assert.match(install, /scripts\/setup\.mjs profiles/);
   assert.match(install, /scripts\/setup\.mjs choose <index> <stamp> <profile id>/);
   assert.equal(/setup\.mjs/.test(text.replace(install, '').replace(/Run `setup\.mjs` only in\s+`\/incantation install`\./, '')), false);
-  assert.match(install, /setup\.mjs runtime plan`\. Show its\s+lines/);
+  assert.match(install, /setup\.mjs runtime plan <engine>`,\s+with the\s+engine the person picked\. Show its\s+lines/);
+  assert.match(install, /runtime install <engine>`/);
+  assert.ok(install.indexOf('voice engine') < install.indexOf('runtime plan'), 'the engine is chosen before the plan');
   assert.match(install, /A heard turn alone never starts the\s+download/);
   assert.ok(install.indexOf('runtime plan') < install.indexOf('setup.mjs devices'), 'the runtime step comes before the microphone');
   assert.match(install, /On a first install no mic is open, so the number is\s+typed/);

@@ -418,6 +418,58 @@ test('claim 15: core counts only the parts the voice needs: Kokoro for a Kokoro 
   }
 });
 
+test('claim 15: the plan and the install for an engine leave out the speaking part the other engine alone needs (issue 674)', async () => {
+  const f = fixture();
+  try {
+    const every = planRuntime({ home: f.home, platform, arch, uv: UV, pins: PINS });
+    const phonon = planRuntime({ home: f.home, platform, arch, uv: UV, engine: 'phonon', pins: PINS });
+    const kokoro = planRuntime({ home: f.home, platform, arch, uv: UV, engine: 'kokoro', pins: PINS });
+    const missing = (plan, part) => plan.lines.some(l => new RegExp(`^${part} missing \\d+ MB$`).test(l));
+    assert.ok(missing(every, 'speaking') && missing(every, 'phonon'), 'no engine named: every part, as before');
+    assert.ok(phonon.lines.includes('speaking skipped not needed by the phonon engine') && missing(phonon, 'phonon'));
+    assert.ok(kokoro.lines.includes('phonon skipped not needed by the kokoro engine') && missing(kokoro, 'speaking'));
+    assert.ok(phonon.download < every.download && kokoro.download < every.download, 'each engine downloads less than both');
+
+    const log = [];
+    const { lines, code } = await install(f, { engine: 'phonon', transport: fakeTransport(served(), log) });
+    assert.equal(code, 0, lines.join(' | '));
+    assert.ok(lines.includes('speaking skipped not needed by the phonon engine') && lines.includes('phonon ok') && lines.includes('python ok'));
+    assert.equal(existsSync(join(runtimeDir(f.home), 'kokoro')), false, 'no Kokoro file is fetched');
+    assert.ok(!log.some(r => r.path.includes('/o/k/')), 'no request goes to the Kokoro files');
+    assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, true, 'the guard is satisfied with no Kokoro on disk');
+    assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').states.speaking, 'absent');
+    assert.ok(verifyRuntime({ home: f.home, platform, arch, pins: PINS }).lines.includes('speaking skipped not installed'));
+  } finally {
+    f.remove();
+  }
+  const g = fixture();
+  try {
+    const log = [];
+    const { lines, code } = await install(g, { engine: 'kokoro', transport: fakeTransport(served(), log) });
+    assert.equal(code, 0, lines.join(' | '));
+    assert.ok(lines.includes('phonon skipped not needed by the kokoro engine') && lines.includes('speaking ok'));
+    assert.equal(existsSync(join(runtimeDir(g.home), 'hf')), false, 'no Phonon file is fetched');
+    assert.equal(checkRuntime(g.home, KEY, PINS, 'kokoro').core, true);
+  } finally {
+    g.remove();
+  }
+});
+
+test('claim 15: the Phonon engine with no uv or no python layer fails the install and the plan says to choose the other engine (issue 674)', async () => {
+  const f = fixture();
+  try {
+    assert.ok(planRuntime({ home: f.home, platform, arch, uv: null, engine: 'phonon', pins: PINS }).lines.includes('phonon engine unavailable without uv; choose the kokoro engine'));
+    assert.ok(!planRuntime({ home: f.home, platform, arch, uv: null, engine: 'kokoro', pins: PINS }).lines.some(l => l.includes('choose the kokoro engine')));
+    const bad = await install(f, { engine: 'phonon', pathValue: '' });
+    assert.equal(bad.code, 1, 'the person picked Phonon, so a skipped Phonon is a failure');
+    assert.ok(bad.lines.includes('phonon skipped no uv') && bad.lines.includes('hearing ok'));
+    const ok = await install(fixture(), { engine: 'kokoro', pathValue: '' });
+    assert.equal(ok.code, 0, 'Kokoro with no uv installs the core as before');
+  } finally {
+    f.remove();
+  }
+});
+
 test('claim 15: nothing installed reads as absent for every part, and nothing is damaged', () => {
   const f = fixture();
   try {
