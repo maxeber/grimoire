@@ -76,7 +76,7 @@ On an Open in app press it reads three environment variables, `OS`,
 does not.)
 It makes no network request of its own, apart from the `gh` call below; its
 one tool call, below, goes to whatever connected server answers to the name
-`ccd_window`. Besides each session's own usage summary, and since 0.81.0 the decision log and the owner's marks and since 0.83.0 the lead hand-off, all below, it writes one file, the lead session's roster,
+`ccd_window`. Besides each session's own usage summary, and since 0.81.0 the decision log and the owner's marks and from 0.83.0 to 0.168.0 the lead hand-off, all below, it writes one file, the lead session's roster,
 through a tool the model calls, `set_roster`, which skips Claude Code's
 permission prompt. So that write has no human and no classifier review; every
 call is still recorded in the transcript as the tool's result. The tool exists
@@ -282,8 +282,8 @@ marks one bulk press writes share one press time. Both files go only where the r
 allows, overwrite only a file that passes the strict check of its own kind,
 and are checked again after the write. While the pane is open, and only then,
 it reads this session's own decision log and marks file by their own paths
-and lists only the hand-off folder on the roster's 5-second poll, reading
-the 20 newest other hand-offs for the Lead hand-off card. Since 0.121.0 (issue
+and, until 0.168.0, listed the hand-off folder on the roster's 5-second poll,
+reading the 20 newest other hand-offs for the Lead hand-off card. Since 0.121.0 (issue
 509) it lists no other session's decision log or marks file for the tab and
 reads none, and the Decisions tab draws only this session's own log: no card,
 row, flagged row or count from another log, and no line or fold for an ended
@@ -296,8 +296,7 @@ told, from the engine's session files and the logs' entry times, whether
 another log's session had ended, kept in the module and never written, and
 drew an ended session's claims as one dim line and in History's fold "From
 ended sessions". All of that is gone. It re-reads a file only when its size or
-time changed, skips a file dated more than two minutes ahead, reads no other
-hand-off from a folder whose listing passes 5,000 entries, and draws this
+time changed, skips a file dated more than two minutes ahead, and draws this
 log's writer by the engine's session name for its session id, or "an ended
 session". `log_decision`'s drop scan reads this session's marks file alone, as above. Nothing it reads enters plugin state
 but the search text, which other plugins can read until the next open clears
@@ -336,12 +335,19 @@ own hash; it protects nothing secret. What follows from it:
   draws a Relayed entry and an answer only as the writer's claim. Any session,
   in any working folder, that loads head-chef without the owner typing it can
   log the same, and until 0.121.0 its entries reached every lead's To review as
-  cards or counts; since then only the hand-off carries them to another lead;
+  cards or counts; since then only the hand-off (until 0.168.0) carried them to another lead;
   the owner accepted this on 2026-10-26 (q10 A on #402's ticket 411), and
   reworded this sentence on 2026-10-30 in chat ("Reword them").
 
-**Since 0.83.0 a lead keeps a hand-off** (spec 402, ticket 3). The mod offers
-two more tools wherever it offers `set_roster`. `set_lead_handoff` replaces
+**Since 0.169.0 the mod has no hand-off.** `set_lead_handoff` and
+`read_lead_handoff`, described next, are gone, and so are the notes the mod
+added before and after a compaction, and so are the Lead hand-off card and the
+mod's reading of the `brigade/handoff/` folder: it no longer lists, reads or
+draws a hand-off file, and a file left there is never read. The paragraph and
+the list below describe 0.83.0 to 0.168.0.
+
+**From 0.83.0 to 0.168.0 a lead kept a hand-off** (spec 402, ticket 3). The mod
+offered two more tools wherever it offers `set_roster`. `set_lead_handoff` replaces
 the lead session's own hand-off, `brigade/handoff/<session id>.json` in the
 plugin's data folder: five sections (how to resume, rules in force, running
 sessions, cleanup waiting, open for the owner), each at most 20 lines of at
@@ -512,7 +518,7 @@ press time and a Dismiss, on the terminal and Desktop only. What follows from it
   as it landed; the command's reply is no check, since a plugin that rewrote
   the command can rewrite its reply too.
 - **Where the level is copied:** each answer of `read_autonomy`,
-  `log_decision` and `set_lead_handoff` names the level in the lead's
+  `log_decision` (and, until 0.168.0, `set_lead_handoff`) names the level in the lead's
   transcript, and `read_autonomy`'s names a 3's press time, where they stay
   after the log is deleted. Since 0.88.0 the band above the lead's prompt
   draws a 3 and its press time in the tree that other plugins' band hooks see.

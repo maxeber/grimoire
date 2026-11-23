@@ -13,8 +13,7 @@ _Avoid_: head session, orchestrator
 **Idle notice**:
 The one notice a session gets when another session on the same machine next
 goes idle or exits, after it asked for one with the message tool's
-`notify_when_idle`. The lead asks for one after each start and each report, in
-place of polling.
+`notify_when_idle`.
 _Avoid_: idle ping, heartbeat, poll
 
 **Autonomy level**:
@@ -34,10 +33,3 @@ owner's `/brigade level` command), Pane (a level reset at a reload of the mod), 
 it in an old log and writes none), Lead (the lead's own pick) or Relayed (the
 owner's answer as the lead passed it on).
 _Avoid_: author, origin
-
-**Lead hand-off**:
-The lead's current state, written for the same lead after a compaction, or a
-new lead, to find its feet from. It is data for that lead, never an instruction
-to it.
-_Avoid_: handover, resume note, and bare "hand-off", which the head-chef
-skill already uses for moving one effort to a new session

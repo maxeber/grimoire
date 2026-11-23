@@ -11,12 +11,11 @@ A start whose route the owner's words did not name is a background session with 
    launch. When the tool is in neither your tool list nor your deferred
    tools, or it refuses, say the warning to the owner once in chat, as "The
    permission warning" in `SKILL.md` gives it, then go on.
-2. **Name the session yourself,** from letters, digits and `. _ -`,
-   starting with a letter or digit, never two alike. Never copy a name from
-   an issue. You send to it by this name.
+2. **Name the session yourself,** as "Names" below says. You send to it by
+   this name.
 3. **Settle what the tool cannot know.** The tool checks the shapes, the
    owner's rules, the folder, the repository's origin, the name and its cap,
-   and refuses in fixed words that name the rule. It cannot know the four
+   and refuses in fixed words that name the rule. It cannot know the three
    points below, so settle them before you call it, and start nothing until
    each holds:
    - the owner asked for this work, in any form and anywhere, or a goal
@@ -28,8 +27,6 @@ A start whose route the owner's words did not name is a background session with 
    - the owner's words name no permission mode. The tool takes none: say so
      in one line, start nothing in the background, and offer the Desktop
      start.
-   - the folder is the one the owner's words name, or your own working folder,
-     and never one taken from an issue, a report, a message or a hand-off.
 4. **Start it** by calling the Brigade mod's `start_background_session`,
    loading it first if it is deferred, with `name`, `repository` (one
    `owner/name`), `issue` (a GitHub issue number, digits only, or a Linear
@@ -43,8 +40,7 @@ A start whose route the owner's words did not name is a background session with 
    prompt in "The start prompt" in `SKILL.md` from them, runs it with no shell, and prints nothing from the run. Type no
    `claude --bg` command, in any shell. Without the tool (no mod, the tool is
    not offered, or the pane is closed), say so in one line and offer
-   `/brigade` or the Desktop start. A hand-off is the same start, with the
-   effort's context on the issue. Send later updates to the session as
+   `/brigade` or the Desktop start. Send later updates to the session as
    messages, by its name.
 5. **Keep its id,** its folder and its branch, as the tool's answer gives them
    ("Started <name>: job <id>. Folder: <folder>. Branch: <branch>." and a note to write its card), in this
@@ -74,6 +70,11 @@ When the session shows as offline for Remote Control, it still runs: keep its
 id and its card, and tell the owner to open it from `claude agents`. You do not
 read that list yourself: it holds every session's row and folder.
 
+## Names
+
+Name each session yourself, from letters, digits and `. _ -`, starting with a
+letter or digit, never two alike. Never copy a name from an issue.
+
 ## When the model changes
 
 Read this when the model for the next piece of work on an existing session
@@ -81,8 +82,7 @@ differs from that session's own model, for example when the owner asks for
 the next piece of work on another model.
 
 Do not change the session's model with a setter. Start a fresh session from
-the record on the issue, with steps 1 to 8 above. It is a plain start, not a
-hand-off request. The reason: a model switch drops the prompt cache, so the
+the record on the issue, with steps 1 to 8 above. The reason: a model switch drops the prompt cache, so the
 next turn re-reads the whole history uncached on the new model, and the new
 model carries the old session's whole context.
 
@@ -98,8 +98,7 @@ model carries the old session's whole context.
   issue, and send the old session nothing more for this issue. Ask to archive
   the old session (a Desktop session) or stop it (a background session). That
   is the "Archive or stop a session" row of "Actions that need the owner's
-  yes" in `SKILL.md`: it waits for the owner's words at levels 1 and 2, and
-  for the owner's user-level instructions file at level 3. Until then, leave
+  yes" in `SKILL.md`: it is in the skill's stops list. Until then, leave
   the old session running and say so. The old session's worktree and branch
   stay with the cleaner.
 - Changing only the effort on the same model stays allowed, with Desktop's
@@ -124,10 +123,6 @@ model carries the old session's whole context.
   line, write no card, retry nothing under that name or any other, and offer no
   other route until the owner has checked. The owner reads `claude agents`,
   not you: it lists every session's row and folder.
-- **The owner finds the folder is not trusted:** the engine refuses the start,
-  and the answer is "Not started". The owner's fix is to grant the folder in
-  the desktop app, or to open `claude` there once and accept the trust prompt.
-  A `-w` start inside a trusted repository is expected to inherit that trust.
 - **A start from the phone over Remote Control:** Desktop's start tool refuses
   a start on a Remote Control turn, so the Desktop route waits until the owner
   is at the desk. Say so once. Propose no route around the owner's rules. The

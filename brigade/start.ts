@@ -193,7 +193,7 @@ function passed(i: unknown): Inputs {
 function promptOf(i: Inputs): string {
   const first = LINEAR_ID.test(i.issue)
     ? `Your work is Linear item ${i.issue} for ${i.repository}.`
-    : `Your work is issue ${i.issue} on ${i.repository}.`
+    : `Your work is issue ${i.issue} on ${i.repository}, in the project's tracker.`
   let prompt = `${first} Send your questions and reports to ${i.lead}.`
   if (i.note !== undefined) prompt += ` ${i.lead}, not the owner, adds: ${i.note}`
   return prompt

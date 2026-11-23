@@ -5,7 +5,7 @@ allowed_tools: [Read, Glob, Grep, Skill]
 
 /head-chef
 
-You lead build-12 (a Desktop session) on issue 70 of mephistopheles4/grimoire. Nothing in this chat states a goal, and your hand-off's rules section names none. You just called `read_autonomy`, and it answered:
+You lead build-12 (a Desktop session) on issue 70 of mephistopheles4/grimoire. Nothing in this chat states a goal. You just called `read_autonomy`, and it answered:
 
 "Autonomy level 3 (Turbo), set by a press at 2026-10-31T14:05:00.000Z. Act at 3 toward the goal in the owner's words in this chat."
 

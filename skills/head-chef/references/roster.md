@@ -76,7 +76,7 @@ the file itself.
   card `bgId`, so leave `url` out.
 - `work` names the repository and the issue number or Linear identifier only, as in the example.
 - A to-do is one line the owner takes in at a glance: at most 50 characters
-  (the 300 below is only the check's limit), one ask or one owner step. It
+  one ask or one owner step. It
   starts with a verb, then names the act and the work: "<verb> <repository>
   issue N" or "... PR N", as in "Decide whether to merge app PR 71", or for a
   session the card's title in place of the number, as in "Approve cleaning up
@@ -90,7 +90,7 @@ the file itself.
   from a report. Put no other facts, options, picks, reasons, commands, file
   names, paths, error text or quoted text in it; they stay in your chat
   message or on the issue. A decision id may follow in brackets as a reference
-  only, as in "(decision 32)", when it fits; when the to-dos of two waiting entries would read the same, end each with its id. A to-do that names only a decision, or points only at the Decisions tab or the log, breaks the rule. The one exception is a carried decision, which `handoff.md` gives: "Answer carried <owner/name>: <title>", or "Answer a carried decision (decision N)" when `<owner/name>` alone does not fit. A waiting entry's
+  only, as in "(decision 32)", when it fits; when the to-dos of two waiting entries would read the same, end each with its id. A to-do that names only a decision, or points only at the Decisions tab or the log, breaks the rule. A waiting entry's
   to-do follows this rule too, and replaces another to-do for that ask that is not a waiting entry's, under a new `id`, so a tick on the old one never hides it. The pane draws a
   to-do on one line and cuts what does not fit.
 - A to-do's `session` is a card's title: give it when the step is in that
@@ -114,28 +114,12 @@ the file itself.
   the first a letter, then `-` and 1 to 9 digits with no leading zero. The pane
   shows the identifier only, and opens the item's page only when the owner has
   set `GRIMOIRE_LINEAR_SLUG` to the workspace's name in its address.
-- Caps: a title at most 80 characters; `work` and `settings` at
-  most 300; `desktopId`, `bgId` and `url` at most 100. A to-do's `id` at
-  most 40, its `text` at most 300, its `session` at most 80, its `link` at
-  most 210.
-  `repo`: the owner 1 to 39 letters, digits or `-`, not starting with `-`;
+- Caps: `repo`: the owner 1 to 39 letters, digits or `-`, not starting with `-`;
   the name 1 to 100 letters, digits, `-`, `.` or `_`, not starting with `-`
   or `.`. At most 50 cards and 50 to-dos. No other field, no title twice, no to-do id twice.
 - A card and a to-do hold what `SKILL.md`'s "What goes out" allows: other
   plugins can read the pane's file. A waiting entry's to-do is
   written as the to-do bullet above says, and holds no more of the question.
-
-## If the pane is rolled back
-
-A pane from before the to-do `link` field refuses a roster that holds one, and
-a pane from before comment links refuses a roster that holds a link with a
-`#` fragment, and a pane from before Linear links refuses one that holds a
-bare identifier.
-If `set_roster` refuses a `link`, or the owner says the pane refused the roster
-file for one, send the roster again without links, and ask the owner to delete
-that session's roster file by hand: you write no file yourself, and the mod
-keeps that one. This happens only when a session spans a downgrade of the
-plugin.
 
 ## When to call it
 

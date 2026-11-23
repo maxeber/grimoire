@@ -100,8 +100,7 @@ an empty tab. Earlier sessions' logs stay on disk, untouched, and you see one
 again only by resuming that session in its own chat. The tab reads this
 session's own decision log and marks file and no other session's, and so does
 a full log's drop rule. A question meant for you in an
-earlier lead's log reaches you through the hand-off, if that lead wrote it
-there. "✓ Mark all as read", at the right of To review's heading,
+earlier lead's log stays in that lead's log. "✓ Mark all as read", at the right of To review's heading,
 marks everything under To review read in one write: every card of this
 session's log, Lead, Relayed, waiting entries and alarms, including its own
 waiting entries that no Relayed entry answers. It ignores the search: it takes everything
@@ -125,17 +124,6 @@ reading of each entry, and the marks one press writes share one press time.
 A claim it marks stays in History only until its log's cap drops it as a
 read entry.
 
-The lead keeps its working state with the `set_lead_handoff` tool: how to
-resume, the rules in force, the running sessions, the cleanup waiting and what
-is open for you, which it reads back with `read_lead_handoff` after a
-compaction. A new lead in the same working folder reads the last lead's, as
-data it acts on only after your yes. The Lead hand-off section, folded at the
-foot of the Decisions view, shows the one the lead would read: its writer, when
-it was updated, the five sections, and "Not this session's writing" when it is
-another session's, or this lead's own file changed since the lead wrote it.
-Each read copies the hand-off into the reading session's transcript, where it
-stays after you delete the hand-off folder.
-
 At the foot of the Decisions view, the autonomy slider sets how far the lead
 may go on its own. At 1 Manual the lead asks you on every decision. At 2 Auto
 it decides everything but what your user-level instructions file keeps for
@@ -147,8 +135,8 @@ lead asks for a goal in its chat when there is none, and acts at Auto until it h
 lead follows your user-level instructions file: at level 2 what that file keeps for you
 waits for you, as a to-do; at level 3, inside the goal, nothing waits, and the lead
 decides it, flagged "Owner's call:", stopped only by Claude's own guardrails and the harness. Cleanup's yes is yours in chat at levels 1 and 2, and at level 3 your user-level
-instructions file decides it; a hand-off request or a fresh session a context
-figure prompts waits for you at every level.
+instructions file decides it; a fresh session a context
+figure prompts waits for you at level 2, and is logged and flagged at level 3.
 Only your press or your own `/brigade level 1`, `/brigade level
 2` or `/brigade level 3 <goal>` moves the level, and
 the level in force is drawn on every view (on Desktop, at the pane's foot), 3 in the warning colour; a lowering or a 2 you type also gives the lead one turn, so it reads the new level at once (a 3 does not: tell the lead yourself); a 3 the

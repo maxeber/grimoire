@@ -22,7 +22,6 @@ const {
   appendEntry, checkInput, mapInput, SHAPE_TAIL, checkLog, checkMarks, emptyLog, addMark, addMarks, mergeMarks, markKey,
   reviewQueue, flaggedRows, historyRows, matchesSearch, searchWords, serializeLog, serializeMarks,
   sha256Hex, projectDigest, sourceLabel, writerName, missingIds,
-  MAX_HANDOFF_BYTES, checkHandoffInput, checkHandoff, serializeHandoff, chooseHandoff,
   levelFrom, storedLevel, levelInForce, ownerEntry, paneEntry, alarmEntry, inFixedShape, clockTime,
   drawnLogs, markAllSet, parseMarkAllKey,
   levelOption, commandEntry, parseLevelCommand, isLevelCommand, levelOriginAllowed, commandHolds, LEVEL_REPLIES,
@@ -605,95 +604,6 @@ test('the project digest is the SHA-256 of the transcript folder name, only for 
   assert.equal(projectDigest({ sessionId: '', transcript: '' }, SID), null);
 });
 
-// --- the lead hand-off (ticket 3: claims 12 and 14) --------------------------------------------
-
-const sections = (over = {}) => ({ resume: ['Read issue 413.'], rules: [], sessions: ['build-413 builds.'], cleanup: [], owner: ['q1 waits.'], ...over });
-const DIGEST = createHash('sha256').update('C--work').digest('hex');
-const OTHER_DIGEST = createHash('sha256').update('C--elsewhere').digest('hex');
-const handoff = (at, project = DIGEST, over = {}) => ({ kind: 'handoff', v: 1, at, project, sections: sections(over) });
-
-test('claim 14: every hand-off line refuses hidden and direction-changing characters and a line break', () => {
-  assert.deepEqual(checkHandoffInput(sections()).value, sections());
-  for (const line of [
-    'a\u{202E}b', 'a\u{200F}b', 'a\u{2066}b', 'zero\u{200B}width',
-    'two\nlines', 'a\u{7}bell', '', 'x'.repeat(301),
-  ]) {
-    const r = checkHandoffInput(sections({ rules: ['fine', line] }));
-    assert.ok('error' in r, JSON.stringify(line));
-    assert.match(r.error, /^rules line 2 /);
-  }
-  assert.ok('value' in checkHandoffInput(sections({ rules: ['x'.repeat(300)] })));
-});
-
-// Issue 486: a hand-off line takes the same text a log field takes.
-test('issue 486 claim 4: every hand-off line takes an email, a home path, a key shape and a session id, and still refuses a hidden character', () => {
-  for (const section of ['resume', 'rules', 'sessions', 'cleanup', 'owner']) {
-    for (const line of ['write to someone@example.org', 'in /home/someone/repo', `sk-ant-${'a'.repeat(24)}`, `see ${SID}`]) {
-      assert.ok('value' in checkHandoffInput(sections({ [section]: ['fine', line] })), `${section} ${line}`);
-    }
-    assert.match(checkHandoffInput(sections({ [section]: ['fine', 'x\u{2066}y'] })).error ?? '', new RegExp(`^${section} line 2 holds a hidden`));
-  }
-});
-
-test('S5.3: a hand-off input takes exactly the five sections, each a list of at most 20 lines, and nothing the mod stamps', () => {
-  assert.ok('value' in checkHandoffInput(sections({ resume: Array.from({ length: 20 }, (_, i) => `Line ${i}`) })));
-  assert.match(checkHandoffInput(sections({ resume: Array.from({ length: 21 }, (_, i) => `Line ${i}`) })).error, /^resume is not a list of at most 20 lines$/);
-  const { owner, ...four } = sections();
-  assert.match(checkHandoffInput(four).error, /^owner is not a list of at most 20 lines$/);
-  assert.match(checkHandoffInput({ ...sections(), at: 5 }).error, /^the hand-off has a field it does not use: at$/);
-  assert.match(checkHandoffInput({ ...sections(), project: DIGEST }).error, /^the hand-off has a field it does not use: project$/);
-  assert.match(checkHandoffInput(sections({ cleanup: 'one line' })).error, /^cleanup is not a list/);
-  assert.match(checkHandoffInput(null).error, /^the hand-off is not an object$/);
-});
-
-test('claim 5: a hand-off file passes its strict check only in its own shape', () => {
-  const good = serializeHandoff(handoff(5));
-  assert.deepEqual(checkHandoff(good.value).value, handoff(5));
-  assert.ok('value' in checkHandoff(JSON.stringify(handoff(5, null))));
-  for (const bad of [
-    { ...handoff(5), extra: 1 },
-    { ...handoff(5), kind: 'decisions' },
-    { ...handoff(5), v: 2 },
-    { ...handoff(5), at: -1 },
-    { ...handoff(5), project: 'C--work' },
-    { ...handoff(5), sections: { ...sections(), more: [] } },
-    { ...handoff(5), sections: sections({ owner: ['a\u{200B}b'] }) },
-  ]) assert.ok('error' in checkHandoff(JSON.stringify(bad)), JSON.stringify(bad).slice(0, 80));
-  assert.ok('error' in checkHandoff('{"cards":[],"todos":[]}'));
-  assert.ok('error' in checkHandoff('not json'));
-});
-
-test('a hand-off over 32 KiB is refused', () => {
-  // Twenty lines of 300 four-byte characters in each section: about 120 KiB.
-  const wide = Array.from({ length: 20 }, () => '\u{1F600}'.repeat(300));
-  const big = handoff(5, DIGEST, { resume: wide, rules: wide, sessions: wide, cleanup: wide, owner: wide });
-  assert.ok('value' in checkHandoffInput(big.sections));
-  assert.match(serializeHandoff(big).error, /^the hand-off is over 32 KiB$/);
-  assert.equal(MAX_HANDOFF_BYTES, 32 * 1024);
-});
-
-test('claim 12: the hand-off chosen is this session\'s own, else the newest by stamped time with the same project digest', () => {
-  const own = { sid: SID, handoff: handoff(100) };
-  const older = { sid: '22222222-2222-2222-2222-222222222222', handoff: handoff(200) };
-  const newer = { sid: '33333333-3333-3333-3333-333333333333', handoff: handoff(300) };
-  const elsewhere = { sid: '44444444-4444-4444-4444-444444444444', handoff: handoff(900, OTHER_DIGEST) };
-  const ahead = { sid: '55555555-5555-5555-5555-555555555555', handoff: handoff(NOW + 120_001) };
-  const undated = { sid: '66666666-6666-6666-6666-666666666666', handoff: handoff(950, null) };
-  const others = [older, elsewhere, ahead, newer, undated];
-  // The own hand-off wins, however old.
-  assert.equal(chooseHandoff(own, others, DIGEST, NOW), own);
-  // Without one: the newest by its own time among the same digest, never
-  // another digest's, a null one or one dated more than two minutes ahead.
-  assert.equal(chooseHandoff(undefined, others, DIGEST, NOW), newer);
-  assert.equal(chooseHandoff(undefined, [elsewhere, ahead, undated], DIGEST, NOW), undefined);
-  // An own hand-off dated ahead is never chosen either.
-  assert.equal(chooseHandoff({ sid: SID, handoff: handoff(NOW + 120_001) }, others, DIGEST, NOW), newer);
-  assert.equal(chooseHandoff({ sid: SID, handoff: handoff(NOW + 120_000) }, others, DIGEST, NOW)?.sid, SID);
-  // A session with no digest finds no other's.
-  assert.equal(chooseHandoff(undefined, others, null, NOW), undefined);
-  assert.equal(chooseHandoff(own, others, null, NOW), own);
-});
-
 // --- spec 444: one lead's log, Mark all as read, the marks cap order ------------
 
 const mk = (sid, id, at, state, when) => ({ log: sid, id, entryAt: at, state, at: when });
@@ -971,11 +881,11 @@ test('issue 466, issue 509: Mark all as read takes everything under To review, o
 // the only check that each written tool's own catch answers a fresh copy of
 // its fixed refusal, and those refusals stay (spec S4); the two decision
 // tools' descriptions bar error text only (claim 5).
-test('issue 486 claims 3 and 5: each written tool\'s catch answers a fresh copy of its refusal, and the two decision tools bar only error text', () => {
+test('issue 486 claims 3 and 5: each written tool\'s catch answers a fresh copy of its refusal, and the decision tool bars only error text', () => {
   const src = readFileSync(new URL('../brigade/register.tsx', import.meta.url), 'utf8');
-  for (const own of ['ROSTER_CAUGHT', 'LOG_CAUGHT', 'HANDOFF_CAUGHT']) assert.ok(src.includes(`}).catch(() => ({ ...${own} }))`), own);
+  for (const own of ['ROSTER_CAUGHT', 'LOG_CAUGHT']) assert.ok(src.includes(`}).catch(() => ({ ...${own} }))`), own);
   const descriptions = src.match(/ Plain text only, with no [^."]*\./g) ?? [];
-  assert.deepEqual(descriptions, [' Plain text only, with no error text.', ' Plain text only, with no error text.']);
+  assert.deepEqual(descriptions, [' Plain text only, with no error text.']);
 });
 
 // Issue 509 (the owner's words, 2026-11-05 and 2026-11-07): Mark all as read
@@ -1182,9 +1092,9 @@ test('C15a, #496: level 3 is named Turbo, and logs written before either rename 
 // --- 618 C2, C3: the ask type and stop on log_decision, judged by checkAsk alone ---------
 
 const FORM =
-  "Fix the entry's ask, stop or question and log it again: ask is question, review or notify, notify never waits, stop is one of the head-chef skill's kinds and only on a wait, and at level 3 a wait needs both and a one-line question. The step stays held until it is logged; if you can't log it, say so in chat.";
+  "Fix the entry's ask, stop or question and log it again: ask is question, review or notify, notify never waits, stop is one of this tool's kinds and only on a wait, and at level 3 a wait needs both and a one-line question. The step stays held until it is logged; if you can't log it, say so in chat.";
 const NO_STOP =
-  "At level 3 a wait needs one stop from the head-chef skill's list. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it with source lead and your pick, flag it, act, and tell the owner what you took.";
+  "At level 3 a wait needs one stop from this tool's kinds. At level 3 only blocked, owner-hands, owner-words, never-lifted and outside-goal fit a wait. A call that fits none of them is yours: log it with source lead and your pick, flag it, act, and tell the owner what you took.";
 const waits = (over = {}) => input({ waiting: true, pick: '', ...over });
 
 test('618 C2: the two fixed answers are exported whole, and neither names level 1 or echoes an input', () => {

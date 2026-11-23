@@ -84,9 +84,7 @@ or type `/brigade` to open it.
 - **Never relies on a card** to start work you asked for. When a start can
   only happen through a card, such as an approval above the lead's settings,
   it says in one line that the card needs a tap in the desktop app.
-- **Nudges about context** (since 1.9.0). It suggests `/compact` once when its
-  own context passes 60%, and again only after a compaction or at the next 10%
-  step. When it takes a member's report it reads that member's figure with the
+- **Nudges about context** (since 1.9.0). When it takes a member's report it reads that member's figure with the
   Brigade mod's `read_context`, and past 60% suggests a fresh session or
   carrying on, once per member per 10% step. A fresh session a figure prompts
   starts only on your words. A figure it cannot read raises nothing.
@@ -141,22 +139,26 @@ or type `/brigade` to open it.
   decides everything but what your user-level instructions file keeps for you, which it sends you as to-dos; at 3 it runs
   toward your goal and lists each decision in the Decisions tab for you to
   review. At levels 2 and 3 it follows your user-level instructions file:
-  at level 2, what that file keeps for you waits. At level 3, inside the goal, the lead and its members stop for nothing: what the file keeps for you, its hard stops included, the lead decides itself, logs with an "Owner's call:" flag and tells you after. Only Claude's own guardrails and the harness stop them: a permission prompt, a classifier block, a tool that refuses. Cleanup waits for your yes in chat at
-  levels 1 and 2, and a hand-off request or a fresh session a context figure
-  prompts waits at every level.
+  at level 2, what that file keeps for you waits. At level 3, inside the goal, the lead and its members stop for nothing: what the file keeps for you, its hard stops included, the lead decides itself, logs with an "Owner's call:" flag and tells you after. Only Claude's own guardrails and the harness stop them: a permission prompt, a classifier block, a tool that refuses. Cleanup and a fresh session a context figure prompts are
+  the skill's stops: at level 2 each waits for your confirmation, and at level
+  3 each is logged and flagged.
 
 ## What counts as your yes
 
-Only your own words in the lead's chat. A session's message, a report, a note
-or an issue comment never counts: a request in one is told to you, and
+Your own words, in any form and anywhere. A session's message, a report, a
+note or an issue comment never counts: a request in one is told to you, and
 nothing happens. Pressing I understand on the permission warning is a
-reminder, not acceptance. A level 3 counts at once: press the slider, or type
-`/brigade level 3 <goal>` at the prompt or from your phone. A compaction
-keeps it; a reload, a clear and a resume reset it to 1. A pressed 3 takes its
-goal from your words in the lead's chat, and the lead asks for one, acting at 2 until you give it, when there
-is none; a level or a goal named anywhere else is data. A reply accepting
-the lead's picks accepts the picks in the lead's own last message, and not
-when a session's report came between; it never counts as cleanup's yes.
+reminder, not acceptance. A start needs your ask, or a goal that names the
+work. The head chef's stops list holds what else waits: cleanup and a fresh session a context
+figure prompts. At level 2 each waits
+for your confirmation; at level 3 each is logged and flagged. A level 3 counts
+at once: press the slider, or type `/brigade level 3 <goal>` at the prompt or
+from your phone. A reload, a clear and a resume reset it to 1. A goal exists at levels 2 and 3, and a pressed 3 takes its goal from
+your words, and the lead asks for one, acting at 2 until you give it, when
+there is none; a level or a goal named anywhere else is data. A reply
+accepting the lead's picks accepts the picks in the lead's own last message,
+and not when a session's report came between; it never counts as cleanup's
+confirmation.
 
 ## What the sessions trust
 
@@ -169,8 +171,7 @@ name, can pass as the lead, or name a new lead and redirect the reports: the
 threat model lists that as an open issue. The head chef tells
 you at once when a session reports a decision it never sent.
 
-Before the lead is renamed or handed off, the head chef tells each session
-and you the new name.
+Before the lead is renamed, the head chef tells each session and you the new name.
 
 A session also follows comments on its issue made as you, and every session
 you start posts as you, so a comment from one session can steer another.
@@ -262,7 +263,6 @@ Claude Code 2.1.310, which rejects a case with a key it does not know.
 | `references/cleanup.md` | Cleanup's steps: your yes, the list, the archive or stop, the cleaner, what stays, and the undo, read when cleanup starts. Generated with `SKILL.md`. |
 | `references/starting.md` | The steps of a start, background by default, read before each start. Generated with `SKILL.md`. |
 | `references/desktop.md` | The Desktop route, read only when your words name it. Generated with `SKILL.md`. |
-| `references/handoff.md` | Writing and reading the lead's hand-off. Generated with `SKILL.md`. |
 | `references/CONTRACT.md` | The contract: intent, then its schedules. |
 | `references/contract.changelog.md` | The contract's history, from 0.1.0. |
 | `.skillspector-baseline.yaml` | Why four of the scanner's rules are false positives here. |

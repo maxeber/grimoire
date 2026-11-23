@@ -52,12 +52,11 @@ owner, who cleans it up by hand.
 4. **Instead of step 3, when no cleaner is named,** the sessions are still archived or stopped and nothing is removed. Say what stays, by session, folder and branch, and that a cleaner, if the owner wants one, is named by its program and how to run it in the owner's user-level instructions or in this chat. If the instructions refer to a cleaner with less than a program and a way to run it, ask that one question in the same message; until the owner answers, remove nothing and never search for one. Do not write removal commands out
    for the owner to run: say what stays, and the owner chooses how to remove
    it.
-5. **Report what stays, and update the pane.** Update the Brigade pane in the same step, whichever path you took: each card whose worktree went goes, and a card whose worktree stays is dismissed once the hand-off names its leftover. A cleaner that fails, is declined at the prompt or
+5. **Report what stays, and update the pane.** Update the Brigade pane in the same step, whichever path you took: each card whose worktree went goes, and a card whose worktree stays is dismissed once you have told the owner its leftover. A cleaner that fails, is declined at the prompt or
    does not finish is told as such, its worktree is listed as staying, and
    it is not run again in a loop. If an item stays because it is in use, run
    the cleaner again once. Leave everything else that stays, and tell the
-   owner what it holds. Your hand-off's cleanup section names each leftover
-   by branch, never by path.
+   owner what it holds. Name each leftover by branch, never by path.
 
 ## Undoing a wrong card
 

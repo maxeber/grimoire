@@ -531,9 +531,9 @@ export type Placed = { file: string; existing?: { size: number } } | { refused: 
 // mod writes: the lead's roster, and each session's usage summary in a folder
 // apart from the rosters. `plugins` is the engine's own and must be there;
 // the mod may create the rest.
-// The decision log, the owner's marks and the lead hand-off (spec 402) each
-// take a folder of their own beside `usage`.
-type Place = 'roster' | 'summary' | 'decisions' | 'marks' | 'handoff'
+// The decision log and the owner's marks (spec 402) each take a folder of
+// their own beside `usage`.
+type Place = 'roster' | 'summary' | 'decisions' | 'marks'
 const FOLDERS = (plugin: string, place: Place) =>
   place === 'roster' ? ['plugins', 'data', plugin, 'brigade'] : ['plugins', 'data', plugin, 'brigade', place === 'summary' ? 'usage' : place]
 
@@ -597,12 +597,6 @@ export function placeDecisions(config: string, plugin: string, sessionId: string
  *  rule, with the walk going into `marks`. */
 export function placeMarks(config: string, plugin: string, sessionId: string, stat: (path: string) => Promise<StatAnswer>): Promise<Placed> {
   return placeFile(config, plugin, sessionId, stat, 'marks')
-}
-
-/** Decides whether a session's hand-off file may be read or written: the
- *  same rule, with the walk going into `handoff`. */
-export function placeHandoff(config: string, plugin: string, sessionId: string, stat: (path: string) => Promise<StatAnswer>): Promise<Placed> {
-  return placeFile(config, plugin, sessionId, stat, 'handoff')
 }
 
 async function placeFile(

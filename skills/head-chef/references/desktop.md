@@ -4,29 +4,21 @@ Read this only when the owner's words in the lead's chat name the Desktop route,
 
 Follow `references/starting.md` for steps 1, 2 and 8 (the warning, the name and the idle notice). Follow this file in place of its steps 3 to 7.
 
-1. **Start it as a Desktop session under the lead,** with Desktop's start
-   tool. Set its model and effort with Desktop's setters at the start. Never
-   change a running session's model with a setter, as "When the model
-   changes" in `references/starting.md` says; the effort setter on a running
-   session, with the model the same, stays allowed. The model and effort
-   come from the owner's words or the owner's own process; this skill sets no
-   default of its own. Set no permission mode: the session takes the default
-   unless the owner's words name one.
-2. **Give it the start prompt** in "The start prompt" in `SKILL.md`, filled
+1. **Give it the start prompt** in "The start prompt" in `SKILL.md`, filled
    in. You may add one note after it, written, labelled and bounded as "The
    start prompt" in `SKILL.md` says. You write and check it yourself, as no
-   tool does. A hand-off is the same start, with the effort's context on the issue.
+   tool does.
    Send later updates to the session as messages, by its name.
-3. **Keep its Desktop id** from the start tool's result, in this chat only,
+2. **Keep its Desktop id** from the start tool's result, in this chat only,
    for its card and the archive. Keep its folder and branch too, as the start
    tool's result shows them, in this chat only, for the list before cleanup.
-4. **Report the start in chat,** in the form of the example in `SKILL.md`'s
+3. **Report the start in chat,** in the form of the example in `SKILL.md`'s
    "What a good report looks like", saying "a Desktop session" in place of "a
    background session with Remote Control": the session, its issue, how it
    runs, what the owner must do (the approval-card line, when the session
    waits on a card), and the 5-hour and weekly usage, read with Desktop's
    usage tool. Usage figures go in this chat only.
-5. **Update the Brigade pane** in the same step, as "The Brigade pane" in
+4. **Update the Brigade pane** in the same step, as "The Brigade pane" in
    `SKILL.md` says. Give the card the Desktop id as `desktopId`.
 
 When Desktop's start tool refuses a start, say so in one line, say the

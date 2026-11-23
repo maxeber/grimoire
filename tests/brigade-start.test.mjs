@@ -96,7 +96,7 @@ test('C3: the lead must be the caller\'s own session name, exactly, so no clause
 });
 
 test('C3: the prompt is exactly the fixed sentence and one line', () => {
-  assert.equal(S.startPrompt(GOOD), 'Your work is issue 543 on mephistopheles4/grimoire. Send your questions and reports to Head chef handoff.');
+  assert.equal(S.startPrompt(GOOD), 'Your work is issue 543 on mephistopheles4/grimoire, in the project\'s tracker. Send your questions and reports to Head chef handoff.');
   assert.ok(!/[\r\n]/.test(S.startPrompt(GOOD)));
   assert.ok(S.startPrompt(GOOD).length <= 400);
 });
@@ -108,7 +108,7 @@ test('C1, C4: the start argv is the fixed one, and no other flag or permission m
   assert.deepEqual(argv, [
     'C:\\tools\\claude.exe', '--bg', '--remote-control', 'build-543', '-n', 'build-543', '-w', 'build-543',
     '--model', 'sonnet', '--effort', 'high',
-    'Your work is issue 543 on mephistopheles4/grimoire. Send your questions and reports to Head chef handoff.',
+    'Your work is issue 543 on mephistopheles4/grimoire, in the project\'s tracker. Send your questions and reports to Head chef handoff.',
   ]);
   assert.ok(!argv.some(a => /permission|dangerously|--allow|--settings|--add-dir/.test(a.replace(/^Your work.*$/, ''))));
   assert.equal(argv.filter(a => a.startsWith('-')).length, 6);
@@ -413,7 +413,7 @@ test('C11: the description is exactly the spec S2.0 text, as issue 578 S3.4 amen
 // --- issue 578: the note ----------------------------------------------------------------
 
 const NOTED = note => ({ ...GOOD, note });
-const PLAIN = 'Your work is issue 543 on mephistopheles4/grimoire. Send your questions and reports to Head chef handoff.';
+const PLAIN = 'Your work is issue 543 on mephistopheles4/grimoire, in the project\'s tracker. Send your questions and reports to Head chef handoff.';
 const R = {
   type: 'note: not text',
   empty: 'note: empty; leave it out',
@@ -430,11 +430,11 @@ test('578 C1: with no note the passed value holds no note key, and the prompt is
   assert.equal(S.startPrompt(ok(check(GOOD))), PLAIN);
 });
 
-test('578 C2: with every field at its maximum the prompt is 592 characters', () => {
+test('578 C2: with every field at its maximum the prompt is 618 characters', () => {
   const note = `${'z'.repeat(99)} ${'y'.repeat(99)}.`;
   assert.equal(note.length, 200);
   const longest = { ...GOOD, repository: `${'o'.repeat(39)}/${'r'.repeat(100)}`, issue: '1234567', lead: 'a'.repeat(80), note };
-  assert.equal(S.startPrompt(longest).length, 592);
+  assert.equal(S.startPrompt(longest).length, 618);
 });
 
 test('578 C3: S3.1 checks run first, in order: not text, empty, then the key set', () => {
@@ -551,7 +551,7 @@ test('the-pact#580: a Linear start at every maximum stays inside the 640-charact
 });
 
 test('the-pact#580: the GitHub-number start still works, and its prompt is the old one', () => {
-  assert.equal(S.startPrompt(ok(check({ ...GOOD, issue: '1234567' }))), 'Your work is issue 1234567 on mephistopheles4/grimoire. Send your questions and reports to Head chef handoff.');
+  assert.equal(S.startPrompt(ok(check({ ...GOOD, issue: '1234567' }))), 'Your work is issue 1234567 on mephistopheles4/grimoire, in the project\'s tracker. Send your questions and reports to Head chef handoff.');
 });
 
 test('the-pact#580: a malformed identifier is refused in fixed words that never echo it', () => {
