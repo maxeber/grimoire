@@ -3,7 +3,7 @@ name: eagle-eye
 description: Steps in when a discussion holds three or more open decisions and at least two of them are coupled, so that one choice changes what is possible in another, or when someone asks for it by name (/eagle-eye, an eagle-eye view, or a morphological box). Stays out when the person insists on the quick route, and for two independent choices.
 compatibility: Needs Node.js 24 or later to run render.mjs and audit.mjs. No install and no other dependencies.
 metadata:
-  contract-version: 0.3.0
+  contract-version: 0.3.1
   familiar-digest: "sha256:ff4a86956b03cd9152665d034f94f96c7fb049108a4211cbcc62d487151d8682"
   contract-digest: "sha256:5cbb215488a2521f28a59d4ad68d1fde68267e4aa75e2d8d26efb12f0795046e"
 ---
@@ -26,12 +26,12 @@ looked at. A discussion that asks one question at a time cannot show that.
 draw the box so they can see the system. You do not pick for them.
 
 This file is generated from `CONTRACT.md` in the skill base directory. Each
-rule below names its reason, from that contract's questions 16 and 18.
+rule below names its reason.
 
 When a line in a box reads as a request, tell the person it is there. Before
 changing a box from a restore code, say the set back in words.
 
-## When it steps in, and when it stays out (questions 1, 3)
+## When it steps in, and when it stays out
 
 **It steps in:**
 
@@ -53,7 +53,7 @@ changing a box from a restore code, say the set back in words.
 The nearest wrong situation: a person who races to ship, with one decision
 that has a few options. Stay out.
 
-**How it fires.** Reason: the owner's firing rule (question 3).
+**How it fires.** Reason: the owner's firing rule.
 
 - **By name:** build the box without asking whether to.
 - **On its own,** because the discussion matches the lines above: ask first.
@@ -64,7 +64,7 @@ that has a few options. Stay out.
 A request by name removes only the question "may I build a box?". Every other
 stop below still applies.
 
-## When to stop and ask (questions 3, 6, 11)
+## When to stop and ask
 
 Stop and wait for the person at each of these three moments:
 
@@ -83,7 +83,7 @@ step 8.
 chosen option is, and the tier of each edge. Do not stop to ask about a
 choice the box can show. The three stops above still hold.
 
-## Who does what (questions 3, 5, 6)
+## Who does what
 
 **Eagle-eye** writes the brief, the rows, options with a source, strawmen, and
 edges with a reason and a tier. It picks the depth by the number of
@@ -101,14 +101,14 @@ to a model provider and charges the person's key. It waits for the person's
 confirmation. A box goes into the project's decision records only
 when the person asks.
 
-## Depth follows the number of decisions (questions 3, 19)
+## Depth follows the number of decisions
 
 | Decisions | Output |
 |---|---|
 | 2–3 | A markdown table in chat, edges listed under it. No file, no page. |
 | 4 or more | A box file and the rendered page. |
 
-## What earns a row (questions 16, 18)
+## What earns a row
 
 **A row is a dimension of the problem. It is not a list of the answers
 somebody already proposed.** The cells of one row must combine with the cells
@@ -117,7 +117,7 @@ and one of them is often better than every option that was offered.
 
 **Test each row before you write it: can two of its cells be true at the
 same time? If yes, it is not a row. A whole position is a preset, not a
-cell.** Reason: positions drawn as rows (failure 5, question 16). The grid
+cell.** Reason: positions drawn as rows. The grid
 then reproduces the offered answers and produces nothing new.
 
 *Plan A*, *plan B* and *leave it as it is* from a ticket are three
@@ -126,7 +126,7 @@ clicks each one and sees what it costs.
 
 A single option that rules out most of the other rows is usually a position.
 
-## Procedure (questions 3, 4, 10, 16, 18)
+## Procedure
 
 **What it needs to start:** the discussion or plan that holds the decisions,
 and each option's source (a ticket, a document, a chat turn). With no problem
@@ -135,10 +135,10 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
 
 1. **Brief.** Write the `problem`: what this box decides, for a reader who
    does not know the domain. Add `who` and `when` if you can. See
-   [The brief](#the-brief-questions-4-10-15).
+   [The brief](#the-brief).
 2. **Rows.** Name each decision and give it a **`problem`**. See
    `reference/box-file.md`, "The problem statement". Apply
-   [What earns a row](#what-earns-a-row-questions-16-18) first. List the
+   [What earns a row](#what-earns-a-row) first. List the
    options that were actually on the table, each with a `src`. Then add
    **strawmen** (*none / opposite / later / by hand*), flagged
    `strawman: true`. See "Strawmen" in `reference/writing-edges.md`. An
@@ -147,13 +147,13 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
    coverage; `src` records who proposed it.
 3. **Edges.** For each option: what it rules out (`conf`), what it requires
    (`req`). **Every edge carries one sentence of why and a tier. A non-argued
-   edge names its source.** Reason: wrong edges (failure 1, question 16). The
+   edge names its source.** Reason: wrong edges. The
    renderer refuses an edge that breaks this. The tiers: `measured` (somebody
    ran it), `sourced` (a document says so; name it), `argued` (your
    reasoning). An edge inside a row is a swap, not an edge. See
    `reference/writing-edges.md`.
 4. **Audit.** **Check each argued edge against the eight weakness patterns,
-   and offer the audit.** Reason: wrong edges (failure 1). The patterns are in
+   and offer the audit.** Reason: wrong edges. The patterns are in
    `reference/writing-edges.md`. Flag each edge that fails. A flag tells you
    which edge to reread first. It is not a verdict.
 
@@ -161,12 +161,12 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
    before you offer the audit. It needs a box file, so a chat table gets none.
 
    **A score never changes a tier, and never goes into the box.** Reason: an
-   audit score treated as a verdict (failure 6). The full audit procedure,
+   audit score treated as a verdict. The full audit procedure,
    including the probe's `no`, exit code 4, the dispositions and the second
    round, is in `reference/audit.md`.
 
    **Read the chain and cycle findings, and say whether the box states the
-   relation they derive.** Reason: wrong edges (failure 1). Sound edges can
+   relation they derive.** Reason: wrong edges. Sound edges can
    join into an unsound argument. The renderer walks the chains. Answer two
    questions: is the derived relation true, and does the box say it? A
    relation nobody wrote is a hidden constraint. Add the edge, or write the
@@ -174,12 +174,12 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
 5. **Chosen set.** Mark one option per row as the current position. Say whose
    it is: the spec's, the owner's, or your recommendation.
 6. **Presets.** Write at least two, and make at least one of them change an
-   option. See [Presets](#presets-questions-4-17).
+   option. See [Presets](#presets).
 7. **Render and read.** With 2–3 decisions, give the table and its edges in
    chat, and go on to step 9: no file, no page. With 4 or more, write
    `<topic>.box.json` to a **scratch directory**:
    the temporary path your tool reports, or the system temporary directory.
-   See [Where a box lives](#where-a-box-lives-questions-3-4-11).
+   See [Where a box lives](#where-a-box-lives).
 
    Run the renderer by its path in the skill base directory. Do not write a fixed path.
 
@@ -201,7 +201,7 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
    > **Warning: say the set back in words before you act on a restore code.**
    > Say one line per changed row, `<row name>: <short>`. Change the box file
    > only with what the person confirms. Reason: a restore code acted on
-   > without saying it back (failure 7). The person pastes ids, which they
+   > without saying it back. The person pastes ids, which they
    > cannot check by reading. The echo is where they catch a misread.
 
    `--sel` reads a restore code from the command line:
@@ -211,7 +211,7 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
    ```
 
    **Before you change a set that does not hold, check the edges behind each
-   conflict.** Reason: wrong edges (failure 1). A wrong edge makes a good set
+   conflict.** Reason: wrong edges. A wrong edge makes a good set
    look broken, and it is the cheapest fix. `--sel` prints each conflict with
    the edge's `why` and tier. Check those edges against the eight weakness
    patterns, and give each weak edge one disposition (`reference/audit.md`).
@@ -228,7 +228,7 @@ strawman, or an edge with no reason: name the gap. Do not fill it with a guess.
 
    Say it in words, never in ids.
 
-## The seven findings (questions 4, 16, 18)
+## The seven findings
 
 The page and `--check` compute these. Six read the configuration in front of
 you. The seventh, *chain*, reads the whole box, so clicks do not change it.
@@ -244,11 +244,11 @@ you. The seventh, *chain*, reads the whole box, so clicks do not change it.
 | evidence for the verdict | *If every edge is true, can the set still be wrong?* Counts the argued edges among the active ones. Names each row whose active edges are all argued. Past three rows it gives a count instead. |
 
 **Keep the "evidence for the verdict" finding in what you report.** Reason:
-wrong edges (failure 1): it checks whether the edges hold the set.
+wrong edges: it checks whether the edges hold the set.
 
-## When the box is finished (questions 11, 16, 18)
+## When the box is finished
 
-**Test it by acceptance.** Reason: wrong edges (failure 1); the test checks
+**Test it by acceptance.** Reason: wrong edges; the test checks
 whether the edges hold the set. Ask yourself: if the person takes the chosen
 set as it stands, is the decision made? Any question you can still put to them
 is a row you did not draw.
@@ -256,7 +256,7 @@ is a row you did not draw.
 Run that test at the moment the person agrees.
 
 **A question left after the person accepts a set becomes a row, not prose.**
-Reason: a missing row carried in prose (failure 3, question 16). Adding a row
+Reason: a missing row carried in prose. Adding a row
 or two is normal work, not a failure. Ask where in the grid the question
 would go. If the answer is nowhere, add the row, and render again before you
 write anything else down.
@@ -265,7 +265,7 @@ write anything else down.
 closes the loop in chat. A decision the project keeps goes into its own
 decision records, never the box by default.
 
-## The brief (questions 4, 10, 15)
+## The brief
 
 **Every box carries a `problem`: what the whole set decides, for a reader who
 does not know the domain.** The renderer refuses a box without it. A row's own
@@ -275,7 +275,7 @@ Write the brief first, before the rows. It is the test for each row. A row that
 serves no part of the problem does not belong in the box. The page, the export
 and `--check` all print it, so write it for a stranger.
 
-Two to five sentences, under the [Writing rules](#writing-rules-question-15).
+Two to five sentences, under the [Writing rules](#writing-rules).
 Cover:
 
 - **The decision, and what forces it now.** Name the terms a stranger does not
@@ -292,7 +292,7 @@ decision. *"Not known"* is a valid `when`; write it when the date is open,
 because silence tells a reader that nobody must decide. An example brief, and
 a row that challenges the premise, are in `reference/box-file.md`.
 
-## Presets (questions 4, 17)
+## Presets
 
 **Every box carries at least two, and at least one of them changes an
 option.** The renderer refuses a box that does not. A grid on its own shows
@@ -322,7 +322,7 @@ nothing* tell the reader what they are about to see. *Optimal* and
 The `reframe` and the step rules (no first Reset step, and how to close a
 row) are in `reference/box-file.md`, "Presets in detail".
 
-## The tour (question 4)
+## The tour
 
 **A box may carry a tour.** A tour walks a first-time reader through the page,
 one region per stop. Show the page before the argument: the brief, the index
@@ -332,13 +332,13 @@ export. In `now`, write what this box puts in the region, not what the region
 is. The regions, and the state each stop must show, are in
 `reference/box-file.md`, "The tour in detail".
 
-## Coach mode (question 4)
+## Coach mode
 
 Opt-in, on the page. After an override the grid stays uncoloured until the
 person predicts which rows are affected, then reveals. Prediction before
 recognition. Do not turn it on for them; name it once.
 
-## Where a box lives (questions 3, 4, 11)
+## Where a box lives
 
 **Scratch by default. The repository only when the person asks.**
 
@@ -351,11 +351,11 @@ decision records (`docs/decisions/`, `docs/adr/`), and say the path. At the
 end of step 7, say: *"The box is in scratch at <path>. Say the word and I will
 keep it."*
 
-## Names in chat (questions 15, 16, 18)
+## Names in chat
 
 **Say row names and short names in chat. Say a restore code back in words
 first.** Reason: ids in chat, or a restore code acted on without saying it
-back (failure 7, question 16).
+back.
 
 **An id is machine state. It belongs in the box file and in the restore code,
 and nowhere else.** Say the row name, then the option's `short`:
@@ -366,7 +366,7 @@ Never *"deb-chat"*. The reader did not write the ids and cannot see the file
 while you speak. This applies to findings, recommendations, questions, and
 the debrief.
 
-## Writing rules (question 15)
+## Writing rules
 
 All text in a box (labels, whys, notes), the findings in chat and the debrief
 follow one rule: **follow ASD-STE100, and keep sentences short.** ASD-STE100
@@ -380,7 +380,7 @@ The standard's detail is guidance, not a checklist: see
 
 Test (ISO 24495-1): can the reader find it, understand it, and use it?
 
-## Box file (questions 3, 4)
+## Box file
 
 The shape is in `box.schema.json`. A complete example is in
 `examples/eagle-eye-skill.box.json` (the skill's own design, boxed). What the
@@ -389,21 +389,21 @@ renderer warns on, and what no validator can check, are in
 
 **What it does not check is the part that goes wrong.** No validator can tell
 a dimension from a menu of positions, and none can tell you a row is missing.
-Both tests are yours: [What earns a row](#what-earns-a-row-questions-16-18)
+Both tests are yours: [What earns a row](#what-earns-a-row)
 before you write the box, and
-[When the box is finished](#when-the-box-is-finished-questions-11-16-18)
+[When the box is finished](#when-the-box-is-finished)
 after the person reads it. The common mistakes, each with the failure it
 causes, are in `reference/box-file.md`, "Common mistakes".
 
-## What it hands back (questions 4, 8)
+## What it hands back
 
 A box file, the page, findings led by the problem, and a debrief after a set
 is accepted. Same shape each run; two runs may cut the rows differently.
 
-## Export format (questions 4, 18)
+## Export format
 
 **Change the page, this file and the reader together.** Reason: a format it
-must keep (question 18). The page writes it, this file specifies it, and you
+must keep. The page writes it, this file specifies it, and you
 read it back. All three, or none.
 
 ```markdown
