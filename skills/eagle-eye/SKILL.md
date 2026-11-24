@@ -3,7 +3,7 @@ name: eagle-eye
 description: Steps in when a discussion holds three or more open decisions and at least two of them are coupled, so that one choice changes what is possible in another, or when someone asks for it by name (/eagle-eye, an eagle-eye view, or a morphological box). Stays out when the person insists on the quick route, and for two independent choices.
 compatibility: Needs Node.js 24 or later to run render.mjs and audit.mjs. No install and no other dependencies.
 metadata:
-  contract-version: 0.3.1
+  contract-version: 0.3.2
 ---
 
 # Eagle-eye
@@ -51,7 +51,7 @@ changing a box from a restore code, say the set back in words.
 The nearest wrong situation: a person who races to ship, with one decision
 that has a few options. Stay out.
 
-**How it fires.** Reason: the owner's firing rule.
+**How it fires.**
 
 - **By name:** build the box without asking whether to.
 - **On its own,** because the discussion matches the lines above: ask first.
