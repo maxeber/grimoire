@@ -164,10 +164,10 @@ Do each step in order and stop at the first failure.
    typed. On a later run, with the mic open, a spoken number counts after the say-back.
 5. **Voice.** Run `node <skill base>/scripts/setup.mjs profiles`. Show its lines
    and ask the person for the id of the voice they want, typed on a first install
-   and spoken or typed after that. Offer only the voices of the engine picked in
-   step 3, each line ends with its engine in brackets: a voice of the other
-   engine fails the check in step 7, since its files were not downloaded.
-   Recommend a preset on Kokoro: a heavier engine costs seconds a line.
+   and spoken or typed after that. The list holds only the voices of the engine
+   installed in step 3, each line ending with its engine in brackets.
+   Recommend a preset on Kokoro when it is listed: a heavier engine costs
+   seconds a line.
 6. **Save.** Run `node <skill base>/scripts/setup.mjs choose <index> <stamp> <profile id>`
    with the number and the id the person gave and the stamp setup printed in
    step 4. Show its line. If the stamp is stale, run step 4 again.

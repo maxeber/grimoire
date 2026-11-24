@@ -175,11 +175,13 @@ export function makeEngine({ port, profile, home = homedir(), platform = process
       return phononVoice ? exists(pythonExe(home, platform)) : true;
     },
     transcribe,
-    // Kokoro's voice always; Phonon's only when its part is installed.
+    // A voice is offered only when its engine's part is installed: a voice the
+    // guard would refuse is not one to pick.
     async profiles() {
+      const { states } = checkRuntime(home, key, pins);
       return [
-        ...Object.keys(VOICES).map(id => ({ id, name: id, engine: 'kokoro' })),
-        ...(checkRuntime(home, key, pins).states.phonon === 'ok' ? Object.keys(PHONON).map(id => ({ id, name: id, engine: 'phonon' })) : []),
+        ...(states.speaking === 'ok' ? Object.keys(VOICES).map(id => ({ id, name: id, engine: 'kokoro' })) : []),
+        ...(states.phonon === 'ok' ? Object.keys(PHONON).map(id => ({ id, name: id, engine: 'phonon' })) : []),
       ];
     },
     // Loads both models and runs each once, so the first real line is warm.

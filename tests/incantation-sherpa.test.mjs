@@ -107,13 +107,17 @@ test('claim 16: no provider but cpu is ever passed, and no PATH is changed', asy
   }
 });
 
-test('claim 16: profiles lists bella, and everly only when Phonon is installed', async () => {
+test('claim 16: profiles lists bella only when Kokoro is installed, and everly only when Phonon is (issue 674)', async () => {
   const f = fixture();
   try {
     const engine = () => makeEngine({ port: 17493, home: f.home, pins: PINS });
-    assert.deepEqual((await engine().profiles()).map(p => p.id), ['bella']);
+    assert.deepEqual((await engine().profiles()).map(p => p.id), [], 'nothing installed, nothing to pick');
     installFake(f.home, ['phonon']);
+    assert.deepEqual((await engine().profiles()).map(p => p.id), ['everly'], 'a Phonon-only install offers no Kokoro voice');
+    installFake(f.home, ['speaking']);
     assert.deepEqual((await engine().profiles()).map(p => p.id), ['bella', 'everly']);
+    rmSync(join(runtimeDir(f.home), 'phonon'), { recursive: true });
+    assert.deepEqual((await engine().profiles()).map(p => p.id), ['bella'], 'a Kokoro-only install offers no Phonon voice');
   } finally {
     f.remove();
   }
