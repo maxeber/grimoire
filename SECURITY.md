@@ -796,8 +796,6 @@ are the setting above.
   bad commit. It does not survive a stolen admin account.
 - **A skill, an agent and a contract from someone else.** A pass of
   `claude plugin validate --strict` says a frontmatter parses, not that anyone
-  reviewed the file. Read the files first. The eagle-eye skill still
-  carries seal marks from the old check, the `familiar-digest` and
-  `contract-digest` lines in its `SKILL.md` metadata; they are inert and prove
-  nothing, and go when it is next amended. The contract and head-chef skills
-  carry none.
+  reviewed the file. Read the files first. No skill here carries the seal
+  marks of the old check, the `familiar-digest` and `contract-digest` lines in
+  `SKILL.md` metadata; eagle-eye's went at its 0.3.1 amendment.

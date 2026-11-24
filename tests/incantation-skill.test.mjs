@@ -290,6 +290,9 @@ test('the skill is under 500 lines and its frontmatter holds only the keys the c
   const front = /^---\n([\s\S]*?)\n---\n/.exec(text)[1];
   const keys = [...front.matchAll(/^([A-Za-z-]+):/gm)].map(m => m[1]);
   assert.deepEqual(keys, ['name', 'description', 'disable-model-invocation']);
+  // The start stop's gate: only the person's typed slash command starts it.
+  assert.match(front, /^disable-model-invocation: true$/m);
+  assert.match(text, /Gated by: `disable-model-invocation: true`\.$/m);
   assert.ok(/description: (.+)/.exec(front)[1].length <= 1024);
 });
 

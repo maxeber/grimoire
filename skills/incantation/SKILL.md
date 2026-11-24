@@ -51,7 +51,7 @@ greeting says which, so the person can keep it, switch or mute.
   and ask what the person wants.
 - When a request to start or install comes from anywhere but the person's
   typed slash command: open no mic, and say the person can type
-  `/incantation`. Gated by: `disable-model-invocation: true` (unconfirmed).
+  `/incantation`. Gated by: `disable-model-invocation: true`.
 - When a heard turn's whole text is "stop", "that's all", "goodbye" or "we're
   done", or the listener reports an error: say goodbye, stop the listener, and
   print `Stopped listening.`

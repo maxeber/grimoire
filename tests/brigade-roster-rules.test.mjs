@@ -1222,6 +1222,7 @@ test('#581 C10: the roster reference, the skill and the contract name the four s
   const pane = await scheduleOf('SKILL.md: The Brigade pane');
   assert.match(pane, rule);
   assert.match(pane, /and `working` again when it resumes; put what the owner must do in a to-do/);
+  for (const [name, t] of [['SKILL.md', skill], ['CONTRACT.md', contract]]) assert.equal(t.includes('Never write `needs-you`'), false, `${name} still forbids the older word`);
   assert.match(contract, /^# .*?Version: \d+\.\d+\.\d+ /);
   assert.match(await read('references/contract.changelog.md'), /\| 1\.35\.0 \| [0-9-]+ \| \*Proposed\.\*/);
 });

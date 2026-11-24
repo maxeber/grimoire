@@ -157,7 +157,7 @@ for it. Never write a fixed path.
 | `--graph <id>` | Which graph `--text` reads. Refused with `--check` and `--out`, which both read every graph — the check validates them all, and the page carries them all and picks between them. |
 
 **A file with several graphs needs the graph named.** `--text` on a one-graph
-file prints as it always did. On a several-graph file without `--graph` it
+file prints its tree. On a several-graph file without `--graph` it
 lists the graphs, one line each, and stops. **Nothing ranks them and nothing
 suggests one**, which is the same rule as step 3: a run that is not told which
 graph to read asks.
