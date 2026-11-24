@@ -305,9 +305,7 @@ files you ask for:
   The cleaner's answer, folder and file names included, lands in the lead's
   conversation and transcript. A lead started, or a skill copied, before this
   update may still tell you to type a command: it now only opens the pane, so
-  say the yes in chat. If an archive is refused with a message that names a
-  window you open, the mod is older than 0.118.0: update it, or archive by
-  hand. To undo a wrong card, recreate its worktree at
+  say the yes in chat. To undo a wrong card, recreate its worktree at
   `.claude/worktrees/<name>` with `git worktree add` from its remote branch or,
   if the cleaner printed one, the tip it printed, then unarchive the Desktop
   session or `claude attach` the stopped one. A stopped background session

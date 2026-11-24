@@ -5,15 +5,15 @@ and the renderer's checks. `SKILL.md` holds the steps and the stops.
 
 ## Contents
 
-- An example brief (questions 4, 9, 15)
-- Challenge the premise with a row (questions 10, 16)
-- The problem statement (questions 10, 15)
-- Presets in detail (questions 4, 17)
-- The tour in detail (question 4)
-- What the renderer checks (questions 3, 4)
-- Common mistakes (questions 16, 17, 18)
+- An example brief
+- Challenge the premise with a row
+- The problem statement
+- Presets in detail
+- The tour in detail
+- What the renderer checks
+- Common mistakes
 
-## An example brief (questions 4, 9, 15)
+## An example brief
 
 > **problem.** The gate blocks a merge when a build is red. Nobody has said who
 > must be able to clear it. A maintainer can fix almost anything, and a
@@ -25,7 +25,7 @@ and the renderer's checks. `SKILL.md` holds the steps and the stops.
 > **when.** Before the next release, because the release note repeats the
 > promise.
 
-## Challenge the premise with a row (questions 10, 16)
+## Challenge the premise with a row
 
 The brief says why the box exists. The box never tests that statement. Every row
 carries a strawman, so a reader can attack its options. The reason for the whole
@@ -39,7 +39,7 @@ This row needs no new concept. Strawmen, edges and all seven findings work on it
 today. The *strawman not rejected* finding then also covers the premise. The
 renderer does not enforce this row. Draw it when the premise deserves a test.
 
-## The problem statement (questions 10, 15)
+## The problem statement
 
 This section is about a **row**. For the box, see "The brief" in `SKILL.md`.
 
@@ -71,7 +71,7 @@ edges carry the argument.
 `question` stays what it was: the decision in one line, under the row name. The
 `problem` explains it.
 
-## Presets in detail (questions 4, 17)
+## Presets in detail
 
 A preset's `reframe` is optional, and it is not the `text`. The `text` says
 what the reader sees. The `reframe` says what the box now decides. The page
@@ -94,7 +94,7 @@ view already. To send the reader back from an open row, close the row in the
 same step: `{ open: null, view: 'findings' }`. Use `view` on its own only for
 `'sheet'`.
 
-## The tour in detail (question 4)
+## The tour in detail
 
 A stop names a `region` and writes `now`. It may change options with `set`, open
 a row with `open`, and pick the `view`. A stop states its whole page. What it
@@ -108,7 +108,7 @@ needs `"view": "sheet"`. The option cards need a row open. The brief and the
 findings need no row open. The page turns coach off during the tour. When the
 tour ends, the page puts back the reader's options.
 
-## What the renderer checks (questions 3, 4)
+## What the renderer checks
 
 It warns on a row with no `problem`, on a row with no strawman, and on a
 strawman that is the chosen option.
@@ -129,42 +129,44 @@ you a row is missing. One mechanical check would help and does not exist yet:
 warn when a single option rules out options across most of the other rows,
 because that cell is usually a position.
 
-## Common mistakes (questions 16, 17, 18)
+## Common mistakes
 
-Each mistake names the failure from question 16 that it causes.
+Each mistake names the failure it causes.
 
 - **Drawing an edge you cannot say why for.** The grid colours on it as if it
-  were measured. Write the why or drop the edge. (Failure 1, wrong edges.)
+  were measured. Write the why or drop the edge. (Wrong edges.)
 - **Marking an argued edge as sourced.** Sourced means a named document says
-  it. Name it in `src` or it is argued. (Failure 1.)
+  it. Name it in `src` or it is argued. (Wrong edges.)
 - **No strawmen.** The *strawman not rejected* finding is the one that changes
   minds most. A row without one has nothing to test the chosen option against.
 - **A row name written for the people already in the room.** *"Reachable by
   whom"* is a handle. Write the `problem` so a stranger can read the row.
 - **A row that lists positions instead of dimensions.** *Build it / document
   it / leave it* is three answers, not one decision. The grid then
-  reproduces those three and produces nothing new. (Failure 5.)
+  reproduces those three and produces nothing new. (Positions drawn as rows.)
 - **More questions after the person accepts the chosen set.** Each one is a
-  row you did not draw. Add the row; do not carry it in prose. (Failure 3.)
+  row you did not draw. Add the row; do not carry it in prose. (A missing row
+  carried in prose.)
 - **Recommending in prose instead of drawing the box.** A paragraph that says
   "that would need a backend" is an edge nobody can click. The same fault
   appears as an answer you recommend that is not a cell anywhere.
 - **A preference drawn as a constraint.** "The owner wants depth tuning" is
-  not an edge. Put it in `notes`, or in `suspected`. (Failure 1.)
+  not an edge. Put it in `notes`, or in `suspected`. (Wrong edges.)
 - **Presets that all walk the chosen set.** Four tours of the baseline teach
   the reader one configuration. Give at least one preset a `set` step.
 - **Saying an id in chat.** *"deb-chat"* names nothing to the reader. Say the
-  row name and the `short`. (Failure 7.)
+  row name and the `short`. (Ids in chat.)
 - **Acting on a restore code without saying it back.** The person pastes ids
   they cannot check by reading. Say the set back in words first, or a misread
-  becomes the record. (Failure 7.)
+  becomes the record. (A restore code acted on without saying it back.)
 - **Changing the set before you check the edge that blocks it.** An argued
   edge can be wrong, and then the set holds as it is. Check the edges behind
-  each conflict first. (Failure 1.)
+  each conflict first. (Wrong edges.)
 - **Reading each edge and never the chain.** Sound edges can join into an
   unsound argument. The *chain* finding names the join. Read it. Then say
-  whether the box states the relation it derives. (Failure 1.)
+  whether the box states the relation it derives. (Wrong edges.)
 - **An audit score written into the box, or used to change a tier.** A score
-  says which edge to reread. It is not a verdict. (Failure 6.)
+  says which edge to reread. It is not a verdict. (An audit score treated as
+  a verdict.)
 - **Changing the export format in one place.** The page writes it; `SKILL.md`
   specifies it; you read it. All three, or none.

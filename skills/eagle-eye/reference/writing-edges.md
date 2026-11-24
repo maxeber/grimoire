@@ -5,16 +5,16 @@ grid, so a wrong edge is worse than no edge.
 
 ## Contents
 
-- Tiers (questions 4, 16)
-- What an edge can say (questions 3, 16)
-- Writing rules (question 15)
-- The eight weakness patterns (questions 16, 18)
-- Chains (questions 16, 18)
-- Cogency test (questions 16, 18)
-- The suspected list (questions 4, 16)
-- Strawmen (questions 10, 16)
+- Tiers
+- What an edge can say
+- Writing rules
+- The eight weakness patterns
+- Chains
+- Cogency test
+- The suspected list
+- Strawmen
 
-## Tiers (questions 4, 16)
+## Tiers
 
 | Tier | Means | `src` |
 |---|---|---|
@@ -25,7 +25,7 @@ grid, so a wrong edge is worse than no edge.
 A tier is a claim about evidence, not about confidence. An argued edge you are
 sure of is still argued.
 
-## What an edge can say (questions 3, 16)
+## What an edge can say
 
 - `conf`: if both options are selected, the set does not hold.
 - `req`: if this option is selected and the target is not, the set is
@@ -39,7 +39,7 @@ sure of is still argued.
 - Target in the same row: not allowed. Choosing one option in a row already
   excludes its siblings.
 
-## Writing rules (question 15)
+## Writing rules
 
 **The rule: follow ASD-STE100, and keep sentences short.** ASD-STE100 is a
 controlled English standard. Use its writing rules only, not its dictionary.
@@ -69,10 +69,10 @@ The points below are the standard's detail. Use them as guidance for what
 Test (ISO 24495-1): can the reader find it, understand it, and use it? A why
 that needs a second reading fails.
 
-## The eight weakness patterns (questions 16, 18)
+## The eight weakness patterns
 
 Check every argued edge against these patterns. Reason: wrong edges are
-failure 1 in question 16, the top priority.
+the top-priority failure.
 
 From the TDE method. Name the pattern when you reject an edge; it teaches the
 next author.
@@ -91,7 +91,7 @@ next author.
 An edge that fails and cannot be fixed goes to `suspected`: a plain string
 that the page lists but that colours nothing.
 
-## Chains (questions 16, 18)
+## Chains
 
 An edge is one reason. A chain is two reasons in a row. The TDE method calls a
 set of reasons **cohesive** when each reason extends the one before it. The
@@ -128,7 +128,7 @@ loop, through three options or more, reports the same way. Either the rows in
 the loop are one decision, or one direction is redundant. Say which, in
 `notes`.
 
-## Cogency test (questions 16, 18)
+## Cogency test
 
 After the audit, ask the user once: *"If every edge in this box is true, can
 the chosen set still be wrong?"* The answer is the list of edges that are
@@ -142,7 +142,7 @@ counts the argued edges and names the rows whose active edges are all argued.
 *Cogency* is the name in the method, and this document is where the method is
 explained. The page uses the plain name.
 
-## The suspected list (questions 4, 16)
+## The suspected list
 
 An edge that fails the audit goes to `suspected`. **Name the pattern first, so
 the debrief can count it:**
@@ -159,7 +159,7 @@ ends, so it is the only record of what the audit rejected.
 what the edge said. A later test of the audit compares its scores against real
 rejected edges, and only the original sentence gives it one.
 
-## Strawmen (questions 10, 16)
+## Strawmen
 
 For every row, before edges, ask four questions:
 

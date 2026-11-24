@@ -6,15 +6,15 @@ stop first. Nothing in this file removes it.
 
 ## Contents
 
-- What the audit is (questions 5, 6, 14)
-- The probe (questions 3, 6)
-- Who can confirm (questions 3, 6)
-- The run (questions 4, 14, 16, 18)
-- Dispositions (questions 4, 16, 18)
-- A second round (questions 3, 6)
-- The audit on one configuration (questions 3, 4, 16)
+- What the audit is
+- The probe
+- Who can confirm
+- The run
+- Dispositions
+- A second round
+- The audit on one configuration
 
-## What the audit is (questions 5, 6, 14)
+## What the audit is
 
 `audit.mjs` sits next to `SKILL.md`, in the skill base directory. It ranks
 the `argued` edges, so you know which edge to reread first. It compares each
@@ -28,7 +28,7 @@ The audit is the one action of this skill that leaves the machine. It sends
 the box's text to a model provider, and the provider charges each request to
 the person's own key.
 
-## The probe (questions 3, 6)
+## The probe
 
 Before you offer the audit, ask the tool whether a key is in the
 environment:
@@ -61,7 +61,7 @@ the four facts, and wait for the person's confirmation:
 
 Never state a price. The provider sets it and can change it.
 
-## Who can confirm (questions 3, 6)
+## Who can confirm
 
 Offer the audit once in a conversation. Run it only after the person's
 confirmation, anywhere. One confirmation covers one run. The
@@ -73,14 +73,14 @@ is there.
 With a confirmation for every run, do not ask. Still run the dry run, and still state
 the four facts before each run.
 
-## The run (questions 4, 14, 16, 18)
+## The run
 
 ```bash
 node <skill base directory>/audit.mjs <scratch>/<topic>.box.json
 ```
 
 **A score never changes a tier, and never goes into the box file.** Reason:
-an audit score treated as a verdict is failure 6 in question 16. The score
+an audit score treated as a verdict. The score
 tells you which edge to reread. It is not evidence about the edge.
 
 The last line on standard error says how many requests the run sent. Give
@@ -92,7 +92,7 @@ person in one line that the audit failed. Then check the argued edges by
 hand, against the eight weakness patterns in `writing-edges.md`. Do not run
 the audit again in a loop.
 
-## Dispositions (questions 4, 16, 18)
+## Dispositions
 
 Give each flagged edge one disposition, and say it in chat:
 
@@ -104,7 +104,7 @@ Give each flagged edge one disposition, and say it in chat:
 A rewrite that adds a factual claim names a `src`, or the edge stays
 `argued`.
 
-## A second round (questions 3, 6)
+## A second round
 
 To check the rewritten edges, run the audit again. A second run sends every
 edge again, so the provider charges again. The second run is not a new
@@ -115,7 +115,7 @@ run.
 Stop after two rounds. The audit stops when every flagged edge has a
 disposition. It never stops on a score.
 
-## The audit on one configuration (questions 3, 4, 16)
+## The audit on one configuration
 
 When a set does not hold, the audit can rank the edges behind it. Give the
 audit the same `--sel` that the renderer got:
