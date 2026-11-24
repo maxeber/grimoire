@@ -4,8 +4,6 @@ description: Steps in when a discussion holds three or more open decisions and a
 compatibility: Needs Node.js 24 or later to run render.mjs and audit.mjs. No install and no other dependencies.
 metadata:
   contract-version: 0.3.1
-  familiar-digest: "sha256:ff4a86956b03cd9152665d034f94f96c7fb049108a4211cbcc62d487151d8682"
-  contract-digest: "sha256:5cbb215488a2521f28a59d4ad68d1fde68267e4aa75e2d8d26efb12f0795046e"
 ---
 
 # Eagle-eye
