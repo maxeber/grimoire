@@ -135,15 +135,23 @@ Do each step in order and stop at the first failure.
 
 1. **Node.** If `node` is not on the path, print the README's Node line and stop.
 2. **A running listener.** Run `node <skill base>/scripts/listen.mjs stop`.
-3. **Runtime.** Run `node <skill base>/scripts/setup.mjs runtime plan`. Show its
-   lines in chat: for each part whether it is there and its size, whether `uv`
-   was found (without it the Python layer is skipped and the plan says what is
-   lost: echo cancelling, the end-of-turn hold, Phonon), the hosts it will
-   contact, and the total download, peak disk use and expected time. Say the plan
+3. **Runtime.** Ask which voice engine the person wants, `kokoro` or
+   `phonon`, and only that engine's voice files are downloaded. Recommend
+   `kokoro`: it is the fast default, and `phonon` also needs `uv`. On a first
+   install no mic is open, so the answer is typed; on a later run a spoken
+   answer counts after the say-back. Then run
+   `node <skill base>/scripts/setup.mjs runtime plan <engine>`, with the
+   engine the person picked. Show its
+   lines in chat: for each part whether it is there and its size, a part the
+   engine does not need as skipped, whether `uv` was found (without it the
+   Python layer is skipped and the plan says what is lost: echo cancelling, the
+   end-of-turn hold, Phonon), the hosts it will
+   contact, and the total download, peak disk use and expected time. If the plan
+   says the `phonon` engine is unavailable, go back and offer `kokoro`. Say the plan
    back with its size, naming the download as the cost, and ask for a yes. On a
    first install no mic is open, so that yes is typed; on a later run a clear yes
    after the spoken say-back counts. A heard turn alone never starts the
-   download. On the yes, run `node <skill base>/scripts/setup.mjs runtime install`
+   download. On the yes, run `node <skill base>/scripts/setup.mjs runtime install <engine>`
    as a background command: it prints one line per part (`ok`,
    `skipped <why>` or `failed <file>`). Show each line, and stop on a `failed`
    one. `node <skill base>/scripts/setup.mjs runtime verify` checks every file
@@ -156,8 +164,11 @@ Do each step in order and stop at the first failure.
    typed. On a later run, with the mic open, a spoken number counts after the say-back.
 5. **Voice.** Run `node <skill base>/scripts/setup.mjs profiles`. Show its lines
    and ask the person for the id of the voice they want, typed on a first install
-   and spoken or typed after that. Recommend a preset on Kokoro: a heavier engine
-   costs seconds a line.
+   and spoken or typed after that. The list holds the voices of each engine installed,
+   the one from step 3 and any from an earlier install, each line ending with
+   its engine in brackets. If it prints a `setup:` line, show it and stop.
+   Recommend a preset on Kokoro when it is listed: a heavier engine costs
+   seconds a line.
 6. **Save.** Run `node <skill base>/scripts/setup.mjs choose <index> <stamp> <profile id>`
    with the number and the id the person gave and the stamp setup printed in
    step 4. Show its line. If the stamp is stale, run step 4 again.

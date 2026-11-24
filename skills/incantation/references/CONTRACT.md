@@ -1,6 +1,6 @@
 # Contract: incantation
 
-Version: 0.2.3
+Version: 0.2.4
 Kind: skill
 Level: Thorough
 
@@ -140,7 +140,7 @@ wanted.
 |---|---|---|---|
 | make any change: an edit, a write, a command with effects, a push, a merge, a delete, an install or a settings change | the request, said back in one sentence, with its cost when it has one | a clear yes after the say-back stands in for the typing any checkpoint would ask for, including one the session's rules hold for the person's own confirmation; voice replaces the typing only: the checkpoint and its say-back stay, and every other rule the session runs under holds unchanged | **Decided**: "Hands-free is the point", for the reason under `good`; the owner's decision on the head chef's gates, 2026-11-22 |
 | confirm or answer by voice anything typing could (a choice, the microphone number, the voice id); only the first typed `/incantation` or `/incantation install` stays typed, since no mic is open before it | the say-back | a clear yes after the say-back | **Decided**: 643, "nothing typed" |
-| download and install the speech runtime, in `/incantation install` | the plan, said back with its size as the cost | a clear yes after the say-back, typed on a first install, since no mic is open then; a heard turn alone never starts it | **Decided**: "I want everything in the prototype to be shipped right now" (the whole engine ships) |
+| download and install the speech runtime, in `/incantation install` | the voice engine the person picked first, then the plan for that engine, said back with its size as the cost; the voice files of the other engine are not downloaded | a clear yes after the say-back, typed on a first install, since no mic is open then; a heard turn alone never starts it | **Decided**: "I want everything in the prototype to be shipped right now" (the whole engine ships); the engine pick before the plan, issue 674 |
 | mute or unmute the mic, or incantation's own voice, for the person | nothing | "mute" or "unmute" said alone, which the listener catches at once; a natural spoken ask to mute or unmute, which the session acts on; or the typed `/incantation mute`, `unmute`, `mute-voice` or `unmute-voice`; a muted voice behaves as unmuted but makes and plays no audio, and a spoken yes still counts | **Decided** |
 
 **Record** (**Confirmed**): in observe mode only, each thing it would have

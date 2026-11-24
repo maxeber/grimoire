@@ -247,7 +247,7 @@ export async function startListener(options = {}) {
 
     let engine;
     try {
-      engine = options.engine ?? (await loadEngine(settings.engine, settings));
+      engine = options.engine ?? (await loadEngine(settings.engine, { ...settings, home, platform, arch: options.arch ?? process.arch }));
     } catch {
       return stop('engine');
     }

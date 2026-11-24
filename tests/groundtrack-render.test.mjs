@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync, linkSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { root, groundtrack, examples, exampleFlightpath, layeredFlightpath, run, errorPastTwoSites, scriptBlocks } from './helpers.mjs';
@@ -864,10 +865,14 @@ test('a file that is not JSON is reported without its text', () => {
 });
 
 test('a crash left in the renderer prints one line naming the file, and exits 2', () => {
-  // Nesting this deep overflows the stack in a JSON conversion of the args.
-  const file = derive(p => { p.nodes.greet.steps[1].args = '@@DEEP@@'; });
-  writeFileSync(file, readFileSync(file, 'utf8').replace('"@@DEEP@@"', () => '['.repeat(200000) + ']'.repeat(200000)));
-  const r = check(file);
+  // A crash no rule foresees, planted. Deep nesting once overflowed the stack
+  // in a JSON conversion of the args, but Node 26 converts any depth, so the
+  // file passed and the test went red. A preload makes every conversion throw
+  // what an overflow throws, on any Node.
+  const file = derive(() => {});
+  const crash = join(work, 'crash-on-stringify.mjs');
+  writeFileSync(crash, "JSON.stringify = () => { throw new RangeError('Maximum call stack size exceeded'); };\n");
+  const r = run(groundtrack, [file, '--check'], { env: { NODE_OPTIONS: `--import=${pathToFileURL(crash).href}` } });
   assert.equal(r.code, 2, r.stderr.slice(0, 400));
   assert.equal(r.stderr.trim(), `${file}: the renderer stopped on this file (RangeError)`);
   // A page that cannot be written names the page, not a good input file.
