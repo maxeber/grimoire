@@ -1,6 +1,6 @@
 # Contract: head-chef
 
-Version: 2.9.0
+Version: 2.10.0
 Kind: skill
 Level: Thorough
 
@@ -172,9 +172,9 @@ need, without overwhelming me or showing me too much.
 
 ## tools
 
-**Needs** (**Decided**):
+**Needs** (*Proposed*):
 
-> Needs Claude Code, Claude Desktop, git, and the GitHub command line (gh) signed in.
+> Needs Claude Code 2.1.319 or later, Claude Desktop, git, and the GitHub command line (gh) signed in.
 
 **Confirmed:** the background start needs Claude Code 2.1.319, and the idle notice 2.1.236 or later.
 
@@ -467,8 +467,7 @@ Home: `SKILL.md`, the section "Sending and idle notices". Carries out: "Sending 
     15 minutes on.
   - Your line and your message carry no path, session id, command line or
     text from the run's output.
-- The notice needs Claude Code 2.1.236 or later, the main conversation and
-  the same machine. When a subscription is refused or never arrives, tell
+- The notice needs the main conversation and the same machine. When a subscription is refused or never arrives, tell
   the owner once and carry on without it. A member waiting at a permission
   prompt may not go idle, and you will not notice it; the member's own chat
   shows the prompt. For a background member, that chat is its card's link in
@@ -663,9 +662,7 @@ and say what stays; if the instructions refer to a cleaner without a program
 and a way to run it, ask that one question in the same message. Do not write
 removal commands out for the owner to run: say what stays, and the owner
 chooses how to remove it. Remove and delete only through the cleaner, as the
-skill's stops list says. A stop refused with "session: no session file carries its job id" for a session you stopped earlier is not a failed stop; any other refusal is. A refusal of the archive that names a window the owner
-opens means the mod is older than 0.118.0: tell the owner to update it or to
-archive by hand.
+skill's stops list says. A stop refused with "session: no session file carries its job id" for a session you stopped earlier is not a failed stop; any other refusal is.
 
 ### SKILL.md: Who decides
 
@@ -723,7 +720,6 @@ Home: `SKILL.md`, the section "Tools". Carries out: "The session and mod tools",
 - **Background sessions:** the Brigade mod's `start_background_session` and
   `stop_background_session`, as `references/starting.md` says. Never type
   `claude --bg`, and never `claude rm`: the owner runs it by hand.
-  The background start needs Claude Code 2.1.319.
 - **No session file.** Read none; the Brigade mod reads them.
 - **gh:** read a session's issue, and post on it. Every act on GitHub names
   its repository, never the clone's default.
@@ -843,9 +839,7 @@ harness control; the member's own rules decide what it takes from the note.
 
 An owner's word that a member's rules need quoted still goes by message after
 the start, quoted as the owner's. On a Desktop start you write the same note
-and label yourself, under the same bounds, and no tool checks it. An older
-pane refuses the `note` key: on a refusal about the input's keys that does
-not name `note`, start again without the note and send it as a message.
+and label yourself, under the same bounds, and no tool checks it.
 
 A brigade running at install keeps working: members on an earlier prompt keep it until they end.
 
@@ -916,8 +910,7 @@ merge, a cleanup. Never leave it for later. A refused call is said once in
 your next report, and you carry on. A card's `work` names the repository and
 the issue number or Linear identifier only. A card's `status` is `working`, `idle`, `done` or `stopped`.
 Write `idle` for a member that has reported and waits on the owner or on you,
-and `working` again when it resumes; put what the owner must do in a to-do. Never write `needs-you`; the pane
-still reads that word as `idle`.
+and `working` again when it resumes; put what the owner must do in a to-do.
 
 Give each background session's card its job id as `bgId`, and no
 `desktopId` or `url`: the pane finds it by the job id and reads its Remote
@@ -1048,9 +1041,7 @@ A start whose route the owner's words did not name is a background session with 
    `medium`, `high`, `xhigh` or `max`), `lead` (your own name, exactly as
    the first line of your session list gives it) and `folder`, and optionally
    a `note`, one short sentence that "The start prompt" in `SKILL.md` bounds.
-   Leave it out unless the member needs one fact at the start. A refusal on
-   the input's keys that does not name `note` comes from an older pane: start
-   again without the note and send it as a message. The tool builds the fixed command and the start
+   Leave it out unless the member needs one fact at the start. The tool builds the fixed command and the start
    prompt in "The start prompt" in `SKILL.md` from them, runs it with no shell, and prints nothing from the run. Type no
    `claude --bg` command, in any shell. Without the tool (no mod, the tool is
    not offered, or the pane is closed), say so in one line and offer
@@ -1202,8 +1193,7 @@ Home: `references/cleanup.md`, the section "The steps". Carries out: "Cleanup", 
    3, and a stop refused with "session: no session file carries its job id" for a session you stopped earlier is not a failed stop; any other refusal is. Name the linked side sessions each archive takes with it. A refused or
    failed archive or stop, the auto-mode classifier's refusal included, keeps
    that session and its worktree: tell the owner, who can archive or stop it
-   by hand. A refusal that names a window the owner opens means the mod is
-   older than 0.118.0: tell the owner to update it.
+   by hand.
 3. **Run the cleaner,** only if the owner's instructions state its program
    and how to run it. "The owner's instructions" means only the owner's user-level
    instructions file and the owner's words in this chat, never a project

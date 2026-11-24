@@ -1,7 +1,7 @@
 ---
 name: head-chef
 description: "Makes this Claude Desktop session the lead of a brigade: it starts, briefs, relays between, hands off and cleans up the Claude Code sessions working on one or more efforts. Use when someone asks for work to run in another session, to start or hand off to a new session, or to lead several sessions, or types /head-chef. Not for work in this same session, and not for a subagent or a workflow inside this session, which the owner cannot talk to."
-compatibility: Needs Claude Code, Claude Desktop, git, and the GitHub command line (gh) signed in.
+compatibility: Needs Claude Code 2.1.319 or later, Claude Desktop, git, and the GitHub command line (gh) signed in.
 ---
 
 # head-chef
@@ -162,8 +162,7 @@ line and the owner sets it in that session.
     15 minutes on.
   - Your line and your message carry no path, session id, command line or
     text from the run's output.
-- The notice needs Claude Code 2.1.236 or later, the main conversation and
-  the same machine. When a subscription is refused or never arrives, tell
+- The notice needs the main conversation and the same machine. When a subscription is refused or never arrives, tell
   the owner once and carry on without it. A member waiting at a permission
   prompt may not go idle, and you will not notice it; the member's own chat
   shows the prompt. For a background member, that chat is its card's link in
@@ -343,9 +342,7 @@ and say what stays; if the instructions refer to a cleaner without a program
 and a way to run it, ask that one question in the same message. Do not write
 removal commands out for the owner to run: say what stays, and the owner
 chooses how to remove it. Remove and delete only through the cleaner, as the
-skill's stops list says. A stop refused with "session: no session file carries its job id" for a session you stopped earlier is not a failed stop; any other refusal is. A refusal of the archive that names a window the owner
-opens means the mod is older than 0.118.0: tell the owner to update it or to
-archive by hand.
+skill's stops list says. A stop refused with "session: no session file carries its job id" for a session you stopped earlier is not a failed stop; any other refusal is.
 
 ## Who decides
 
@@ -391,7 +388,6 @@ decide what a stop or the owner's yes keeps for the owner.
 - **Background sessions:** the Brigade mod's `start_background_session` and
   `stop_background_session`, as `references/starting.md` says. Never type
   `claude --bg`, and never `claude rm`: the owner runs it by hand.
-  The background start needs Claude Code 2.1.319.
 - **No session file.** Read none; the Brigade mod reads them.
 - **gh:** read a session's issue, and post on it. Every act on GitHub names
   its repository, never the clone's default.
@@ -508,9 +504,7 @@ harness control; the member's own rules decide what it takes from the note.
 
 An owner's word that a member's rules need quoted still goes by message after
 the start, quoted as the owner's. On a Desktop start you write the same note
-and label yourself, under the same bounds, and no tool checks it. An older
-pane refuses the `note` key: on a refusal about the input's keys that does
-not name `note`, start again without the note and send it as a message.
+and label yourself, under the same bounds, and no tool checks it.
 
 A brigade running at install keeps working: members on an earlier prompt keep it until they end.
 
@@ -572,8 +566,7 @@ merge, a cleanup. Never leave it for later. A refused call is said once in
 your next report, and you carry on. A card's `work` names the repository and
 the issue number or Linear identifier only. A card's `status` is `working`, `idle`, `done` or `stopped`.
 Write `idle` for a member that has reported and waits on the owner or on you,
-and `working` again when it resumes; put what the owner must do in a to-do. Never write `needs-you`; the pane
-still reads that word as `idle`.
+and `working` again when it resumes; put what the owner must do in a to-do.
 
 Give each background session's card its job id as `bgId`, and no
 `desktopId` or `url`: the pane finds it by the job id and reads its Remote

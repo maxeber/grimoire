@@ -34,9 +34,7 @@ A start whose route the owner's words did not name is a background session with 
    `medium`, `high`, `xhigh` or `max`), `lead` (your own name, exactly as
    the first line of your session list gives it) and `folder`, and optionally
    a `note`, one short sentence that "The start prompt" in `SKILL.md` bounds.
-   Leave it out unless the member needs one fact at the start. A refusal on
-   the input's keys that does not name `note` comes from an older pane: start
-   again without the note and send it as a message. The tool builds the fixed command and the start
+   Leave it out unless the member needs one fact at the start. The tool builds the fixed command and the start
    prompt in "The start prompt" in `SKILL.md` from them, runs it with no shell, and prints nothing from the run. Type no
    `claude --bg` command, in any shell. Without the tool (no mod, the tool is
    not offered, or the pane is closed), say so in one line and offer
