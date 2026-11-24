@@ -782,8 +782,9 @@ a claim says otherwise.
 12. `engines/sherpa.mjs` with a fake addon and worker: `warm()` loads and runs
     each model once; `transcribe` and `synthesize` return text and a WAV;
     `profiles()` lists `bella` when Kokoro is installed and `everly` when
-    Phonon is, so a person is never offered a voice the guard would refuse; no
-    provider but `cpu` is ever passed; no PATH is changed.
+    Phonon is, so a person is never offered a voice the guard would refuse;
+    with neither, `setup.mjs profiles` prints that no voice is installed and
+    exits 1; no provider but `cpu` is ever passed; no PATH is changed.
 13. The engine table holds `sherpa` and `voicebox`; a fresh `choose` writes
     `sherpa`, a settings file with no `engine` key reads as `voicebox`; a
     `voicebox` setting still passes every #208 claim.

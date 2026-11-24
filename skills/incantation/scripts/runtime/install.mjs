@@ -34,7 +34,7 @@ export const LAYER = Object.freeze(['python', 'turn', 'phonon']);
 // cancelling and the end-of-turn hold do not depend on the voice. With no
 // engine named, the plan and the install cover every part.
 export const OMITTED = Object.freeze({ kokoro: Object.freeze(['phonon']), phonon: Object.freeze(['speaking']) });
-const omitted = (engine, part) => OMITTED[engine]?.includes(part) ?? false;
+const omitted = (engine, part) => Object.hasOwn(OMITTED, engine) && OMITTED[engine].includes(part);
 
 // The parts a voice needs to run, which is what the guard asks of the runtime.
 // A Kokoro voice needs the core, with Kokoro as its speaking part. A Phonon
@@ -182,7 +182,7 @@ export function partState(home, part, key, pins = PINS) {
 export function checkRuntime(home, key, pins = PINS, voice = 'kokoro') {
   const states = Object.fromEntries(PARTS.map(p => [p, partState(home, p, key, pins)]));
   const damaged = PARTS.filter(p => states[p] === 'damaged');
-  return { states, damaged, core: (NEEDS[voice] ?? CORE).every(p => states[p] === 'ok') };
+  return { states, damaged, core: (Object.hasOwn(NEEDS, voice) ? NEEDS[voice] : CORE).every(p => states[p] === 'ok') };
 }
 
 // ---- finding uv ----------------------------------------------------------
@@ -203,6 +203,9 @@ export function findUv({ platform, pathValue, startDir, fs }) {
 export function planRuntime({ home, platform, arch, uv, engine, release = osRelease(), pins = PINS }) {
   const key = platformKey(platform, arch);
   const noPython = pythonGap(key, release, pins);
+  // Offering the kokoro engine helps only where the addon runs: without it,
+  // the plan already says to choose Voicebox.
+  const kokoroHere = specOf('addon', key, pins).supported;
   const lines = [];
   let download = 0;
   let unpacked = 0;
@@ -223,13 +226,13 @@ export function planRuntime({ home, platform, arch, uv, engine, release = osRele
     }
     if ((part === 'turn' || part === 'phonon') && noPython) {
       lines.push(`${part} skipped no python layer`);
-      if (part === 'phonon' && engine === 'phonon') lines.push('phonon engine unavailable here; choose the kokoro engine');
+      if (part === 'phonon' && engine === 'phonon' && kokoroHere) lines.push('phonon engine unavailable here; choose the kokoro engine');
       continue;
     }
     const layerNeedsUv = LAYER.includes(part) && !uv;
     if (layerNeedsUv) {
       lines.push(`${part} skipped no uv`);
-      if (part === 'phonon' && engine === 'phonon') lines.push('phonon engine unavailable without uv; choose the kokoro engine');
+      if (part === 'phonon' && engine === 'phonon' && kokoroHere) lines.push('phonon engine unavailable without uv; choose the kokoro engine');
       continue;
     }
     if (state === 'ok') {

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { isEngine, loadEngine } from '../skills/incantation/scripts/engines/index.mjs';
 import { makeEngine } from '../skills/incantation/scripts/engines/sherpa.mjs';
 import { SETTINGS_DEFAULTS, parseSettings, secureState } from '../skills/incantation/scripts/lib.mjs';
-import { platformKey, runtimeDir } from '../skills/incantation/scripts/runtime/install.mjs';
+import { platformKey, pythonExe, runtimeDir } from '../skills/incantation/scripts/runtime/install.mjs';
 
 const KEY = platformKey(process.platform, process.arch);
 
@@ -123,6 +123,24 @@ test('claim 16: profiles lists bella only when Kokoro is installed, and everly o
   }
 });
 
+test('claim 16: profiles names each voice and its engine, and a damaged part offers no voice of its engine (issue 674)', async () => {
+  const f = fixture();
+  try {
+    const profiles = () => makeEngine({ port: 17493, home: f.home, pins: PINS }).profiles();
+    const BELLA = { id: 'bella', name: 'bella', engine: 'kokoro' };
+    const EVERLY = { id: 'everly', name: 'everly', engine: 'phonon' };
+    installFake(f.home, ['speaking', 'phonon']);
+    assert.deepEqual(await profiles(), [BELLA, EVERLY]);
+    writeFileSync(join(runtimeDir(f.home), 'speaking', 'f.bin'), 'x');
+    assert.deepEqual(await profiles(), [EVERLY], 'a short Kokoro file offers no Kokoro voice');
+    installFake(f.home, ['speaking']);
+    writeFileSync(join(runtimeDir(f.home), 'phonon', 'f.bin'), 'x');
+    assert.deepEqual(await profiles(), [BELLA], 'a short Phonon file offers no Phonon voice');
+  } finally {
+    f.remove();
+  }
+});
+
 test('claim 16: a Phonon voice runs in a worker started with no shell, -I, the runtime interpreter, the state folder and a named environment', async () => {
   const f = fixture();
   try {
@@ -185,8 +203,53 @@ test('claim 16: a Phonon voice is healthy with no Kokoro on disk, and a Kokoro v
     assert.equal(await engine('everly', () => false).health(), false, 'a Phonon voice still needs the runtime interpreter');
     rmSync(join(runtimeDir(f.home), 'phonon'), { recursive: true });
     assert.equal(await engine('everly').health(), false, 'a Phonon voice needs Phonon itself');
-    installFake(f.home, ['speaking']);
-    assert.equal(await engine('bella').health(), true, 'Kokoro alone serves a Kokoro voice');
+  } finally {
+    f.remove();
+  }
+});
+
+test('claim 16: a Phonon voice is not healthy without the addon, the hearing model or the speech detector (issue 674)', async () => {
+  for (const missing of ['addon', 'hearing', 'detector']) {
+    const f = fixture();
+    try {
+      installFake(f.home, ['addon', 'hearing', 'detector', 'phonon'].filter(p => p !== missing));
+      const engine = makeEngine({ port: 17493, profile: 'everly', home: f.home, pins: PINS, exists: () => true });
+      assert.equal(await engine.health(), false, `a Phonon voice needs ${missing}`);
+    } finally {
+      f.remove();
+    }
+  }
+});
+
+test('claim 16: a Phonon voice\'s health asks for the runtime interpreter of the platform it runs on (issue 674)', async () => {
+  const f = fixture();
+  try {
+    // The other platform's interpreter path differs, so a path built for the host fails.
+    const other = process.platform === 'win32' ? 'linux' : 'win32';
+    const pins = { ...PINS, ARCHIVES: PINS.ARCHIVES.map(a => ({ ...a, platform: platformKey(other, process.arch) })) };
+    installFake(f.home, ['addon', 'hearing', 'detector', 'phonon']);
+    const asked = [];
+    const engine = makeEngine({ port: 17493, profile: 'everly', home: f.home, platform: other, pins, exists: p => (asked.push(p), true) });
+    assert.equal(await engine.health(), true);
+    assert.deepEqual(asked, [pythonExe(f.home, other)]);
+  } finally {
+    f.remove();
+  }
+});
+
+test('claim 16: a profile that is a key of every object is spoken as a Kokoro voice, never by a Phonon worker', async () => {
+  const f = fixture();
+  try {
+    const log = [];
+    const spawned = [];
+    const engine = makeEngine({ port: 17493, profile: 'toString', home: f.home, pins: PINS, load: () => fakeAddon(log), spawn: (...a) => spawned.push(a), exists: () => false });
+    assert.equal(await engine.health(), false, 'nothing installed');
+    installFake(f.home, ['addon', 'hearing', 'speaking', 'detector']);
+    assert.equal(await engine.health(), true, 'the Kokoro parts serve it, with no interpreter asked for');
+    await engine.warm();
+    assert.equal(spawned.length, 0);
+    assert.equal(log.filter(l => l[0] === 'tts').length, 1);
+    assert.equal(log.find(l => l[0] === 'generate')[1].sid, 2);
   } finally {
     f.remove();
   }

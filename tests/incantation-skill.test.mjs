@@ -88,6 +88,11 @@ test('claim 15: the check fails on each thing it forbids', () => {
   assert.equal(claim15('x', '`node <skill base>/scripts/listen.mjs working`').length, 0);
   assert.equal(claim15('x', '`node <skill base>/scripts/listen.mjs mute-voice`').length, 0);
   assert.equal(claim15('x', '`node <skill base>/scripts/observe.mjs add <8 hex>`').length, 0);
+  assert.equal(claim15('x', '`node <skill base>/scripts/setup.mjs runtime plan <engine>`').length, 0);
+  assert.equal(claim15('x', '`node <skill base>/scripts/setup.mjs runtime verify`').length, 0);
+  assert.equal(claim15('x', '`node <skill base>/scripts/setup.mjs runtime plan`').length, 1, 'issue 674: the skill plans for the engine the person picked, never every part');
+  assert.equal(claim15('x', '`node <skill base>/scripts/setup.mjs runtime install`').length, 1);
+  assert.equal(claim15('x', '`node <skill base>/scripts/setup.mjs runtime verify <engine>`').length, 1, 'verify takes no engine');
 });
 
 test('setup.mjs is run in the Install section and nowhere else', () => {
@@ -96,9 +101,17 @@ test('setup.mjs is run in the Install section and nowhere else', () => {
   assert.match(install, /scripts\/setup\.mjs profiles/);
   assert.match(install, /scripts\/setup\.mjs choose <index> <stamp> <profile id>/);
   assert.equal(/setup\.mjs/.test(text.replace(install, '').replace(/Run `setup\.mjs` only in\s+`\/incantation install`\./, '')), false);
-  assert.match(install, /setup\.mjs runtime plan <engine>`,\s+with the\s+engine the person picked\. Show its\s+lines/);
+  assert.match(install, /setup\.mjs runtime plan <engine>`/);
   assert.match(install, /runtime install <engine>`/);
   assert.ok(install.indexOf('voice engine') < install.indexOf('runtime plan'), 'the engine is chosen before the plan');
+  // Issue 674: step 3 recommends kokoro and falls back to it, and step 5 lists
+  // the voices of the engines installed.
+  const runtime = flat(section('3. **Runtime.**', '4. **Microphone.**'));
+  assert.match(runtime, /Recommend `kokoro`/);
+  assert.match(runtime, /If the plan says the `phonon` engine is unavailable, go back and offer `kokoro`/);
+  const voice = flat(section('5. **Voice.**', '6. **Save.**'));
+  assert.match(voice, /The list holds the voices of each engine installed/);
+  assert.match(voice, /If it prints a `setup:` line, show it and stop/);
   assert.match(install, /A heard turn alone never starts the\s+download/);
   assert.ok(install.indexOf('runtime plan') < install.indexOf('setup.mjs devices'), 'the runtime step comes before the microphone');
   assert.match(install, /On a first install no mic is open, so the number is\s+typed/);

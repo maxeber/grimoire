@@ -3,11 +3,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, posix, win32 } from 'node:path';
 import { stampOf } from '../skills/incantation/scripts/capture/ffmpeg.mjs';
-import { deviceDigest, keyPath, parseSettings, readKey, settingsPath } from '../skills/incantation/scripts/lib.mjs';
+import { deviceDigest, keyPath, parseSettings, readKey, secureState, settingsPath } from '../skills/incantation/scripts/lib.mjs';
+import { FILES } from '../skills/incantation/scripts/runtime/pins.mjs';
+import { PARTS, runtimeDir } from '../skills/incantation/scripts/runtime/install.mjs';
 import { LINES, runSetup } from '../skills/incantation/scripts/setup.mjs';
 
 const win = process.platform === 'win32';
@@ -89,10 +91,14 @@ test('choose refuses a stale stamp, an out-of-range index, an unknown profile an
     [['runtime', 'install', 'kokoro', 'phonon'], LINES.usage],
     [['runtime', 'verify', 'phonon'], LINES.usage],
     [['runtime'], LINES.usage],
+    [['runtime', 'plan', 'toString'], LINES.usage],
+    [['runtime', 'install', '__proto__'], LINES.usage],
+    [['runtime', 'plan', ''], LINES.usage],
   ];
   for (const [argv, line] of cases) {
     const r = await setup(argv);
     assert.deepEqual(r.lines, [line], argv.join(' '));
+    if (line === LINES.usage) assert.equal(r.code, 2, argv.join(' '));
     assert.throws(() => readFileSync(settingsPath(r.home)));
     r.remove();
   }
@@ -108,4 +114,104 @@ test('no trusted recorder, no microphone, or no Voicebox each give a fixed line'
     assert.deepEqual(r.lines, [line]);
     r.remove();
   }
+});
+
+// The runtime command against the real pin table (docs/spec/0001, S5.9; issue
+// 674). setup.mjs hands in no table of its own, so no install here can pass a
+// pin: the fake transport answers 404 and logs what was asked, which shows the
+// parts each engine fetches. Nothing goes to the network.
+const UV = win ? win32.join(BIN, 'uv.exe') : posix.join(BIN, 'uv');
+const fsUv = { ...fs, isFile: p => p === RECORDER || p === UV };
+const ARCH = 'x64';
+const basesOf = part => FILES.filter(g => g.part === part).map(g => g.base);
+const notFound = log => async url => (log.push(url.pathname), { status: 404, headers: {}, body: (async function* () {})() });
+const failingUv = async () => ({ code: 1, stdout: '' });
+
+// A file of the real table, at its pinned size and the wrong bytes.
+function put(home, rel, size) {
+  const p = join(runtimeDir(home), ...rel.split('/'));
+  mkdirSync(join(p, '..'), { recursive: true, mode: 0o700 });
+  writeFileSync(p, '', { mode: 0o600 });
+  truncateSync(p, size);
+}
+const lay = (home, part) => {
+  for (const g of FILES.filter(g => g.part === part)) for (const [f, size] of g.files) put(home, `${g.dest}${f}`, size);
+};
+
+test('runtime plan for an engine skips the speaking part the other engine alone needs; with none named it plans every part', async () => {
+  const skipped = r => r.lines.filter(l => l.includes('skipped not needed'));
+  const bare = await setup(['runtime', 'plan'], { fs: fsUv, arch: ARCH });
+  bare.remove();
+  assert.equal(bare.code, 0);
+  assert.deepEqual(skipped(bare), []);
+  assert.ok(bare.lines.includes('uv found'), bare.lines.join('\n'));
+  for (const part of PARTS) assert.ok(bare.lines.some(l => l.startsWith(`${part} `)), part);
+  for (const [engine, other, kept] of [['kokoro', 'phonon', 'speaking'], ['phonon', 'speaking', 'phonon']]) {
+    const r = await setup(['runtime', 'plan', engine], { fs: fsUv, arch: ARCH });
+    r.remove();
+    assert.equal(r.code, 0, engine);
+    assert.deepEqual(skipped(r), [`${other} skipped not needed by the ${engine} engine`], engine);
+    assert.ok(r.lines.some(l => l.startsWith(`${kept} `) && !l.includes('skipped')), `${engine} plans ${kept}`);
+  }
+  const noUv = await setup(['runtime', 'plan', 'phonon'], { fs: fsUv, arch: ARCH, pathValue: '' });
+  noUv.remove();
+  assert.ok(noUv.lines.includes('phonon engine unavailable without uv; choose the kokoro engine'), noUv.lines.join('\n'));
+});
+
+test("runtime install for an engine leaves out the other engine's speaking part and keeps the disk check; Phonon with no uv says so (issue 674)", async () => {
+  const install = async (engine, over = {}) => {
+    const log = [];
+    const r = await setup(['runtime', 'install', engine], { fs: fsUv, arch: ARCH, transport: notFound(log), runUv: failingUv, free: () => Infinity, env: {}, ...over });
+    r.remove();
+    return { ...r, log };
+  };
+  const asked = (log, part) => log.some(p => basesOf(part).some(b => p.startsWith(b)));
+
+  const kokoro = await install('kokoro');
+  assert.ok(kokoro.lines.includes('phonon skipped not needed by the kokoro engine'), kokoro.lines.join('\n'));
+  assert.ok(asked(kokoro.log, 'speaking'), 'the kokoro engine fetches Kokoro');
+  assert.equal(asked(kokoro.log, 'phonon'), false);
+  assert.equal(kokoro.code, 1, 'every fetch is refused');
+
+  const phonon = await install('phonon');
+  assert.ok(phonon.lines.includes('speaking skipped not needed by the phonon engine'), phonon.lines.join('\n'));
+  assert.ok(asked(phonon.log, 'hearing'), 'the phonon engine still fetches the shared parts');
+  assert.equal(asked(phonon.log, 'speaking'), false, 'the phonon engine never asks for Kokoro');
+
+  // Exit 1 here comes from the refused fetches as well: the runtime test, on a
+  // table of its own, shows that no uv alone fails the Phonon install.
+  const noUv = await install('phonon', { pathValue: '' });
+  assert.equal(noUv.code, 1);
+  assert.ok(noUv.lines.includes('phonon skipped no uv'), noUv.lines.join('\n'));
+
+  const full = await install('kokoro', { free: () => 0 });
+  assert.deepEqual(full.lines, ['install: not enough free disk space on the home drive']);
+  assert.deepEqual(full.log, [], 'nothing is fetched');
+});
+
+test('runtime verify reports every part as not installed on an empty home, and fails on a file whose bytes are not the pinned ones', async t => {
+  const empty = await setup(['runtime', 'verify'], { arch: ARCH });
+  empty.remove();
+  assert.deepEqual([empty.lines, empty.code], [PARTS.map(p => `${p} skipped not installed`), 0]);
+  const home = mkdtempSync(join(tmpdir(), 'incantation-setup-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  secureState(home);
+  lay(home, 'detector');
+  const r = await runSetup(['runtime', 'verify'], { home, arch: ARCH });
+  assert.equal(r.code, 1);
+  const [[file]] = FILES.find(g => g.part === 'detector').files;
+  assert.ok(r.lines.includes(`detector failed ${file}`), r.lines.join('\n'));
+});
+
+// profiles with the real sherpa engine, on the home it is handed (issue 674).
+test('profiles with the sherpa engine lists only the voices whose part is installed, and says so when none is', async t => {
+  const none = await setup(['profiles'], { engine: undefined });
+  none.remove();
+  assert.deepEqual([none.lines, none.code], [[LINES.voices], 1]);
+  const home = mkdtempSync(join(tmpdir(), 'incantation-setup-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  secureState(home);
+  lay(home, 'phonon');
+  const r = await runSetup(['profiles'], { home, pathValue: BIN, startDir: home, fs });
+  assert.deepEqual([r.lines, r.code], [['everly everly (phonon)'], 0]);
 });

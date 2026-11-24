@@ -23,6 +23,7 @@ export const LINES = {
   index: 'setup: there is no microphone with that index.',
   voicebox: 'setup: Voicebox is not answering on this machine. Start it: README step 1.',
   profile: 'setup: Voicebox has no profile with that id. Run setup.mjs profiles.',
+  voices: 'setup: no voice is installed. Run setup.mjs runtime install first.',
   state: 'setup: the ~/.grimoire/incantation folder is not private or not a plain folder. See README step 3.',
   failed: 'setup: could not save the settings.',
   saved: 'setup: saved. Run /incantation in a session.',
@@ -81,13 +82,14 @@ export async function runSetup(argv, o) {
     return { lines: [LINES.state], code: 1 };
   }
   if (command === 'runtime') return runtimeCommand(args, o, platform);
-  const engine = o.engine ?? (await loadEngine(FRESH_ENGINE, { port: SETTINGS_DEFAULTS.port }));
+  const engine = o.engine ?? (await loadEngine(FRESH_ENGINE, { port: SETTINGS_DEFAULTS.port, home: o.home, platform, arch: o.arch ?? process.arch }));
   const recorderOf = () => resolveRecorder({ platform, pathValue: o.pathValue, startDir: o.startDir, fs: o.fs });
   const listOf = async recorder => listDevices({ recorder, platform, run: o.list ?? runListing(runDir(o.home)) });
 
   if (command === 'profiles') {
     const profiles = await engine.profiles();
     if (!profiles) return { lines: [LINES.voicebox], code: 1 };
+    if (!profiles.length) return { lines: [LINES.voices], code: 1 };
     return { lines: profiles.filter(p => SETTINGS_KEYS.profile(p.id)).map(p => `${p.id} ${cleanText(p.name, 64)}${p.engine ? ` (${cleanText(p.engine, 32)})` : ''}`), code: 0 };
   }
   const recorder = recorderOf();

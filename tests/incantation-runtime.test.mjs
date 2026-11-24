@@ -418,6 +418,21 @@ test('claim 15: core counts only the parts the voice needs: Kokoro for a Kokoro 
   }
 });
 
+test('claim 15: a Phonon voice still needs the addon, the hearing model and the speech detector (issue 674)', async () => {
+  const f = fixture();
+  try {
+    for (const [part, folder] of [['addon', 'node_modules'], ['hearing', 'parakeet'], ['detector', 'vad']]) {
+      await install(f);
+      assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, true, `${part}: the whole runtime is there`);
+      rmSync(join(runtimeDir(f.home), folder), { recursive: true });
+      assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').states.phonon, 'ok');
+      assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, false, `a Phonon voice needs ${part}`);
+    }
+  } finally {
+    f.remove();
+  }
+});
+
 test('claim 15: the plan and the install for an engine leave out the speaking part the other engine alone needs (issue 674)', async () => {
   const f = fixture();
   try {
@@ -429,11 +444,20 @@ test('claim 15: the plan and the install for an engine leave out the speaking pa
     assert.ok(phonon.lines.includes('speaking skipped not needed by the phonon engine') && missing(phonon, 'phonon'));
     assert.ok(kokoro.lines.includes('phonon skipped not needed by the kokoro engine') && missing(kokoro, 'speaking'));
     assert.ok(phonon.download < every.download && kokoro.download < every.download, 'each engine downloads less than both');
+    assert.ok(phonon.peak < every.peak && kokoro.peak < every.peak, 'each engine needs less disk than both');
+    for (const plan of [phonon, kokoro]) for (const part of ['python', 'turn']) assert.ok(missing(plan, part), `${part} stays planned for both engines`);
+
+    // Room for one engine but not for both: the disk check reads the engine's own plan.
+    const free = Math.ceil(phonon.peak * 1.1);
+    assert.ok(free < every.peak * 1.1, 'the fixture leaves a gap between one engine and both');
+    const all = await install(f, { free: () => free });
+    assert.equal(all.code, 1);
+    assert.match(all.lines[0], /not enough free disk space/);
 
     const log = [];
-    const { lines, code } = await install(f, { engine: 'phonon', transport: fakeTransport(served(), log) });
+    const { lines, code } = await install(f, { engine: 'phonon', free: () => free, transport: fakeTransport(served(), log) });
     assert.equal(code, 0, lines.join(' | '));
-    assert.ok(lines.includes('speaking skipped not needed by the phonon engine') && lines.includes('phonon ok') && lines.includes('python ok'));
+    assert.ok(lines.includes('speaking skipped not needed by the phonon engine') && lines.includes('phonon ok') && lines.includes('python ok') && lines.includes('turn ok'));
     assert.equal(existsSync(join(runtimeDir(f.home), 'kokoro')), false, 'no Kokoro file is fetched');
     assert.ok(!log.some(r => r.path.includes('/o/k/')), 'no request goes to the Kokoro files');
     assert.equal(checkRuntime(f.home, KEY, PINS, 'phonon').core, true, 'the guard is satisfied with no Kokoro on disk');
@@ -447,9 +471,12 @@ test('claim 15: the plan and the install for an engine leave out the speaking pa
     const log = [];
     const { lines, code } = await install(g, { engine: 'kokoro', transport: fakeTransport(served(), log) });
     assert.equal(code, 0, lines.join(' | '));
-    assert.ok(lines.includes('phonon skipped not needed by the kokoro engine') && lines.includes('speaking ok'));
+    assert.ok(lines.includes('phonon skipped not needed by the kokoro engine') && lines.includes('speaking ok') && lines.includes('python ok') && lines.includes('turn ok'));
     assert.equal(existsSync(join(runtimeDir(g.home), 'hf')), false, 'no Phonon file is fetched');
+    assert.ok(log.some(r => r.path.includes('/o/k/')), 'the Kokoro files are fetched');
+    assert.ok(!log.some(r => r.path.includes('/o/ph/')), 'no request goes to the Phonon files');
     assert.equal(checkRuntime(g.home, KEY, PINS, 'kokoro').core, true);
+    assert.ok(verifyRuntime({ home: g.home, platform, arch, pins: PINS }).lines.includes('phonon skipped not installed'));
   } finally {
     g.remove();
   }
@@ -463,8 +490,54 @@ test('claim 15: the Phonon engine with no uv or no python layer fails the instal
     const bad = await install(f, { engine: 'phonon', pathValue: '' });
     assert.equal(bad.code, 1, 'the person picked Phonon, so a skipped Phonon is a failure');
     assert.ok(bad.lines.includes('phonon skipped no uv') && bad.lines.includes('hearing ok'));
-    const ok = await install(fixture(), { engine: 'kokoro', pathValue: '' });
-    assert.equal(ok.code, 0, 'Kokoro with no uv installs the core as before');
+    const g = fixture();
+    try {
+      const ok = await install(g, { engine: 'kokoro', pathValue: '' });
+      assert.equal(ok.code, 0, 'Kokoro with no uv installs the core as before');
+    } finally {
+      g.remove();
+    }
+  } finally {
+    f.remove();
+  }
+});
+
+test('claim 15: the Phonon engine below the Python layer\'s floor, with uv found, fails the install and the plan says to choose the other engine (issue 674)', async () => {
+  const f = fixture();
+  try {
+    const pins = { ...PINS, PYTHON_FLOOR: { [KEY]: { release: 99, name: 'Test OS 99', why: 'the test wheel needs it' } } };
+    const plan = planRuntime({ home: f.home, platform, arch, uv: UV, engine: 'phonon', release: '20.1.0', pins }).lines;
+    assert.ok(plan.includes('phonon skipped no python layer') && plan.includes('phonon engine unavailable here; choose the kokoro engine'), plan.join(' | '));
+    const bad = await install(f, { engine: 'phonon', pins, release: '20.1.0' });
+    assert.equal(bad.code, 1, 'the person picked Phonon, so a skipped Phonon is a failure');
+    assert.ok(bad.lines.includes('phonon skipped no python layer') && bad.lines.includes('hearing ok'), bad.lines.join(' | '));
+  } finally {
+    f.remove();
+  }
+});
+
+test('claim 15: where the addon does not run, the Phonon engine\'s plan says choose Voicebox and never offers the kokoro engine (issue 674)', () => {
+  const f = fixture();
+  try {
+    // No lock either: the python gap comes first.
+    const bsd = planRuntime({ home: f.home, platform: 'freebsd', arch: 'x64', uv: UV, engine: 'phonon' }).lines;
+    // A lock but no addon: the missing uv comes first.
+    const noAddon = planRuntime({ home: f.home, platform, arch, uv: null, engine: 'phonon', pins: { ...PINS, ARCHIVES: PINS.ARCHIVES.filter(a => a.platform === null) } }).lines;
+    for (const [lines, phononLine] of [[bsd, 'phonon skipped no python layer'], [noAddon, 'phonon skipped no uv']]) {
+      assert.ok(lines.some(l => l.startsWith('addon unavailable ') && l.endsWith('; choose Voicebox')), lines.join(' | '));
+      assert.ok(lines.includes(phononLine), lines.join(' | '));
+      assert.ok(!lines.some(l => l.includes('choose the kokoro engine')), lines.join(' | '));
+    }
+  } finally {
+    f.remove();
+  }
+});
+
+test('claim 15: an engine name that is a key of every object reads as no engine named, and a voice as a Kokoro voice', () => {
+  const f = fixture();
+  try {
+    assert.deepEqual(checkRuntime(f.home, KEY, PINS, 'toString'), checkRuntime(f.home, KEY, PINS));
+    assert.deepEqual(planRuntime({ home: f.home, platform, arch, uv: UV, engine: 'toString', pins: PINS }).lines, planRuntime({ home: f.home, platform, arch, uv: UV, pins: PINS }).lines);
   } finally {
     f.remove();
   }

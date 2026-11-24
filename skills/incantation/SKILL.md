@@ -164,8 +164,9 @@ Do each step in order and stop at the first failure.
    typed. On a later run, with the mic open, a spoken number counts after the say-back.
 5. **Voice.** Run `node <skill base>/scripts/setup.mjs profiles`. Show its lines
    and ask the person for the id of the voice they want, typed on a first install
-   and spoken or typed after that. The list holds only the voices of the engine
-   installed in step 3, each line ending with its engine in brackets.
+   and spoken or typed after that. The list holds the voices of each engine installed,
+   the one from step 3 and any from an earlier install, each line ending with
+   its engine in brackets. If it prints a `setup:` line, show it and stop.
    Recommend a preset on Kokoro when it is listed: a heavier engine costs
    seconds a line.
 6. **Save.** Run `node <skill base>/scripts/setup.mjs choose <index> <stamp> <profile id>`

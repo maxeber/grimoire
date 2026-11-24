@@ -75,7 +75,7 @@ async function check(o) {
   }
   let engine;
   try {
-    engine = o.engine ?? (await loadEngine(settings.engine, settings));
+    engine = o.engine ?? (await loadEngine(settings.engine, { ...settings, home: o.home, platform, arch: o.arch ?? process.arch }));
   } catch {
     return fail('engine');
   }

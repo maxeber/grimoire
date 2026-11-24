@@ -103,8 +103,8 @@ export function makeEngine({ port, profile, home = homedir(), platform = process
   let asr = null;
   const key = platformKey(platform, arch);
   const root = runtimeDir(home);
-  const sid = VOICES[profile] ?? VOICES.bella;
-  const phononVoice = PHONON[profile];
+  const sid = Object.hasOwn(VOICES, profile) ? VOICES[profile] : VOICES.bella;
+  const phononVoice = Object.hasOwn(PHONON, profile) ? PHONON[profile] : undefined;
   let phonon = null;
 
   const loadAddon = load ?? (() => createRequire(import.meta.url)(join(root, 'node_modules', 'sherpa-onnx-node')));
