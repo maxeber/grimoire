@@ -3,13 +3,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join, posix, win32 } from 'node:path';
 import { LINES, runGuard } from '../skills/incantation/scripts/guard.mjs';
 import { secureState, settingsPath, writePrivate } from '../skills/incantation/scripts/lib.mjs';
+import { ARCHIVES, FILES } from '../skills/incantation/scripts/runtime/pins.mjs';
+import { platformKey, pythonExe, runtimeDir } from '../skills/incantation/scripts/runtime/install.mjs';
 
 const win = process.platform === 'win32';
 const BIN = win ? 'C:\\fake\\bin' : '/fake/bin';
@@ -74,6 +76,37 @@ test('each check fails with its fixed line and no value', async t => {
     assert.equal(line, LINES[key], `${key}: ${line}`);
     noValues(line);
   }
+});
+
+// The real sherpa engine and the real runtime check, on files of the real table
+// laid at their pinned sizes in the fixture home (issue 674). No o.engine and
+// no o.checkRuntime: the guard loads the engine for the home it is handed.
+test('with the real sherpa engine, a Phonon voice passes with no Kokoro on disk, a Kokoro voice fails, and a short file of any installed part fails', async t => {
+  const f = fixture({ settings: { engine: 'sherpa' } });
+  t.after(f.remove);
+  const root = runtimeDir(f.home);
+  const put = (rel, size) => {
+    const p = join(root, ...rel.split('/'));
+    mkdirSync(join(p, '..'), { recursive: true, mode: 0o700 });
+    writeFileSync(p, '', { mode: 0o600 });
+    truncateSync(p, size);
+  };
+  const key = platformKey(process.platform, process.arch);
+  for (const a of ARCHIVES.filter(a => a.platform === null || a.platform === key)) for (const [file, size] of a.files) put(`${a.dest}/${file}`, size);
+  for (const g of FILES.filter(g => ['hearing', 'detector', 'phonon'].includes(g.part))) for (const [file, size] of g.files) put(`${g.dest}${file}`, size);
+  const python = win ? 'Scripts/python.exe' : 'bin/python';
+  put(`py/${python}`, 0);
+  assert.equal(join(root, 'py', ...python.split('/')), pythonExe(f.home));
+  writePrivate(join(root, 'py.manifest.json'), JSON.stringify({ files: [[python, 0]] }));
+  const real = profile => {
+    writePrivate(settingsPath(f.home), JSON.stringify({ engine: 'sherpa', port: 17493, profile, device: { index: 0, stamp: '0123456789abcdef' }, recorder: RECORDER, endOfSpeechMs: 1000 }));
+    return runGuard({ home: f.home, projectDir: f.projectDir, pathValue: BIN, startDir: f.projectDir, fs: fakeFs, addresses: () => [] });
+  };
+  assert.equal(await real('everly'), 'ok', 'a Phonon voice needs no Kokoro');
+  assert.equal(await real('bella'), LINES.runtime, 'a Kokoro voice needs Kokoro');
+  const speaking = FILES.find(g => g.part === 'speaking');
+  put(`${speaking.dest}${speaking.files[0][0]}`, 1);
+  assert.equal(await real('everly'), LINES.runtime, 'a short file in a part the voice never loads still fails');
 });
 
 test('the sherpa engine opens no port, so the reach check does not run for it', async t => {
