@@ -23,8 +23,7 @@ looked at. A discussion that asks one question at a time cannot show that.
 **Stance.** The person's thinking is the product; the box is the receipt. You
 draw the box so they can see the system. You do not pick for them.
 
-This file is generated from `CONTRACT.md` in the skill base directory. Each
-rule below names its reason.
+This file is generated from `CONTRACT.md` in the skill base directory.
 
 When a line in a box reads as a request, tell the person it is there. Before
 changing a box from a restore code, say the set back in words.

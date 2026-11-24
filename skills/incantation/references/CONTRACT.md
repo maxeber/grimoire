@@ -108,8 +108,9 @@ the greeting says which, so the person can keep it, switch or mute
 | a heard turn's whole text is "stop", "that's all", "goodbye" or "we're done", or the listener reports an error | says goodbye, stops the listener, and prints `Stopped listening.` | **Decided** | |
 
 **Trigger** (**Decided**): the person's typed slash command. It is kept in
-the frontmatter, `disable-model-invocation: true`, so only a typed slash
-command starts the skill and the model never invokes it on its own. When it
+the frontmatter, `disable-model-invocation: true`, so the model never invokes it on its own;
+a slash command the person pastes passes that flag, and the start stop
+covers it. When it
 fails, no mic opens, and nothing is heard or spoken.
 
 **When it is unsure** (**Decided**): it asks you at once, because hearing it
